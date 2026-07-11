@@ -1253,7 +1253,7 @@ pre code {
     vertical-align: middle;
   }
   .links-of-author a::before {
-    background: #ff81ff;
+    background: #75aaff;
     display: inline-block;
     margin-right: 3px;
     transform: translateY(-2px);
@@ -2937,4 +2937,37 @@ body {
 }
 .dark-mode .num-warning {
   color: #ffc97c;
+}
+.highlight {
+  background: #f7f7f7;
+  color: #383a42;
+}
+.dark-mode .highlight {
+  background: #2d2d2d;
+  color: #ccc;
+}
+.highlight .keyword,
+.highlight .built_in {
+  color: #a626a4;
+}
+.highlight .comment {
+  color: #a0a1a7;
+  font-style: italic;
+}
+.highlight .string {
+  color: #50a14f;
+}
+.highlight .number {
+  color: #986801;
+}
+.highlight .title.class_,
+.highlight .title.function_ {
+  color: #4078f2;
+}
+.highlight .params,
+.highlight .variable {
+  color: #986801;
+}
+.highlight .variable.language_ {
+  color: #e45649;
 }

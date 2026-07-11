@@ -558,7 +558,58 @@
 <li>Claude Opus 4.8 在 1M 上下文中部也有类似问题</li>
 <li><strong>2026 年企业实践中,100K 以上的上下文基本不直接塞 prompt</strong>,而是先做 RAG 预处理</li>
 </ul>
-<h3 id="3-3-子问题-2-成本爆炸——-2026-年的真实账单"><a href="#3-3-子问题-2-成本爆炸——-2026-年的真实账单" class="headerlink" title="3.3 子问题 2:成本爆炸—— 2026 年的真实账单"></a>3.3 子问题 2:成本爆炸—— 2026 年的真实账单</h3><p>| 模型 | 输入 <span class="katex"><span class="katex-mathml"><math xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi mathvariant="normal">/</mi><mi>M</mi><mi mathvariant="normal">∣</mi><mtext>输出</mtext></mrow><annotation encoding="application/x-tex">/M | 输出 </annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height:1em;vertical-align:-0.25em;"></span><span class="mord">/</span><span class="mord mathnormal" style="margin-right:0.109em;">M</span><span class="mord">∣</span><span class="mord cjk_fallback">输出</span></span></span></span>&#x2F;M | 1M token 单次 |<br>|—|—|—|—|<br>| <strong>DeepSeek V4-Flash</strong> | <strong>$0.14</strong> | <strong>$0.28</strong> | <strong>$0.42</strong> |<br>| Gemini 3 Flash-Lite | $0.10 | $0.40 | $0.50 |<br>| GLM-5.2 | $0.88 | $3.51 | $4.39 |<br>| Gemini 3.1 Pro | $2 | $10 | $12 |<br>| GPT-5.4 | $2.5 | $15 | $17.5 |<br>| Claude Sonnet 4.6 | $3 | $15 | $18 |<br>| <strong>Claude Opus 4.8</strong> | <strong>$5</strong> | <strong>$25</strong> | <strong>$30</strong> |</p>
+<h3 id="3-3-子问题-2-成本爆炸——-2026-年的真实账单"><a href="#3-3-子问题-2-成本爆炸——-2026-年的真实账单" class="headerlink" title="3.3 子问题 2:成本爆炸—— 2026 年的真实账单"></a>3.3 子问题 2:成本爆炸—— 2026 年的真实账单</h3><table>
+<thead>
+<tr>
+<th>模型</th>
+<th>输入 $&#x2F;M</th>
+<th>输出 $&#x2F;M</th>
+<th>1M token 单次</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>DeepSeek V4-Flash</strong></td>
+<td><strong>$0.14</strong></td>
+<td><strong>$0.28</strong></td>
+<td><strong>$0.42</strong></td>
+</tr>
+<tr>
+<td>Gemini 3 Flash-Lite</td>
+<td>$0.10</td>
+<td>$0.40</td>
+<td>$0.50</td>
+</tr>
+<tr>
+<td>GLM-5.2</td>
+<td>$0.88</td>
+<td>$3.51</td>
+<td>$4.39</td>
+</tr>
+<tr>
+<td>Gemini 3.1 Pro</td>
+<td>$2</td>
+<td>$10</td>
+<td>$12</td>
+</tr>
+<tr>
+<td>GPT-5.4</td>
+<td>$2.5</td>
+<td>$15</td>
+<td>$17.5</td>
+</tr>
+<tr>
+<td>Claude Sonnet 4.6</td>
+<td>$3</td>
+<td>$15</td>
+<td>$18</td>
+</tr>
+<tr>
+<td><strong>Claude Opus 4.8</strong></td>
+<td><strong>$5</strong></td>
+<td><strong>$25</strong></td>
+<td><strong>$30</strong></td>
+</tr>
+</tbody></table>
 <h3 id="3-4-子问题-3-延迟与子问题-4-位置偏差"><a href="#3-4-子问题-3-延迟与子问题-4-位置偏差" class="headerlink" title="3.4 子问题 3:延迟与子问题 4:位置偏差"></a>3.4 子问题 3:延迟与子问题 4:位置偏差</h3><p><strong>延迟</strong>:1M token 仍然需要 5-10 秒 Prefill。RAG 方案通常 prompt 长度控制在 4K-16K,Prefill 时间毫秒级。</p>
 <p><strong>位置偏差</strong>:开头权重最高,结尾次高,**中段 50% 位置召回率比首尾低 30-50%**。RAG 检索结果的顺序很重要——最相关的放最前面。</p>
 <figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># LangChain LongContextReorder 解决 Lost in the Middle</span></span><br><span class="line"><span class="keyword">from</span> langchain_community.document_transformers <span class="keyword">import</span> LongContextReorder</span><br><span class="line"></span><br><span class="line"><span class="comment"># 检索后重排序:最相关放首尾,不太相关的放中间</span></span><br><span class="line">reordering = LongContextReorder()</span><br><span class="line">reordered_docs = reordering.transform_documents(docs)</span><br></pre></td></tr></table></figure>
