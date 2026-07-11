@@ -28,8 +28,8 @@
 <meta property="og:site_name" content="陌忆的博客">
 <meta property="og:description" content="RAG 学习笔记 · 1.1 LLM 三大缺陷(2026 版)    :root {     --bg-primary: #0a0e1a;     --bg-secondary: #131829;     --bg-card: #1a2138;     --bg-code: #0d1117;     --border: #2a3450;     --text-primary: #e6ed">
 <meta property="og:locale" content="zh_CN">
-<meta property="article:published_time" content="2026-07-11T08:15:55.490Z">
-<meta property="article:modified_time" content="2026-07-11T08:14:13.123Z">
+<meta property="article:published_time" content="2026-07-11T09:46:14.432Z">
+<meta property="article:modified_time" content="2026-07-11T09:46:14.432Z">
 <meta property="article:author" content="陌忆">
 <meta name="twitter:card" content="summary">
 
@@ -247,8 +247,8 @@
     --bg-code: #0d1117;
     --border: #2a3450;
     --text-primary: #e6edf3;
-    --text-secondary: #9da7be;
-    --text-muted: #6b7488;
+    --text-secondary: #c8d0dc;
+    --text-muted: #8b95a8;
     --accent: #7c9eff;
     --accent-glow: rgba(124, 158, 255, 0.15);
     --danger: #ff7a7a;
@@ -638,6 +638,8 @@
     margin: 40px 0;
   }
 </style>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/atom-one-dark.min.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js" defer></script>
 </head>
 <body>
 <div class="container">
@@ -794,7 +796,7 @@
   </table>
 
   <h3>2026 年工程级幻觉治理(多层防线)</h3>
-  <pre><code># 2026 年的工程实践(伪代码)
+  <pre><code class="language-python"># 2026 年的工程实践(伪代码)
 class HallucinationDefense:
     def __init__(self):
         self.consistency_checker = ConsistencyChecker(n_samples=5)  # 一致性
@@ -1028,7 +1030,7 @@ class HallucinationDefense:
   <p><strong>延迟</strong>:1M token 仍然需要 5-10 秒 Prefill。RAG 方案通常 prompt 长度控制在 4K-16K,Prefill 时间毫秒级。</p>
   <p><strong>位置偏差</strong>:开头权重最高,结尾次高,<strong>中段 50% 位置召回率比首尾低 30-50%</strong>。RAG 检索结果的顺序很重要——最相关的放最前面。</p>
 
-  <pre><code># LangChain LongContextReorder 解决 Lost in the Middle
+  <pre><code class="language-python"># LangChain LongContextReorder 解决 Lost in the Middle
 from langchain_community.document_transformers import LongContextReorder
 
 # 检索后重排序:最相关放首尾,不太相关的放中间
@@ -1130,6 +1132,7 @@ reordered_docs = reordering.transform_documents(docs)</code></pre>
   </div>
 
 </div>
+<script defer>hljs.highlightAll();</script>
 </body>
 </html>
 
