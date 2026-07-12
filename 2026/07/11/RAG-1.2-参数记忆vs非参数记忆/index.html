@@ -1,0 +1,627 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width">
+<meta name="theme-color" content="#222"><meta name="generator" content="Hexo 7.3.0">
+<link rel="preconnect" href="https://cdnjs.cloudflare.com" crossorigin>
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon-next.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32-next.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next.png">
+  <link rel="mask-icon" href="/images/logo.svg" color="#222">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/7.0.0/css/all.min.css" integrity="sha256-VHqXKFhhMxcpubYf9xiWdCiojEbY9NexQ4jh8AxbvcM=" crossorigin="anonymous">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/animate.css/3.1.1/animate.min.css" integrity="sha256-PR7ttpcvz8qrF57fur/yAx1qXMFJeJFiA6pSzWi0OIE=" crossorigin="anonymous">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/pace/1.2.4/themes/blue/pace-theme-minimal.css">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pace/1.2.4/pace.min.js" integrity="sha256-gqd7YTjg/BtfqWSwsJOvndl0Bxc8gFImLEkXQT8+qj0=" crossorigin="anonymous" defer></script>
+
+<script class="next-config" data-name="main" type="application/json">{"hostname":"moyi-math.github.io","root":"/","images":"/images","scheme":"Gemini","darkmode":false,"version":"8.28.0","exturl":false,"sidebar":{"position":"left","width_expanded":320,"width_dual_column":240,"display":"post","padding":18,"offset":12},"hljswrap":true,"codeblock":{"theme":{"light":"default","dark":"stackoverflow-dark"},"prism":{"light":"prism","dark":"prism-dark"},"copy_button":{"enable":true,"style":null},"fold":{"enable":false,"height":500},"language":false},"bookmark":{"enable":false,"color":"#222","save":"auto"},"mediumzoom":false,"lazyload":false,"pangu":false,"comments":{"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},"stickytabs":false,"motion":{"enable":true,"async":false,"duration":200,"transition":{"menu_item":"fadeInDown","post_block":"fadeIn","post_header":"fadeInDown","post_body":"fadeInDown","coll_header":"fadeInLeft","sidebar":"fadeInUp"}},"prism":false,"i18n":{"placeholder":"搜索...","empty":"没有找到任何搜索结果：${query}","hits_time":"找到 ${hits} 个搜索结果（用时 ${time} 毫秒）","hits":"找到 ${hits} 个搜索结果"},"path":"/search.json","localsearch":{"enable":true,"top_n_per_article":1,"unescape":false,"preload":false}}</script><script src="/js/config.js" defer></script>
+
+    <meta name="description" content="理解 RAG 的核心原理:为什么 LLM 需要&quot;外挂大脑&quot;——参数记忆与非参数记忆的区别、双记忆系统的协同机制,以及 2026 年的最新演进。">
+<meta property="og:type" content="article">
+<meta property="og:title" content="RAG 学习笔记 · 1.2 参数记忆 vs 非参数记忆——RAG 的核心解法">
+<meta property="og:url" content="https://moyi-math.github.io/2026/07/11/RAG-1.2-%E5%8F%82%E6%95%B0%E8%AE%B0%E5%BF%86vs%E9%9D%9E%E5%8F%82%E6%95%B0%E8%AE%B0%E5%BF%86/index.html">
+<meta property="og:site_name" content="陌忆的博客">
+<meta property="og:description" content="理解 RAG 的核心原理:为什么 LLM 需要&quot;外挂大脑&quot;——参数记忆与非参数记忆的区别、双记忆系统的协同机制,以及 2026 年的最新演进。">
+<meta property="og:locale" content="zh_CN">
+<meta property="article:published_time" content="2026-07-11T14:00:00.000Z">
+<meta property="article:modified_time" content="2026-07-11T14:00:00.000Z">
+<meta property="article:author" content="陌忆">
+<meta property="article:tag" content="RAG">
+<meta property="article:tag" content="LLM">
+<meta property="article:tag" content="参数记忆">
+<meta property="article:tag" content="非参数记忆">
+<meta property="article:tag" content="检索增强">
+<meta property="article:tag" content="知识库">
+<meta property="article:tag" content="2026">
+<meta name="twitter:card" content="summary">
+
+
+<link rel="canonical" href="https://moyi-math.github.io/2026/07/11/RAG-1.2-%E5%8F%82%E6%95%B0%E8%AE%B0%E5%BF%86vs%E9%9D%9E%E5%8F%82%E6%95%B0%E8%AE%B0%E5%BF%86/">
+
+
+<script class="next-config" data-name="page" type="application/json">{"sidebar":"","isHome":false,"isPost":true,"lang":"zh-CN","comments":true,"permalink":"https://moyi-math.github.io/2026/07/11/RAG-1.2-%E5%8F%82%E6%95%B0%E8%AE%B0%E5%BF%86vs%E9%9D%9E%E5%8F%82%E6%95%B0%E8%AE%B0%E5%BF%86/","path":"2026/07/11/RAG-1.2-参数记忆vs非参数记忆/","title":"RAG 学习笔记 · 1.2 参数记忆 vs 非参数记忆——RAG 的核心解法"}</script>
+
+<script class="next-config" data-name="calendar" type="application/json">""</script>
+<title>RAG 学习笔记 · 1.2 参数记忆 vs 非参数记忆——RAG 的核心解法 | 陌忆的博客</title>
+  
+
+
+
+
+
+
+
+
+  
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/animejs/3.2.1/anime.min.js" integrity="sha256-XL2inqUJaslATFnHdJOi9GfQ60on8Wx1C2H8DYiN1xY=" crossorigin="anonymous" defer></script>
+<script src="/js/utils.js" defer></script><script src="/js/motion.js" defer></script><script src="/js/sidebar.js" defer></script><script src="/js/next-boot.js" defer></script>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/hexo-generator-searchdb/1.5.0/search.js" integrity="sha256-xFC6PJ82SL9b3WkGjFavNiA9gm5z6UBxWPiu4CYjptg=" crossorigin="anonymous" defer></script>
+<script src="/js/third-party/search/local-search.js" defer></script>
+
+
+
+
+
+  <script src="/js/third-party/pace.js" defer></script>
+
+
+  
+
+
+
+
+  
+
+  <script class="next-config" data-name="enableMath" type="application/json">false</script><link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/katex.min.css" integrity="sha256-UF1fgpAiu3tPJN/uCqEUHNe7pnr+QR0SQDNfgglgtcM=" crossorigin="anonymous">
+
+
+<link rel="preconnect" href="https://cdn.jsdelivr.net">
+<link rel="preconnect" href="https://cdn.bootcss.com">
+
+  <noscript>
+    <link rel="stylesheet" href="/css/noscript.css">
+  </noscript>
+<!-- hexo injector head_end start --><link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/katex.min.css" integrity="sha512-fHwaWebuwA7NSF5Qg/af4UeDx9XqUpYpOGgubo3yWu+b2IQR4UeQwbb42Ti7gVAjNtVoI/I9TEoYeu9omwcC6g==" crossorigin="anonymous" referrerpolicy="no-referrer" /><!-- hexo injector head_end end --></head>
+
+<body itemscope itemtype="http://schema.org/WebPage" class="use-motion">
+  <div class="headband"></div>
+
+  <main class="main">
+    <div class="column">
+      <header class="header" itemscope itemtype="http://schema.org/WPHeader"><div class="site-brand-container">
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="切换导航栏" role="button">
+        <span class="toggle-line"></span>
+        <span class="toggle-line"></span>
+        <span class="toggle-line"></span>
+    </div>
+  </div>
+
+  <div class="site-meta">
+
+    <a href="/" class="brand" rel="start">
+      <i class="logo-line"></i>
+      <p class="site-title">陌忆的博客</p>
+      <i class="logo-line"></i>
+    </a>
+      <p class="site-subtitle" itemprop="description">数据库无法得出结论</p>
+  </div>
+
+  <div class="site-nav-right">
+    <div class="toggle popup-trigger" aria-label="搜索" role="button">
+        <i class="fa fa-search fa-fw fa-lg"></i>
+    </div>
+  </div>
+</div>
+
+
+
+<nav class="site-nav">
+  <ul class="main-menu menu"><li class="menu-item menu-item-home"><a href="/" rel="section"><i class="fa fa-home fa-fw"></i>首页</a></li><li class="menu-item menu-item-about"><a href="/about/" rel="section"><i class="fa fa-user fa-fw"></i>关于</a></li><li class="menu-item menu-item-tags"><a href="/tags/" rel="section"><i class="fa fa-tags fa-fw"></i>标签</a></li><li class="menu-item menu-item-categories"><a href="/categories/" rel="section"><i class="fa fa-th fa-fw"></i>分类</a></li><li class="menu-item menu-item-archives"><a href="/archives/" rel="section"><i class="fa fa-archive fa-fw"></i>归档</a></li>
+      <li class="menu-item menu-item-search">
+        <a role="button" class="popup-trigger"><i class="fa fa-search fa-fw"></i>搜索
+        </a>
+      </li>
+  </ul>
+</nav>
+
+
+
+  <div class="search-pop-overlay">
+    <div class="popup search-popup">
+      <div class="search-header">
+        <span class="search-icon">
+          <i class="fa fa-search"></i>
+        </span>
+        <div class="search-input-container">
+          <input autocomplete="off" autocapitalize="off" maxlength="80"
+                placeholder="搜索..." spellcheck="false"
+                type="search" class="search-input">
+        </div>
+        <span class="popup-btn-close" role="button">
+          <i class="fa fa-times-circle"></i>
+        </span>
+      </div>
+      <div class="search-result-container">
+        <div class="search-result-icon">
+          <i class="fa fa-spinner fa-pulse fa-5x"></i>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</header>
+        
+  
+  <aside class="sidebar">
+
+    <div class="sidebar-inner sidebar-nav-active sidebar-toc-active">
+      <ul class="sidebar-nav">
+        <li class="sidebar-nav-toc">
+          文章目录
+        </li>
+        <li class="sidebar-nav-overview">
+          站点概览
+        </li>
+      </ul>
+
+      <div class="sidebar-panel-container">
+        <!--noindex-->
+        <div class="post-toc-wrap sidebar-panel">
+            <div class="post-toc animated"><ol class="nav"><li class="nav-item nav-level-1"><a class="nav-link" href="#RAG-%E5%AD%A6%E4%B9%A0%E7%AC%94%E8%AE%B0-%C2%B7-1-2-%E5%8F%82%E6%95%B0%E8%AE%B0%E5%BF%86-vs-%E9%9D%9E%E5%8F%82%E6%95%B0%E8%AE%B0%E5%BF%86%E2%80%94%E2%80%94RAG-%E7%9A%84%E6%A0%B8%E5%BF%83%E8%A7%A3%E6%B3%95"><span class="nav-text">RAG 学习笔记 · 1.2 参数记忆 vs 非参数记忆——RAG 的核心解法</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#%E4%B8%80%E3%80%81%E4%B8%A4%E7%A7%8D%E2%80%9D%E8%AE%B0%E5%BF%86%E2%80%9D%E6%96%B9%E5%BC%8F"><span class="nav-text">一、两种”记忆”方式</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E4%BA%8C%E3%80%81%E4%B8%BA%E4%BB%80%E4%B9%88-LLM-%E5%8F%AA%E6%9C%89%E2%80%9D%E5%8F%82%E6%95%B0%E8%AE%B0%E5%BF%86%E2%80%9D%E4%BC%9A%E5%87%BA%E9%97%AE%E9%A2%98"><span class="nav-text">二、为什么 LLM 只有”参数记忆”会出问题?</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#1-%E5%AD%98%E5%82%A8%E5%AF%86%E5%BA%A6%E4%BD%8E"><span class="nav-text">1. 存储密度低</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#2-%E5%86%99%E5%85%A5%E4%BB%A3%E4%BB%B7%E6%9E%81%E9%AB%98"><span class="nav-text">2. 写入代价极高</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#3-%E6%A3%80%E7%B4%A2%E4%B8%8D%E5%8F%AF%E6%8E%A7"><span class="nav-text">3. 检索不可控</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E4%B8%89%E3%80%81%E9%9D%9E%E5%8F%82%E6%95%B0%E8%AE%B0%E5%BF%86%E6%80%8E%E4%B9%88%E2%80%9D%E8%A1%A5%E2%80%9D%E8%BF%99%E4%BA%9B%E7%9F%AD%E6%9D%BF"><span class="nav-text">三、非参数记忆怎么”补”这些短板?</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#%E5%85%B8%E5%9E%8B%E6%B5%81%E7%A8%8B"><span class="nav-text">典型流程</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E4%B8%80%E4%B8%AA%E7%9B%B4%E8%A7%89%E5%8C%96%E7%9A%84%E6%AF%94%E5%96%BB"><span class="nav-text">一个直觉化的比喻</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%9B%9B%E3%80%81%E5%AE%9E%E9%99%85%E5%B7%A5%E4%BD%9C%E6%B5%81%E7%9A%84%E5%AF%B9%E6%AF%94"><span class="nav-text">四、实际工作流的对比</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#%E5%9C%BA%E6%99%AF-%E9%97%AE-%E2%80%9CGLM-5-2-%E6%98%AF%E4%BB%80%E4%B9%88%E6%97%B6%E5%80%99%E5%8F%91%E5%B8%83%E7%9A%84-%E2%80%9D"><span class="nav-text">场景:问 “GLM-5.2 是什么时候发布的?”</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E4%BA%94%E3%80%81RAG-%E5%8E%9F%E5%A7%8B%E8%AE%BA%E6%96%87%E7%9A%84%E6%A0%B8%E5%BF%83%E8%AE%BA%E7%82%B9-2020"><span class="nav-text">五、RAG 原始论文的核心论点(2020)</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%85%AD%E3%80%812026-%E5%B9%B4%E8%A7%86%E8%A7%92-%E4%B8%A4%E7%A7%8D%E8%AE%B0%E5%BF%86%E7%9A%84%E8%BE%B9%E7%95%8C%E6%AD%A3%E5%9C%A8%E6%A8%A1%E7%B3%8A"><span class="nav-text">六、2026 年视角:两种记忆的边界正在模糊</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#1-%E5%8F%82%E6%95%B0%E4%BE%A7-%E6%A8%A1%E5%9E%8B%E8%B6%8A%E6%9D%A5%E8%B6%8A%E5%A4%A7-%E8%AE%B0%E5%BF%86%E8%83%BD%E5%8A%9B%E8%B6%8A%E6%9D%A5%E8%B6%8A%E5%BC%BA"><span class="nav-text">1. 参数侧:模型越来越大,记忆能力越来越强</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#2-%E9%9D%9E%E5%8F%82%E6%95%B0%E4%BE%A7-%E6%A3%80%E7%B4%A2%E8%83%BD%E5%8A%9B%E8%B6%8A%E6%9D%A5%E8%B6%8A%E5%BC%BA"><span class="nav-text">2. 非参数侧:检索能力越来越强</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#3-%E8%9E%8D%E5%90%88%E4%BE%A7-%E9%95%BF%E6%9C%9F%E8%AE%B0%E5%BF%86%E7%B3%BB%E7%BB%9F-Memory-Augmented-AI"><span class="nav-text">3. 融合侧:长期记忆系统(Memory-Augmented AI)</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E4%B8%83%E3%80%81%E6%9C%AC%E8%8A%82%E6%A0%B8%E5%BF%83%E8%A6%81%E7%82%B9"><span class="nav-text">七、本节核心要点</span></a></li></ol></li></ol></div>
+        </div>
+        <!--/noindex-->
+
+        <div class="site-overview-wrap sidebar-panel">
+          <div class="site-author animated" itemprop="author" itemscope itemtype="http://schema.org/Person">
+    <img class="site-author-image" itemprop="image" alt="陌忆"
+      src="/images/avatar.webp">
+  <p class="site-author-name" itemprop="name">陌忆</p>
+  <div class="site-description" itemprop="description">欢迎来到我的世界💜</div>
+</div>
+<div class="site-state-wrap animated">
+  <nav class="site-state">
+      <div class="site-state-item site-state-posts">
+        <a href="/archives/">
+          <span class="site-state-item-count">4</span>
+          <span class="site-state-item-name">日志</span>
+        </a>
+      </div>
+      <div class="site-state-item site-state-categories">
+          <a href="/categories/">
+        <span class="site-state-item-count">2</span>
+        <span class="site-state-item-name">分类</span></a>
+      </div>
+      <div class="site-state-item site-state-tags">
+          <a href="/tags/">
+        <span class="site-state-item-count">15</span>
+        <span class="site-state-item-name">标签</span></a>
+      </div>
+  </nav>
+</div>
+  <div class="cc-license animated" itemprop="license">
+    <a href="https://creativecommons.org/licenses/by-nc-sa/4.0/" class="cc-opacity" rel="noopener" target="_blank"><img src="https://cdnjs.cloudflare.com/ajax/libs/creativecommons-vocabulary/2020.11.3/assets/license_badges/small/by_nc_sa.svg" alt="Creative Commons"></a>
+  </div>
+
+        </div>
+      </div>
+    </div>
+
+    
+  </aside>
+
+
+    </div>
+
+    <div class="main-inner post posts-expand">
+
+
+  
+
+
+<div class="post-block">
+  
+  
+
+  <article itemscope itemtype="http://schema.org/Article" class="post-content" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="https://moyi-math.github.io/2026/07/11/RAG-1.2-%E5%8F%82%E6%95%B0%E8%AE%B0%E5%BF%86vs%E9%9D%9E%E5%8F%82%E6%95%B0%E8%AE%B0%E5%BF%86/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.webp">
+      <meta itemprop="name" content="陌忆">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="陌忆的博客">
+      <meta itemprop="description" content="欢迎来到我的世界💜">
+    </span>
+
+    <span hidden itemprop="post" itemscope itemtype="http://schema.org/CreativeWork">
+      <meta itemprop="name" content="RAG 学习笔记 · 1.2 参数记忆 vs 非参数记忆——RAG 的核心解法 | 陌忆的博客">
+      <meta itemprop="description" content="理解 RAG 的核心原理:为什么 LLM 需要&quot;外挂大脑&quot;——参数记忆与非参数记忆的区别、双记忆系统的协同机制,以及 2026 年的最新演进。">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          RAG 学习笔记 · 1.2 参数记忆 vs 非参数记忆——RAG 的核心解法
+        </h1>
+
+        <div class="post-meta-container">
+          <div class="post-meta">
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-calendar"></i>
+      </span>
+      <span class="post-meta-item-text">发表于</span>
+
+      <time title="创建时间：2026-07-11 22:00:00" itemprop="dateCreated datePublished" datetime="2026-07-11T22:00:00+08:00">2026-07-11</time>
+    </span>
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-folder"></i>
+      </span>
+      <span class="post-meta-item-text">分类于</span>
+        <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+          <a href="/categories/RAG%E5%AD%A6%E4%B9%A0%E7%AC%94%E8%AE%B0/" itemprop="url" rel="index"><span itemprop="name">RAG学习笔记</span></a>
+        </span>
+    </span>
+
+  
+    <span class="post-meta-break"></span>
+    <span class="post-meta-item" title="本文字数">
+      <span class="post-meta-item-icon">
+        <i class="far fa-file-word"></i>
+      </span>
+      <span class="post-meta-item-text">本文字数：</span>
+      <span>1.7k</span>
+    </span>
+    <span class="post-meta-item" title="阅读时长">
+      <span class="post-meta-item-icon">
+        <i class="far fa-clock"></i>
+      </span>
+      <span class="post-meta-item-text">阅读时长 &asymp;</span>
+      <span>6 分钟</span>
+    </span>
+</div>
+
+            <div class="post-description">理解 RAG 的核心原理:为什么 LLM 需要"外挂大脑"——参数记忆与非参数记忆的区别、双记忆系统的协同机制,以及 2026 年的最新演进。</div>
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody"><h1 id="RAG-学习笔记-·-1-2-参数记忆-vs-非参数记忆——RAG-的核心解法"><a href="#RAG-学习笔记-·-1-2-参数记忆-vs-非参数记忆——RAG-的核心解法" class="headerlink" title="RAG 学习笔记 · 1.2 参数记忆 vs 非参数记忆——RAG 的核心解法"></a>RAG 学习笔记 · 1.2 参数记忆 vs 非参数记忆——RAG 的核心解法</h1><blockquote>
+<p><strong>章节定位:</strong> 1.1 我们聊了 LLM 三大缺陷(幻觉 &#x2F; 知识截止 &#x2F; 上下文窗口),本节看 RAG 怎么从原理上解决这些缺陷——两种”记忆”的区别。</p>
+</blockquote>
+<hr>
+<h2 id="一、两种”记忆”方式"><a href="#一、两种”记忆”方式" class="headerlink" title="一、两种”记忆”方式"></a>一、两种”记忆”方式</h2><p>想象一下你学习一门新知识,有两种方式:</p>
+<ul>
+<li><strong>死记硬背</strong>:把整本教材背下来,考试时从脑子里”回忆”</li>
+<li><strong>开卷考试</strong>:考试时翻书、查资料,只需要会”用”资料</li>
+</ul>
+<p>LLM 也有这两种方式,只是换了个名字:</p>
+<table>
+<thead>
+<tr>
+<th>维度</th>
+<th>参数记忆(Parametric Memory)</th>
+<th>非参数记忆(Non-Parametric Memory)</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>存储在哪</strong></td>
+<td>模型参数里(几百亿到几万亿个数字)</td>
+<td>外部数据库、向量库、文件系统</td>
+</tr>
+<tr>
+<td><strong>怎么获取</strong></td>
+<td>前向推理时激活相关参数</td>
+<td>检索时查询、读取、拼到 prompt 里</td>
+</tr>
+<tr>
+<td><strong>更新成本</strong></td>
+<td>重训或微调(几十万到几亿美元)</td>
+<td>增删文档或重建索引(几分钱)</td>
+</tr>
+<tr>
+<td><strong>更新速度</strong></td>
+<td>月级到年级</td>
+<td>实时(秒级)</td>
+</tr>
+<tr>
+<td><strong>容量上限</strong></td>
+<td>受限于模型大小</td>
+<td>几乎无限(取决于磁盘)</td>
+</tr>
+<tr>
+<td><strong>可解释性</strong></td>
+<td>差(黑盒)</td>
+<td>强(可追溯到具体文档)</td>
+</tr>
+<tr>
+<td><strong>知识粒度</strong></td>
+<td>模糊(分布式的)</td>
+<td>精确(可逐条引用)</td>
+</tr>
+</tbody></table>
+<blockquote>
+<p>🎯 <strong>一句话总结</strong>:RAG 的本质是给 LLM 装一个**”外挂大脑”**,让 LLM 在自己”脑子”之外,还能”翻资料”。</p>
+</blockquote>
+<hr>
+<h2 id="二、为什么-LLM-只有”参数记忆”会出问题"><a href="#二、为什么-LLM-只有”参数记忆”会出问题" class="headerlink" title="二、为什么 LLM 只有”参数记忆”会出问题?"></a>二、为什么 LLM 只有”参数记忆”会出问题?</h2><h3 id="1-存储密度低"><a href="#1-存储密度低" class="headerlink" title="1. 存储密度低"></a>1. 存储密度低</h3><p>GPT-4 估计有 1.8 万亿参数,GLM-5 是 744B(激活 40B)。听起来很大,但<strong>实际能”记住”的信息量</strong>远小于训练数据量。</p>
+<p>训练数据是几十 TB 的清洗后文本,压缩到几百 GB 的参数里,<strong>压缩比超过 50:1</strong>——大量细节被丢掉了:</p>
+<ul>
+<li>罕见的人名、地名、术语</li>
+<li>长尾事实(冷门的历史事件、小众的学术引用)</li>
+<li>精确的数字、日期、版本号</li>
+<li>私有知识(企业内部文档、个人笔记)</li>
+</ul>
+<h3 id="2-写入代价极高"><a href="#2-写入代价极高" class="headerlink" title="2. 写入代价极高"></a>2. 写入代价极高</h3><p>想让模型”记住”一个新事实,比如”GLM-5.2 在 2026 年 6 月 17 日发布”:</p>
+<ul>
+<li>准备相关训练数据</li>
+<li>走一遍完整的 fine-tuning 或 continued pretraining</li>
+<li>几万 GPU 小时</li>
+<li>几万到几百万美元</li>
+</ul>
+<p>而同样的信息,<strong>用 RAG 只需要往向量库里加一条文档,几秒钟搞定</strong>。</p>
+<h3 id="3-检索不可控"><a href="#3-检索不可控" class="headerlink" title="3. 检索不可控"></a>3. 检索不可控</h3><ul>
+<li>模型”记住”了什么?——只有 LLM 自己的 attention 模式知道,人类无从知晓</li>
+<li>模型会”忘记”或”混淆”相似的知识(比如把 GLM-5 和 GLM-5.2 搞混)</li>
+<li>难以做精确的引用和溯源——<strong>幻觉就是这么来的</strong></li>
+</ul>
+<hr>
+<h2 id="三、非参数记忆怎么”补”这些短板"><a href="#三、非参数记忆怎么”补”这些短板" class="headerlink" title="三、非参数记忆怎么”补”这些短板?"></a>三、非参数记忆怎么”补”这些短板?</h2><p>RAG 的核心机制:<strong>把”知识”和”推理”解耦</strong>。</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line">┌─────────────────────────────────────┐</span><br><span class="line">│  LLM 负责:理解问题 + 推理 + 生成       │  ← 参数记忆</span><br><span class="line">├─────────────────────────────────────┤</span><br><span class="line">│  知识库负责:存储 + 检索 + 召回        │  ← 非参数记忆</span><br><span class="line">└─────────────────────────────────────┘</span><br></pre></td></tr></table></figure>
+
+<h3 id="典型流程"><a href="#典型流程" class="headerlink" title="典型流程"></a>典型流程</h3><p><strong>离线(构建知识库)</strong>:</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">原始文档 → 切块(chunks) → 向量化(embeddings) → 存入向量库</span><br></pre></td></tr></table></figure>
+
+<p><strong>在线(回答问题)</strong>:</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line">用户问题 → 问题向量化</span><br><span class="line">        → 在向量库中检索最相关的 top-K 块</span><br><span class="line">        → 把这些块拼到 prompt 里(作为参考资料)</span><br><span class="line">        → LLM 基于这些参考资料生成答案</span><br><span class="line">        → 答案 + 引用来源</span><br></pre></td></tr></table></figure>
+
+<h3 id="一个直觉化的比喻"><a href="#一个直觉化的比喻" class="headerlink" title="一个直觉化的比喻"></a>一个直觉化的比喻</h3><blockquote>
+<p>原来:让一个人<strong>背下整本百科全书</strong>(参数化)</p>
+<p>现在:让一个人<strong>会查百科全书</strong>(检索增强)</p>
+</blockquote>
+<p>前者耗时长、记得不牢、还容易记错;后者省力、随时查新东西、还能精确引用。</p>
+<hr>
+<h2 id="四、实际工作流的对比"><a href="#四、实际工作流的对比" class="headerlink" title="四、实际工作流的对比"></a>四、实际工作流的对比</h2><h3 id="场景-问-“GLM-5-2-是什么时候发布的-”"><a href="#场景-问-“GLM-5-2-是什么时候发布的-”" class="headerlink" title="场景:问 “GLM-5.2 是什么时候发布的?”"></a>场景:问 “GLM-5.2 是什么时候发布的?”</h3><p><strong>纯参数记忆</strong>(传统 LLM):</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">用户:GLM-5.2 是什么时候发布的?</span><br><span class="line">LLM:(从参数中&quot;回忆&quot;)...  2025 年?不,2026 年?不,2025 年 12 月?...</span><br></pre></td></tr></table></figure>
+<p>→ 容易说错,因为是从模糊的”参数分布”中猜的。</p>
+<p><strong>纯非参数记忆</strong>(纯 RAG,无 LLM 推理):</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">检索:[&quot;GLM-5.2 2026.06.17 发布&quot;] → 找到原文</span><br><span class="line">返回:直接返回原文</span><br></pre></td></tr></table></figure>
+<p>→ 准确但机械,无法做总结、对比、推理。</p>
+<p><strong>RAG(参数记忆 + 非参数记忆协同)</strong>:</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">检索:[&quot;GLM-5.2 2026.06.17 发布&quot;, &quot;GLM-5 2026.02.12 发布&quot;]</span><br><span class="line">LLM(基于检索结果):&quot;GLM-5.2 是智谱在 2026 年 6 月 17 日发布的最新旗舰,</span><br><span class="line">                前作 GLM-5 在 2026 年 2 月 12 日发布。两次发布间隔约 4 个月...&quot;</span><br></pre></td></tr></table></figure>
+<p>→ 既准确,又能综合、推理、对比、总结。</p>
+<p>这就是 RAG 的魔力——**不是替代 LLM 的能力,而是给 LLM 一个可靠的”参考资料库”**。</p>
+<hr>
+<h2 id="五、RAG-原始论文的核心论点-2020"><a href="#五、RAG-原始论文的核心论点-2020" class="headerlink" title="五、RAG 原始论文的核心论点(2020)"></a>五、RAG 原始论文的核心论点(2020)</h2><p>2020 年 Patrick Lewis 等人提出 RAG 时,论文的核心论点就一句话:</p>
+<blockquote>
+<p><strong>“RAG combines a pre-trained retriever (non-parametric memory) with a pre-trained seq2seq generator (parametric memory).”</strong></p>
+</blockquote>
+<p>也就是<strong>显式地把两种记忆融合</strong>:</p>
+<ul>
+<li><strong>Retriever(DPR)</strong>:基于密集向量检索,负责非参数记忆</li>
+<li><strong>Generator(BART)</strong>:基于参数化的 seq2seq,负责生成</li>
+</ul>
+<p>后续的所有 Advanced RAG、Agentic RAG、GraphRAG,本质上都在优化这个双系统架构的某个环节。</p>
+<hr>
+<h2 id="六、2026-年视角-两种记忆的边界正在模糊"><a href="#六、2026-年视角-两种记忆的边界正在模糊" class="headerlink" title="六、2026 年视角:两种记忆的边界正在模糊"></a>六、2026 年视角:两种记忆的边界正在模糊</h2><h3 id="1-参数侧-模型越来越大-记忆能力越来越强"><a href="#1-参数侧-模型越来越大-记忆能力越来越强" class="headerlink" title="1. 参数侧:模型越来越大,记忆能力越来越强"></a>1. 参数侧:模型越来越大,记忆能力越来越强</h3><ul>
+<li>GPT-4:1.8T 参数</li>
+<li>GLM-5:744B(激活 40B),训练数据 28.5T tokens</li>
+<li>下一代模型传闻 10T+</li>
+</ul>
+<p>更大的参数能记住更多事实,**但仍然解决不了”私有数据 100% 缺失”**——企业内文档、个人笔记、行业资料,模型从训练阶段就完全没见过。</p>
+<h3 id="2-非参数侧-检索能力越来越强"><a href="#2-非参数侧-检索能力越来越强" class="headerlink" title="2. 非参数侧:检索能力越来越强"></a>2. 非参数侧:检索能力越来越强</h3><table>
+<thead>
+<tr>
+<th>时期</th>
+<th>主要技术</th>
+<th>特点</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>早期(~2018)</td>
+<td>BM25 关键词匹配</td>
+<td>精确但无法语义理解</td>
+</tr>
+<tr>
+<td>2020-2023</td>
+<td>向量检索(DPR、Contriever)</td>
+<td>语义匹配,但有 lost in the middle</td>
+</tr>
+<tr>
+<td>2023-2025</td>
+<td>Hybrid Search(BM25 + 向量)+ Reranker</td>
+<td>召回+精排两阶段</td>
+</tr>
+<tr>
+<td>2025-2026</td>
+<td>Agentic RAG、GraphRAG、ColBERT</td>
+<td>检索成为行动循环的一部分</td>
+</tr>
+</tbody></table>
+<h3 id="3-融合侧-长期记忆系统-Memory-Augmented-AI"><a href="#3-融合侧-长期记忆系统-Memory-Augmented-AI" class="headerlink" title="3. 融合侧:长期记忆系统(Memory-Augmented AI)"></a>3. 融合侧:长期记忆系统(Memory-Augmented AI)</h3><p>2026 年最热的方向是**”让 AI 拥有持续记忆”**:</p>
+<ul>
+<li>AI 不再每次重新检索,而是<strong>形成用户画像、记录历史决策、持续更新知识状态</strong></li>
+<li>代表工作:MemVerse(多模态记忆)、ACE(Agentic Context Engineering)</li>
+<li>这让 RAG 从”外部知识补丁”变成”AI 认知结构的一部分”</li>
+</ul>
+<hr>
+<h2 id="七、本节核心要点"><a href="#七、本节核心要点" class="headerlink" title="七、本节核心要点"></a>七、本节核心要点</h2><ol>
+<li><strong>两种记忆的本质区别</strong>:参数记忆内化在模型里,非参数记忆存储在外部;前者快但难更新,后者慢但灵活。</li>
+<li><strong>RAG 不是替代 LLM,而是给 LLM 装”外挂大脑”</strong>:LLM 不用”学”所有知识,只需要”会读 + 会用”资料。</li>
+<li><strong>2026 年的双记忆协同</strong>:参数侧持续变大(更强的内化知识),非参数侧持续变强(GraphRAG、Agentic),融合侧出现长期记忆系统。</li>
+<li><strong>RAG 解决的是结构性问题</strong>:企业私有数据 100% 缺失、知识截止的物理限制、长尾事实的存储密度问题——这些不是更大模型能解决的,必须靠非参数记忆补。</li>
+</ol>
+<hr>
+<blockquote>
+<p><strong>下一步:</strong> 1.3 Naive RAG → Advanced RAG → Modular RAG 演进</p>
+</blockquote>
+
+    </div>
+
+    
+    
+    
+
+    <footer class="post-footer">
+          
+
+<div class="post-copyright">
+<ul>
+  <li class="post-copyright-author">
+      <strong>本文作者： </strong>陌忆
+  </li>
+  <li class="post-copyright-link">
+      <strong>本文链接：</strong>
+      <a href="https://moyi-math.github.io/2026/07/11/RAG-1.2-%E5%8F%82%E6%95%B0%E8%AE%B0%E5%BF%86vs%E9%9D%9E%E5%8F%82%E6%95%B0%E8%AE%B0%E5%BF%86/" title="RAG 学习笔记 · 1.2 参数记忆 vs 非参数记忆——RAG 的核心解法">https://moyi-math.github.io/2026/07/11/RAG-1.2-参数记忆vs非参数记忆/</a>
+  </li>
+  <li class="post-copyright-license">
+      <strong>版权声明： </strong>本博客所有文章除特别声明外，均采用 <a href="https://creativecommons.org/licenses/by-nc-sa/4.0/" rel="noopener" target="_blank"><i class="fab fa-fw fa-creative-commons"></i>BY-NC-SA</a> 许可协议。转载请注明出处！
+  </li>
+</ul>
+</div>
+
+          <div class="post-tags">
+              <a href="/tags/RAG/" rel="tag"># RAG</a>
+              <a href="/tags/LLM/" rel="tag"># LLM</a>
+              <a href="/tags/%E5%8F%82%E6%95%B0%E8%AE%B0%E5%BF%86/" rel="tag"># 参数记忆</a>
+              <a href="/tags/%E9%9D%9E%E5%8F%82%E6%95%B0%E8%AE%B0%E5%BF%86/" rel="tag"># 非参数记忆</a>
+              <a href="/tags/%E6%A3%80%E7%B4%A2%E5%A2%9E%E5%BC%BA/" rel="tag"># 检索增强</a>
+              <a href="/tags/%E7%9F%A5%E8%AF%86%E5%BA%93/" rel="tag"># 知识库</a>
+              <a href="/tags/2026/" rel="tag"># 2026</a>
+          </div>
+
+        
+
+          <div class="post-nav">
+            <div class="post-nav-item">
+                <a href="/2026/07/11/RAG-1.1-LLM%E4%B8%89%E5%A4%A7%E7%BC%BA%E9%99%B7/" rel="prev" title="RAG 学习笔记 · 1.1 LLM 三大缺陷">
+                  <i class="fa fa-angle-left"></i> RAG 学习笔记 · 1.1 LLM 三大缺陷
+                </a>
+            </div>
+            <div class="post-nav-item">
+                <a href="/2026/07/12/RAG-1.3-RAG%E5%9F%BA%E7%A1%80%E6%A6%82%E5%BF%B5%E4%B8%8E%E5%B7%A5%E4%BD%9C%E5%8E%9F%E7%90%86/" rel="next" title="RAG 学习笔记 · 1.3 RAG 基础概念与工作原理">
+                  RAG 学习笔记 · 1.3 RAG 基础概念与工作原理 <i class="fa fa-angle-right"></i>
+                </a>
+            </div>
+          </div>
+    </footer>
+  </article>
+</div>
+
+
+
+
+
+
+</div>
+  </main>
+
+  <footer class="footer">
+    <div class="footer-inner">
+
+  <div class="copyright">
+    &copy; 
+    <span itemprop="copyrightYear">2026</span>
+    <span class="with-love">
+      <i class="fa fa-heart"></i>
+    </span>
+    <span class="author" itemprop="copyrightHolder">陌忆</span>
+  </div>
+<div class="wordcount">
+  <span class="post-meta-item">
+    <span class="post-meta-item-icon">
+      <i class="fa fa-chart-line"></i>
+    </span>
+    <span title="站点总字数">9k</span>
+  </span>
+  <span class="post-meta-item">
+    <span class="post-meta-item-icon">
+      <i class="fa fa-coffee"></i>
+    </span>
+    <span title="站点阅读时长">34 分钟</span>
+  </span>
+</div>
+
+    </div>
+  </footer>
+
+  
+  <div class="toggle sidebar-toggle" role="button">
+    <span class="toggle-line"></span>
+    <span class="toggle-line"></span>
+    <span class="toggle-line"></span>
+  </div>
+  <div class="sidebar-dimmer"></div>
+  <div class="back-to-top" role="button" aria-label="返回顶部">
+    <i class="fa fa-arrow-up fa-lg"></i>
+    <span>0%</span>
+  </div>
+
+<noscript>
+  <div class="noscript-warning">Theme NexT works best with JavaScript enabled</div>
+</noscript>
+<!-- canvas-nest particle background -->
+<script defer>
+(function() {
+  var s = document.createElement("script");
+  s.src = "//cdn.bootcss.com/canvas-nest.js/1.0.0/canvas-nest.min.js";
+  s.setAttribute("count", "150");
+  s.setAttribute("opacity", "1");
+  document.body.appendChild(s);
+})();
+</script>
+
+<!-- Live2D widget -->
+<script defer src="/live2dw/lib/L2Dwidget.min.js"></script>
+<script defer>
+L2Dwidget.init({
+  "pluginRootPath": "live2dw/",
+  "pluginJsPath": "lib/",
+  "pluginModelPath": "assets/",
+  "tagMode": false,
+  "debug": false,
+  "model": {"jsonPath": "/live2dw/assets/assets/shizuku.model.json"},
+  "display": {"position": "right", "width": 150, "height": 300},
+  "mobile": {"show": true},
+  "log": false
+});
+</script>
+
+<!-- Page click heart effect -->
+<script defer src="/js/clicklove.js"></script>
+
+<!-- Site running time -->
+<span id="timeDate"></span>
+<script>
+var now = new Date();
+function createtime() {
+  var grt = new Date("11/17/2022 8:00:00");
+  now.setTime(now.getTime() + 250);
+  var days = (now - grt) / 1000 / 60 / 60 / 24;
+  var dnum = Math.floor(days);
+  var hours = (now - grt) / 1000 / 60 / 60 - (24 * dnum);
+  var hnum = Math.floor(hours);
+  if (String(hnum).length == 1) hnum = "0" + hnum;
+  var minutes = (now - grt) / 1000 / 60 - (24 * 60 * dnum) - (60 * hnum);
+  var mnum = Math.floor(minutes);
+  if (String(mnum).length == 1) mnum = "0" + mnum;
+  var seconds = (now - grt) / 1000 - (24 * 60 * 60 * dnum) - (60 * 60 * hnum) - (60 * mnum);
+  var snum = Math.round(seconds);
+  if (String(snum).length == 1) snum = "0" + snum;
+  document.getElementById("timeDate").innerHTML = "本站已安全运行 " + dnum + " 天 " + hnum + " 小时 " + mnum + " 分 " + snum + " 秒";
+}
+setInterval(createtime, 1000);
+</script>
+
+</body>
+</html>

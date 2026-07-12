@@ -1,0 +1,898 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width">
+<meta name="theme-color" content="#222"><meta name="generator" content="Hexo 7.3.0">
+<link rel="preconnect" href="https://cdnjs.cloudflare.com" crossorigin>
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon-next.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32-next.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next.png">
+  <link rel="mask-icon" href="/images/logo.svg" color="#222">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/7.0.0/css/all.min.css" integrity="sha256-VHqXKFhhMxcpubYf9xiWdCiojEbY9NexQ4jh8AxbvcM=" crossorigin="anonymous">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/animate.css/3.1.1/animate.min.css" integrity="sha256-PR7ttpcvz8qrF57fur/yAx1qXMFJeJFiA6pSzWi0OIE=" crossorigin="anonymous">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/pace/1.2.4/themes/blue/pace-theme-minimal.css">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pace/1.2.4/pace.min.js" integrity="sha256-gqd7YTjg/BtfqWSwsJOvndl0Bxc8gFImLEkXQT8+qj0=" crossorigin="anonymous" defer></script>
+
+<script class="next-config" data-name="main" type="application/json">{"hostname":"moyi-math.github.io","root":"/","images":"/images","scheme":"Gemini","darkmode":false,"version":"8.28.0","exturl":false,"sidebar":{"position":"left","width_expanded":320,"width_dual_column":240,"display":"post","padding":18,"offset":12},"hljswrap":true,"codeblock":{"theme":{"light":"default","dark":"stackoverflow-dark"},"prism":{"light":"prism","dark":"prism-dark"},"copy_button":{"enable":true,"style":null},"fold":{"enable":false,"height":500},"language":false},"bookmark":{"enable":false,"color":"#222","save":"auto"},"mediumzoom":false,"lazyload":false,"pangu":false,"comments":{"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},"stickytabs":false,"motion":{"enable":true,"async":false,"duration":200,"transition":{"menu_item":"fadeInDown","post_block":"fadeIn","post_header":"fadeInDown","post_body":"fadeInDown","coll_header":"fadeInLeft","sidebar":"fadeInUp"}},"prism":false,"i18n":{"placeholder":"搜索...","empty":"没有找到任何搜索结果：${query}","hits_time":"找到 ${hits} 个搜索结果（用时 ${time} 毫秒）","hits":"找到 ${hits} 个搜索结果"},"path":"/search.json","localsearch":{"enable":true,"top_n_per_article":1,"unescape":false,"preload":false}}</script><script src="/js/config.js" defer></script>
+
+    <meta name="description" content="把 1.2 的双记忆理论&quot;组装&quot;成标准 RAG:RAG 一句话定义、与微调的对比、5 步流水线、Grounding 为什么能把幻觉率从 13% 压到 2%,以及标准 RAG 自身的 3 个固有缺陷。">
+<meta property="og:type" content="article">
+<meta property="og:title" content="RAG 学习笔记 · 1.3 RAG 基础概念与工作原理">
+<meta property="og:url" content="https://moyi-math.github.io/2026/07/12/RAG-1.3-RAG%E5%9F%BA%E7%A1%80%E6%A6%82%E5%BF%B5%E4%B8%8E%E5%B7%A5%E4%BD%9C%E5%8E%9F%E7%90%86/index.html">
+<meta property="og:site_name" content="陌忆的博客">
+<meta property="og:description" content="把 1.2 的双记忆理论&quot;组装&quot;成标准 RAG:RAG 一句话定义、与微调的对比、5 步流水线、Grounding 为什么能把幻觉率从 13% 压到 2%,以及标准 RAG 自身的 3 个固有缺陷。">
+<meta property="og:locale" content="zh_CN">
+<meta property="article:published_time" content="2026-07-11T16:30:00.000Z">
+<meta property="article:modified_time" content="2026-07-11T16:30:00.000Z">
+<meta property="article:author" content="陌忆">
+<meta property="article:tag" content="RAG">
+<meta property="article:tag" content="LLM">
+<meta property="article:tag" content="面试">
+<meta property="article:tag" content="参数记忆">
+<meta property="article:tag" content="非参数记忆">
+<meta property="article:tag" content="检索增强">
+<meta property="article:tag" content="向量检索">
+<meta property="article:tag" content="Grounding">
+<meta name="twitter:card" content="summary">
+
+
+<link rel="canonical" href="https://moyi-math.github.io/2026/07/12/RAG-1.3-RAG%E5%9F%BA%E7%A1%80%E6%A6%82%E5%BF%B5%E4%B8%8E%E5%B7%A5%E4%BD%9C%E5%8E%9F%E7%90%86/">
+
+
+<script class="next-config" data-name="page" type="application/json">{"sidebar":"","isHome":false,"isPost":true,"lang":"zh-CN","comments":true,"permalink":"https://moyi-math.github.io/2026/07/12/RAG-1.3-RAG%E5%9F%BA%E7%A1%80%E6%A6%82%E5%BF%B5%E4%B8%8E%E5%B7%A5%E4%BD%9C%E5%8E%9F%E7%90%86/","path":"2026/07/12/RAG-1.3-RAG基础概念与工作原理/","title":"RAG 学习笔记 · 1.3 RAG 基础概念与工作原理"}</script>
+
+<script class="next-config" data-name="calendar" type="application/json">""</script>
+<title>RAG 学习笔记 · 1.3 RAG 基础概念与工作原理 | 陌忆的博客</title>
+  
+
+
+
+
+
+
+
+
+  
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/animejs/3.2.1/anime.min.js" integrity="sha256-XL2inqUJaslATFnHdJOi9GfQ60on8Wx1C2H8DYiN1xY=" crossorigin="anonymous" defer></script>
+<script src="/js/utils.js" defer></script><script src="/js/motion.js" defer></script><script src="/js/sidebar.js" defer></script><script src="/js/next-boot.js" defer></script>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/hexo-generator-searchdb/1.5.0/search.js" integrity="sha256-xFC6PJ82SL9b3WkGjFavNiA9gm5z6UBxWPiu4CYjptg=" crossorigin="anonymous" defer></script>
+<script src="/js/third-party/search/local-search.js" defer></script>
+
+
+
+
+
+  <script src="/js/third-party/pace.js" defer></script>
+
+
+  
+
+
+
+
+  
+
+  <script class="next-config" data-name="enableMath" type="application/json">false</script><link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/katex.min.css" integrity="sha256-UF1fgpAiu3tPJN/uCqEUHNe7pnr+QR0SQDNfgglgtcM=" crossorigin="anonymous">
+
+
+<link rel="preconnect" href="https://cdn.jsdelivr.net">
+<link rel="preconnect" href="https://cdn.bootcss.com">
+
+  <noscript>
+    <link rel="stylesheet" href="/css/noscript.css">
+  </noscript>
+<!-- hexo injector head_end start --><link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/katex.min.css" integrity="sha512-fHwaWebuwA7NSF5Qg/af4UeDx9XqUpYpOGgubo3yWu+b2IQR4UeQwbb42Ti7gVAjNtVoI/I9TEoYeu9omwcC6g==" crossorigin="anonymous" referrerpolicy="no-referrer" /><!-- hexo injector head_end end --></head>
+
+<body itemscope itemtype="http://schema.org/WebPage" class="use-motion">
+  <div class="headband"></div>
+
+  <main class="main">
+    <div class="column">
+      <header class="header" itemscope itemtype="http://schema.org/WPHeader"><div class="site-brand-container">
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="切换导航栏" role="button">
+        <span class="toggle-line"></span>
+        <span class="toggle-line"></span>
+        <span class="toggle-line"></span>
+    </div>
+  </div>
+
+  <div class="site-meta">
+
+    <a href="/" class="brand" rel="start">
+      <i class="logo-line"></i>
+      <p class="site-title">陌忆的博客</p>
+      <i class="logo-line"></i>
+    </a>
+      <p class="site-subtitle" itemprop="description">数据库无法得出结论</p>
+  </div>
+
+  <div class="site-nav-right">
+    <div class="toggle popup-trigger" aria-label="搜索" role="button">
+        <i class="fa fa-search fa-fw fa-lg"></i>
+    </div>
+  </div>
+</div>
+
+
+
+<nav class="site-nav">
+  <ul class="main-menu menu"><li class="menu-item menu-item-home"><a href="/" rel="section"><i class="fa fa-home fa-fw"></i>首页</a></li><li class="menu-item menu-item-about"><a href="/about/" rel="section"><i class="fa fa-user fa-fw"></i>关于</a></li><li class="menu-item menu-item-tags"><a href="/tags/" rel="section"><i class="fa fa-tags fa-fw"></i>标签</a></li><li class="menu-item menu-item-categories"><a href="/categories/" rel="section"><i class="fa fa-th fa-fw"></i>分类</a></li><li class="menu-item menu-item-archives"><a href="/archives/" rel="section"><i class="fa fa-archive fa-fw"></i>归档</a></li>
+      <li class="menu-item menu-item-search">
+        <a role="button" class="popup-trigger"><i class="fa fa-search fa-fw"></i>搜索
+        </a>
+      </li>
+  </ul>
+</nav>
+
+
+
+  <div class="search-pop-overlay">
+    <div class="popup search-popup">
+      <div class="search-header">
+        <span class="search-icon">
+          <i class="fa fa-search"></i>
+        </span>
+        <div class="search-input-container">
+          <input autocomplete="off" autocapitalize="off" maxlength="80"
+                placeholder="搜索..." spellcheck="false"
+                type="search" class="search-input">
+        </div>
+        <span class="popup-btn-close" role="button">
+          <i class="fa fa-times-circle"></i>
+        </span>
+      </div>
+      <div class="search-result-container">
+        <div class="search-result-icon">
+          <i class="fa fa-spinner fa-pulse fa-5x"></i>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</header>
+        
+  
+  <aside class="sidebar">
+
+    <div class="sidebar-inner sidebar-nav-active sidebar-toc-active">
+      <ul class="sidebar-nav">
+        <li class="sidebar-nav-toc">
+          文章目录
+        </li>
+        <li class="sidebar-nav-overview">
+          站点概览
+        </li>
+      </ul>
+
+      <div class="sidebar-panel-container">
+        <!--noindex-->
+        <div class="post-toc-wrap sidebar-panel">
+            <div class="post-toc animated"><ol class="nav"><li class="nav-item nav-level-2"><a class="nav-link" href="#%E6%91%98%E8%A6%81-Abstract"><span class="nav-text">摘要(Abstract)</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E4%B8%80%E3%80%81RAG-%E6%98%AF%E4%BB%80%E4%B9%88-%E2%80%94%E2%80%94%E4%B8%80%E5%8F%A5%E8%AF%9D%E5%AE%9A%E4%B9%89"><span class="nav-text">一、RAG 是什么?——一句话定义</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E4%BA%8C%E3%80%81RAG-vs-%E5%BE%AE%E8%B0%83-Fine-tuning-%E2%80%94%E2%80%94%E4%BB%80%E4%B9%88%E6%97%B6%E5%80%99%E7%94%A8%E5%93%AA%E4%B8%AA"><span class="nav-text">二、RAG vs 微调(Fine-tuning)——什么时候用哪个?</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#1-%E5%AF%B9%E6%AF%94%E7%9F%A9%E9%98%B5"><span class="nav-text">1. 对比矩阵</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#2-%E5%86%B3%E7%AD%96%E6%B5%81%E7%A8%8B%E5%9B%BE"><span class="nav-text">2. 决策流程图</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#3-2026-%E5%B9%B4%E7%9A%84%E7%9C%9F%E5%AE%9E%E5%B7%A5%E7%A8%8B%E5%8F%96%E8%88%8D"><span class="nav-text">3. 2026 年的真实工程取舍</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E4%B8%89%E3%80%81%E6%A0%87%E5%87%86-RAG-%E7%9A%84-5-%E6%AD%A5%E6%B5%81%E6%B0%B4%E7%BA%BF"><span class="nav-text">三、标准 RAG 的 5 步流水线</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#1-%E5%85%A8%E6%B5%81%E7%A8%8B%E5%9B%BE"><span class="nav-text">1. 全流程图</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#2-%E7%A6%BB%E7%BA%BF%E9%98%B6%E6%AE%B5%E8%AF%A6%E8%A7%A3"><span class="nav-text">2. 离线阶段详解</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#3-%E5%9C%A8%E7%BA%BF%E9%98%B6%E6%AE%B5%E8%AF%A6%E8%A7%A3"><span class="nav-text">3. 在线阶段详解</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%9B%9B%E3%80%81Grounding-%E6%9C%BA%E5%88%B6-%E2%80%94%E2%80%94-%E4%B8%BA%E4%BB%80%E4%B9%88-RAG-%E8%83%BD%E6%8A%8A%E5%B9%BB%E8%A7%89%E7%8E%87%E4%BB%8E-13-%E5%8E%8B%E5%88%B0-2"><span class="nav-text">四、Grounding 机制 —— 为什么 RAG 能把幻觉率从 13% 压到 2%?</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#1-%E5%8E%9F%E7%90%86-%E8%AE%A9%E6%A8%A1%E5%9E%8B%E2%80%9D%E7%9C%8B%E7%9D%80%E8%B5%84%E6%96%99%E5%86%99%E7%AD%94%E6%A1%88%E2%80%9D"><span class="nav-text">1. 原理:让模型”看着资料写答案”</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#2-%E4%B8%BA%E4%BB%80%E4%B9%88-grounding-%E8%BF%99%E4%B9%88%E6%9C%89%E6%95%88"><span class="nav-text">2. 为什么 grounding 这么有效?</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#3-grounding-%E7%9A%84%E5%89%AF%E4%BD%9C%E7%94%A8-over-reliance-%E8%BF%87%E5%BA%A6%E4%BE%9D%E8%B5%96"><span class="nav-text">3. grounding 的副作用:over-reliance(过度依赖)</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E4%BA%94%E3%80%81%E6%A0%87%E5%87%86-RAG-%E8%87%AA%E8%BA%AB%E7%9A%84-3-%E4%B8%AA%E5%9B%BA%E6%9C%89%E7%BC%BA%E9%99%B7-%E2%80%94%E2%80%94-%E7%BB%99-1-4-%E9%93%BA%E5%9E%AB"><span class="nav-text">五、标准 RAG 自身的 3 个固有缺陷 —— 给 1.4 铺垫</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#1-%E5%8F%AC%E5%9B%9E%E8%B4%A8%E9%87%8F%E5%B7%AE-Retrieval-Quality"><span class="nav-text">1. 召回质量差(Retrieval Quality)</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#2-%E4%B8%8A%E4%B8%8B%E6%96%87%E6%B1%A1%E6%9F%93-Context-Contamination-Lost-in-the-Middle"><span class="nav-text">2. 上下文污染(Context Contamination &#x2F; Lost-in-the-Middle)</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#3-%E4%B8%8A%E4%B8%8B%E6%96%87%E6%B3%A8%E5%85%A5%E5%9E%8B%E5%B9%BB%E8%A7%89-Context-Injected-Hallucination"><span class="nav-text">3. 上下文注入型幻觉(Context-Injected Hallucination)</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#1-3-%E7%9A%84%E5%B0%BE%E5%A3%B0-RAG-%E4%B8%8D%E6%98%AF%E7%BB%88%E7%82%B9-%E6%98%AF%E8%B5%B7%E7%82%B9"><span class="nav-text">1.3 的尾声:RAG 不是终点,是起点</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%85%AD%E3%80%81%E6%9C%80%E5%B0%8F%E5%8F%AF%E8%BF%90%E8%A1%8C%E7%A4%BA%E4%BE%8B-30-%E8%A1%8C-Python"><span class="nav-text">六、最小可运行示例(30 行 Python)</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E4%B8%83%E3%80%81%E9%9D%A2%E8%AF%95%E5%BF%AB%E9%97%AE%E5%BF%AB%E7%AD%94-3-%E9%A2%98%E8%A6%86%E7%9B%96-1-3-%E5%85%A8%E9%83%A8%E7%9F%A5%E8%AF%86%E7%82%B9"><span class="nav-text">七、面试快问快答(3 题覆盖 1.3 全部知识点)</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%85%AB%E3%80%81%E6%9C%AC%E8%8A%82%E6%A0%B8%E5%BF%83%E8%A6%81%E7%82%B9"><span class="nav-text">八、本节核心要点</span></a></li></ol></div>
+        </div>
+        <!--/noindex-->
+
+        <div class="site-overview-wrap sidebar-panel">
+          <div class="site-author animated" itemprop="author" itemscope itemtype="http://schema.org/Person">
+    <img class="site-author-image" itemprop="image" alt="陌忆"
+      src="/images/avatar.webp">
+  <p class="site-author-name" itemprop="name">陌忆</p>
+  <div class="site-description" itemprop="description">欢迎来到我的世界💜</div>
+</div>
+<div class="site-state-wrap animated">
+  <nav class="site-state">
+      <div class="site-state-item site-state-posts">
+        <a href="/archives/">
+          <span class="site-state-item-count">4</span>
+          <span class="site-state-item-name">日志</span>
+        </a>
+      </div>
+      <div class="site-state-item site-state-categories">
+          <a href="/categories/">
+        <span class="site-state-item-count">2</span>
+        <span class="site-state-item-name">分类</span></a>
+      </div>
+      <div class="site-state-item site-state-tags">
+          <a href="/tags/">
+        <span class="site-state-item-count">15</span>
+        <span class="site-state-item-name">标签</span></a>
+      </div>
+  </nav>
+</div>
+  <div class="cc-license animated" itemprop="license">
+    <a href="https://creativecommons.org/licenses/by-nc-sa/4.0/" class="cc-opacity" rel="noopener" target="_blank"><img src="https://cdnjs.cloudflare.com/ajax/libs/creativecommons-vocabulary/2020.11.3/assets/license_badges/small/by_nc_sa.svg" alt="Creative Commons"></a>
+  </div>
+
+        </div>
+      </div>
+    </div>
+
+    
+  </aside>
+
+
+    </div>
+
+    <div class="main-inner post posts-expand">
+
+
+  
+
+
+<div class="post-block">
+  
+  
+
+  <article itemscope itemtype="http://schema.org/Article" class="post-content" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="https://moyi-math.github.io/2026/07/12/RAG-1.3-RAG%E5%9F%BA%E7%A1%80%E6%A6%82%E5%BF%B5%E4%B8%8E%E5%B7%A5%E4%BD%9C%E5%8E%9F%E7%90%86/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.webp">
+      <meta itemprop="name" content="陌忆">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="陌忆的博客">
+      <meta itemprop="description" content="欢迎来到我的世界💜">
+    </span>
+
+    <span hidden itemprop="post" itemscope itemtype="http://schema.org/CreativeWork">
+      <meta itemprop="name" content="RAG 学习笔记 · 1.3 RAG 基础概念与工作原理 | 陌忆的博客">
+      <meta itemprop="description" content="把 1.2 的双记忆理论&quot;组装&quot;成标准 RAG:RAG 一句话定义、与微调的对比、5 步流水线、Grounding 为什么能把幻觉率从 13% 压到 2%,以及标准 RAG 自身的 3 个固有缺陷。">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          RAG 学习笔记 · 1.3 RAG 基础概念与工作原理
+        </h1>
+
+        <div class="post-meta-container">
+          <div class="post-meta">
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-calendar"></i>
+      </span>
+      <span class="post-meta-item-text">发表于</span>
+
+      <time title="创建时间：2026-07-12 00:30:00" itemprop="dateCreated datePublished" datetime="2026-07-12T00:30:00+08:00">2026-07-12</time>
+    </span>
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-folder"></i>
+      </span>
+      <span class="post-meta-item-text">分类于</span>
+        <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+          <a href="/categories/RAG%E5%AD%A6%E4%B9%A0%E7%AC%94%E8%AE%B0/" itemprop="url" rel="index"><span itemprop="name">RAG学习笔记</span></a>
+        </span>
+    </span>
+
+  
+    <span class="post-meta-break"></span>
+    <span class="post-meta-item" title="本文字数">
+      <span class="post-meta-item-icon">
+        <i class="far fa-file-word"></i>
+      </span>
+      <span class="post-meta-item-text">本文字数：</span>
+      <span>4.3k</span>
+    </span>
+    <span class="post-meta-item" title="阅读时长">
+      <span class="post-meta-item-icon">
+        <i class="far fa-clock"></i>
+      </span>
+      <span class="post-meta-item-text">阅读时长 &asymp;</span>
+      <span>16 分钟</span>
+    </span>
+</div>
+
+            <div class="post-description">把 1.2 的双记忆理论"组装"成标准 RAG:RAG 一句话定义、与微调的对比、5 步流水线、Grounding 为什么能把幻觉率从 13% 压到 2%,以及标准 RAG 自身的 3 个固有缺陷。</div>
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody"><blockquote>
+<p><strong>章节定位:</strong> 1.1 讲了 LLM 三大缺陷,1.2 讲了”两种记忆”的理论框架。本节把双记忆”组装”成可运行的 RAG 流水线——一句话定义、与微调的取舍、标准 5 步流程,以及为什么 Grounding(接地)能直接对冲幻觉。</p>
+</blockquote>
+<span id="more"></span>
+
+<h2 id="摘要-Abstract"><a href="#摘要-Abstract" class="headerlink" title="摘要(Abstract)"></a>摘要(Abstract)</h2><p><strong>TL;DR:</strong> RAG(Retrieval-Augmented Generation,检索增强生成)&#x3D; <strong>检索器 + 生成器</strong>。本质是把 1.2 的”参数记忆(LLM)”和”非参数记忆(外部知识库)”<strong>显式拼接</strong>:用 LLM 的”理解力”读外部资料,再用 LLM 的”推理力”写答案。Grounding(接地)机制能让幻觉率从 13% 压到 2%,但<strong>标准 RAG 自身也有 3 个固有缺陷</strong>——这正是 1.4 要讲的 Naive → Advanced → Modular 演进动力。</p>
+<p>本文覆盖:</p>
+<ul>
+<li><strong>RAG 一句话定义</strong>:Retrieval-Augmented Generation 的字面拆解与本质</li>
+<li><strong>RAG vs 微调</strong>:决策矩阵,企业 AI 的”什么时候用哪个”取舍</li>
+<li><strong>标准 RAG 的 5 步流水线</strong>:离线构建 + 在线检索,一张流程图串完</li>
+<li><strong>Grounding 机制</strong>:为什么能把幻觉率从 13% 压到 2%,背后原理</li>
+<li><strong>标准 RAG 的 3 个固有缺陷</strong>:召回差、上下文污染、生成端幻觉,为 1.4 铺垫</li>
+<li><strong>最小可运行示例</strong>:30 行 Python,把概念落到可执行代码</li>
+<li><strong>面试高频题</strong>:3 道覆盖 1.3 全部知识点的 RAG 基础面试题</li>
+</ul>
+<p>适合读者:正在设计或评估企业级 AI 系统、需要判断 RAG 是否值得投入的工程师 &#x2F; 架构师 &#x2F; 技术决策者,以及准备 RAG 方向面试的候选人。</p>
+<hr>
+<h2 id="一、RAG-是什么-——一句话定义"><a href="#一、RAG-是什么-——一句话定义" class="headerlink" title="一、RAG 是什么?——一句话定义"></a>一、RAG 是什么?——一句话定义</h2><div class="note primary"><p><strong>RAG(Retrieval-Augmented Generation,检索增强生成)</strong> &#x3D; <strong>用一个外部检索器(Retriever)给 LLM “查资料”,再用检索到的内容增强(Enhance)LLM 的生成(Generation)结果。</strong></p>
+</div>
+
+<p>把上面这句话拆成三段对应 1.2 的双记忆理论:</p>
+<table>
+<thead>
+<tr>
+<th>RAG 三段</th>
+<th>1.2 中的对应角色</th>
+<th>具体职责</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>Retrieval(检索)</strong></td>
+<td>非参数记忆</td>
+<td>从外部知识库(向量库、搜索引擎、数据库)找到和问题最相关的文档片段</td>
+</tr>
+<tr>
+<td><strong>Augmented(增强)</strong></td>
+<td>双记忆的拼接</td>
+<td>把检索到的片段 + 用户问题,组装成一个新的、<strong>带有参考资料</strong>的 prompt</td>
+</tr>
+<tr>
+<td><strong>Generation(生成)</strong></td>
+<td>参数记忆</td>
+<td>LLM 基于这个增强后的 prompt 生成最终答案,并可附带引用</td>
+</tr>
+</tbody></table>
+<p><strong>本质一句话</strong>:RAG 不是新模型,不是新算法,<strong>它是一种”把外部知识拼到 prompt 里”的工作流</strong>。LLM 本身可以不变,变的是你喂给它的 prompt 里多了”参考资料”这一段。</p>
+<div class="note info"><p><strong>一个常见误区:</strong> 别把 RAG 当成”一种模型”。RAG 是 2020 年 Patrick Lewis 等人在 Facebook AI 提出的<strong>架构范式</strong>(见论文《Retrieval-Augmented Generation for Knowledge-Intensive NLP Tasks》),后续所有的 Advanced RAG &#x2F; Agentic RAG &#x2F; GraphRAG 都是这个范式的演进,<strong>没有改变 RAG &#x3D; 检索 + 增强 + 生成 这个三段式骨架</strong>。</p>
+</div>
+
+<hr>
+<h2 id="二、RAG-vs-微调-Fine-tuning-——什么时候用哪个"><a href="#二、RAG-vs-微调-Fine-tuning-——什么时候用哪个" class="headerlink" title="二、RAG vs 微调(Fine-tuning)——什么时候用哪个?"></a>二、RAG vs 微调(Fine-tuning)——什么时候用哪个?</h2><p><strong>这是 2026 年 AI 工程师面试最高频的问题之一</strong>。企业 AI 项目立项时,第一个问题就是:”我该选 RAG 还是微调?”</p>
+<h3 id="1-对比矩阵"><a href="#1-对比矩阵" class="headerlink" title="1. 对比矩阵"></a>1. 对比矩阵</h3><table>
+<thead>
+<tr>
+<th>维度</th>
+<th>RAG(检索增强)</th>
+<th>微调(Fine-tuning)</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>核心动作</strong></td>
+<td>在推理时<strong>检索</strong>外部知识拼到 prompt</td>
+<td>在训练时<strong>改写模型参数</strong></td>
+</tr>
+<tr>
+<td><strong>知识更新成本</strong></td>
+<td>几秒钟(往向量库里加文档)</td>
+<td>几万到几百万美元(fine-tune 一次)</td>
+</tr>
+<tr>
+<td><strong>知识更新延迟</strong></td>
+<td>秒级(实时)</td>
+<td>月级到年级(重训)</td>
+</tr>
+<tr>
+<td><strong>适合的知识</strong></td>
+<td><strong>动态事实</strong>(产品文档、价格、新闻)、<strong>私有数据</strong>、<strong>长尾知识</strong></td>
+<td><strong>稳定技能</strong>(特定语气、风格、输出格式)、<strong>领域术语理解</strong></td>
+</tr>
+<tr>
+<td><strong>可解释性</strong></td>
+<td>✅ 高(每条答案都能追溯到原始文档)</td>
+<td>❌ 低(黑盒,难溯源)</td>
+</tr>
+<tr>
+<td><strong>幻觉控制</strong></td>
+<td>✅ 强(有 grounding)</td>
+<td>⚠️ 中(微调可降低部分幻觉,但难根除)</td>
+</tr>
+<tr>
+<td><strong>数据要求</strong></td>
+<td>中等(需要文档清洗 + 切块)</td>
+<td>高(需要大量高质量问答对)</td>
+</tr>
+<tr>
+<td><strong>算力要求</strong></td>
+<td>低(只是检索 + 推理)</td>
+<td>高(训练成本高)</td>
+</tr>
+<tr>
+<td><strong>适用场景</strong></td>
+<td>企业知识库、客服问答、文档助手</td>
+<td>特定领域风格、代码助手、垂直行业语料</td>
+</tr>
+</tbody></table>
+<h3 id="2-决策流程图"><a href="#2-决策流程图" class="headerlink" title="2. 决策流程图"></a>2. 决策流程图</h3><figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br></pre></td><td class="code"><pre><span class="line">你的需求是什么?</span><br><span class="line">│</span><br><span class="line">├─ 需要接入实时 / 动态 / 私有的知识?</span><br><span class="line">│   └─ ✅ YES → RAG</span><br><span class="line">│</span><br><span class="line">├─ 需要改变模型的输出风格 / 格式 / 特定技能?</span><br><span class="line">│   └─ ✅ YES → 微调</span><br><span class="line">│</span><br><span class="line">├─ 两者都需要?</span><br><span class="line">│   └─ ✅ 大多数企业真实场景 → RAG + 少量微调(2026 年主流架构)</span><br><span class="line">│</span><br><span class="line">└─ 需要极致的事实准确性 + 可溯源?</span><br><span class="line">    └─ ✅ YES → RAG(且配合引用 + 评估)</span><br></pre></td></tr></table></figure>
+
+<h3 id="3-2026-年的真实工程取舍"><a href="#3-2026-年的真实工程取舍" class="headerlink" title="3. 2026 年的真实工程取舍"></a>3. 2026 年的真实工程取舍</h3><p><strong>主流架构</strong>:<strong>RAG 为主 + 少量微调</strong>。</p>
+<ul>
+<li>80% 的企业 AI 系统走 RAG(因为知识随时在变)</li>
+<li>20% 的场景配合微调(例如客服话术统一、特定 schema 输出)</li>
+</ul>
+<p><strong>纯微调的应用场景已经很少了</strong>,因为:</p>
+<ul>
+<li>知识更新跟不上业务变化</li>
+<li>一旦微调完,模型就是”快照”,文档一改就要重训</li>
+<li>私有数据微调后塞不进 LLM 的参数里(压缩比 50:1,见 1.2)</li>
+</ul>
+<div class="note warning"><p><strong>一个反直觉的观察:</strong> 大模型越来越大(Long Context 1M+ tokens)后,有人以为”不需要 RAG 了,把全文档塞进去就行”。<strong>这是错的</strong>——</p>
+<ul>
+<li>1M tokens 也有极限,且成本高(Gemini 3.1 Pro 处理 1M tokens 完整 prompt 约 <span class="katex"><span class="katex-mathml"><math xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mn>1.5</mn><mi mathvariant="normal">&#x2F;</mi><mtext>次</mtext><mo stretchy="false">)</mo></mrow><annotation encoding="application/x-tex">1.5&#x2F;次)</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height:1em;vertical-align:-0.25em;"></span><span class="mord">1.5&#x2F;</span><span class="mord cjk_fallback">次</span><span class="mclose">)</span></span></span></span>- Long Context 的 lost in the middle 问题(中间位置事实性错误率显著高于首尾)依然存在</li>
+<li><strong>RAG 把 100M 文档压缩成 top-5 片段,精确度 + 成本都更优</strong></li>
+</ul>
+</div>
+
+<hr>
+<h2 id="三、标准-RAG-的-5-步流水线"><a href="#三、标准-RAG-的-5-步流水线" class="headerlink" title="三、标准 RAG 的 5 步流水线"></a>三、标准 RAG 的 5 步流水线</h2><p>这是 1.3 的核心。RAG 工作流拆成两个阶段:<strong>离线(构建知识库)</strong> + **在线(回答问题)**。</p>
+<h3 id="1-全流程图"><a href="#1-全流程图" class="headerlink" title="1. 全流程图"></a>1. 全流程图</h3><figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br><span class="line">48</span><br><span class="line">49</span><br></pre></td><td class="code"><pre><span class="line">┌─────────────────────────────────── 离线阶段(只需做一次) ───────────────────────────────────┐</span><br><span class="line">│                                                                                          │</span><br><span class="line">│   原始文档(Word/PDF/Markdown/网页/Notion)                                               │</span><br><span class="line">│       │                                                                                  │</span><br><span class="line">│       ▼                                                                                  │</span><br><span class="line">│   ① 文档加载(Document Loading) —— 把 PDF/Word/HTML 解析成纯文本                          │</span><br><span class="line">│       │                                                                                  │</span><br><span class="line">│       ▼                                                                                  │</span><br><span class="line">│   ② 文档切块(Document Chunking) —— 按语义/长度切成 200~1000 token 的小块                │</span><br><span class="line">│       │                                                                                  │</span><br><span class="line">│       ▼                                                                                  │</span><br><span class="line">│   ③ 向量化(Embedding) —— 用 Embedding 模型把每块文本转成 768~4096 维向量                │</span><br><span class="line">│       │                                                                                  │</span><br><span class="line">│       ▼                                                                                  │</span><br><span class="line">│   ④ 入库(Storage) —— 存到向量数据库(Chroma / Milvus / Pinecone / pgvector)              │</span><br><span class="line">│                                                                                          │</span><br><span class="line">└──────────────────────────────────────────────────────────────────────────────────────────┘</span><br><span class="line"></span><br><span class="line">┌─────────────────────────────────── 在线阶段(每次提问都跑) ──────────────────────────────────┐</span><br><span class="line">│                                                                                          │</span><br><span class="line">│   用户问题: &quot;GLM-5.2 是哪天发布的?&quot;                                                       │</span><br><span class="line">│       │                                                                                  │</span><br><span class="line">│       ▼                                                                                  │</span><br><span class="line">│   ① 问题向量化 —— 用同一个 Embedding 模型把问题也转成向量                                │</span><br><span class="line">│       │                                                                                  │</span><br><span class="line">│       ▼                                                                                  │</span><br><span class="line">│   ② 检索(Retrieval) —— 在向量库里找最相似的 top-K 个文档块                              │</span><br><span class="line">│       │                                                                                  │</span><br><span class="line">│       ▼                                                                                  │</span><br><span class="line">│   ③ Prompt 拼接(Prompt Augmentation) —— 把检索到的块 + 问题拼成 LLM 的输入             │</span><br><span class="line">│       │                                                                                  │</span><br><span class="line">│       │   ┌────────────────────────────────────────────────────────────────────┐        │</span><br><span class="line">│       │   │ System: 你是一个专业的 AI 助手,请根据下面的参考资料回答用户问题。            │        │</span><br><span class="line">│       │   │         如果参考资料里没有答案,直接说&quot;我不知道&quot;,不要编造。                    │        │</span><br><span class="line">│       │   │                                                                              │        │</span><br><span class="line">│       │   │ 参考资料:                                                                      │        │</span><br><span class="line">│       │   │ [1] 智谱 2026 年 6 月 17 日正式发布 GLM-5.2...                              │        │</span><br><span class="line">│       │   │ [2] GLM-5.2 相比前作在推理能力上有显著提升...                                │        │</span><br><span class="line">│       │   │                                                                              │        │</span><br><span class="line">│       │   │ 用户问题: GLM-5.2 是哪天发布的?                                              │        │</span><br><span class="line">│       │   └────────────────────────────────────────────────────────────────────┘        │</span><br><span class="line">│       │                                                                                  │</span><br><span class="line">│       ▼                                                                                  │</span><br><span class="line">│   ④ 生成(Generation) —— LLM 基于&quot;参考资料 + 问题&quot;生成最终答案                          │</span><br><span class="line">│       │                                                                                  │</span><br><span class="line">│       ▼                                                                                  │</span><br><span class="line">│   ⑤ 后处理(Post-processing) —— 答案 + 引用来源 + (可选)拒答兜底                         │</span><br><span class="line">│                                                                                          │</span><br><span class="line">└──────────────────────────────────────────────────────────────────────────-───────────────────┘</span><br></pre></td></tr></table></figure>
+
+<h3 id="2-离线阶段详解"><a href="#2-离线阶段详解" class="headerlink" title="2. 离线阶段详解"></a>2. 离线阶段详解</h3><p><strong>① 文档加载(Document Loading)</strong></p>
+<p>把各种格式的文档解析成纯文本。常用工具:</p>
+<ul>
+<li>PDF: <code>PyMuPDF</code>、<code>pdfplumber</code>、<code>Unstructured</code></li>
+<li>Word: <code>python-docx</code></li>
+<li>HTML: <code>BeautifulSoup</code>、<code>Trafilatura</code></li>
+<li>Markdown: 直接读</li>
+<li>Notion&#x2F;Confluence: 各自 API</li>
+</ul>
+<p>这一阶段常见问题:</p>
+<ul>
+<li>PDF 中的表格、公式、扫描图片容易丢失结构</li>
+<li>多栏排版的 PDF 会被读成单栏</li>
+<li>需要 OCR 处理扫描件</li>
+</ul>
+<p><strong>② 文档切块(Document Chunking)</strong></p>
+<p><strong>这是 RAG 工程质量的天花板之一。</strong> 切不好,再好的模型也白搭。</p>
+<p>常见策略:</p>
+<table>
+<thead>
+<tr>
+<th>策略</th>
+<th>块大小</th>
+<th>优点</th>
+<th>缺点</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>固定长度切块</strong></td>
+<td>200~512 tokens</td>
+<td>简单、均匀</td>
+<td>经常从句子中间切断,语义破碎</td>
+</tr>
+<tr>
+<td><strong>按句子&#x2F;段落切</strong></td>
+<td>1~10 个句子</td>
+<td>语义完整</td>
+<td>块大小不均,检索粒度不可控</td>
+</tr>
+<tr>
+<td><strong>递归字符切块(Recursive)</strong></td>
+<td>自适应</td>
+<td>平衡,LangChain 默认</td>
+<td>切分点选择有经验成分</td>
+</tr>
+<tr>
+<td><strong>语义切块(Semantic)</strong></td>
+<td>变长</td>
+<td>块内语义高度连贯</td>
+<td>切分慢、需要 embedding 模型</td>
+</tr>
+<tr>
+<td><strong>按文档结构切</strong></td>
+<td>按 H1&#x2F;H2&#x2F;章节</td>
+<td>结构保留好</td>
+<td>仅适用于结构化文档</td>
+</tr>
+</tbody></table>
+<p><strong>经验值</strong>:英文 200<del>512 tokens &#x2F; 中文 300</del>800 tokens,后续 2.x 章节会专门讲切块的深度策略。</p>
+<p><strong>③ 向量化(Embedding)</strong></p>
+<p>把每块文本转成稠密向量,2026 年主流 Embedding 模型:</p>
+<table>
+<thead>
+<tr>
+<th>模型</th>
+<th>维度</th>
+<th>特点</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>OpenAI text-embedding-3-large</td>
+<td>3072</td>
+<td>综合最佳,生产稳定</td>
+</tr>
+<tr>
+<td>BGE-M3 (BAAI)</td>
+<td>1024</td>
+<td>中英文都强,国产开源</td>
+</tr>
+<tr>
+<td>M3E &#x2F; BCE</td>
+<td>768</td>
+<td>中文场景性价比较高</td>
+</tr>
+<tr>
+<td>Cohere embed-v3</td>
+<td>1024</td>
+<td>多语种、长文本</td>
+</tr>
+<tr>
+<td>bge-large-zh-v1.5</td>
+<td>1024</td>
+<td>国产开源经典</td>
+</tr>
+</tbody></table>
+<p><strong>关键</strong>:检索时,问题和文档必须用<strong>同一个 Embedding 模型</strong>——否则向量空间对不上,检索必失败。</p>
+<p><strong>④ 入库(Storage)</strong></p>
+<p>向量数据库选型:</p>
+<table>
+<thead>
+<tr>
+<th>类型</th>
+<th>代表产品</th>
+<th>适用场景</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>嵌入式 &#x2F; 轻量</td>
+<td>Chroma &#x2F; FAISS</td>
+<td>本地原型、小规模(&lt;100万向量)</td>
+</tr>
+<tr>
+<td>开源生产级</td>
+<td>Milvus &#x2F; Weaviate &#x2F; Qdrant</td>
+<td>大规模、可集群</td>
+</tr>
+<tr>
+<td>云托管</td>
+<td>Pinecone &#x2F; Zilliz Cloud</td>
+<td>不想运维</td>
+</tr>
+<tr>
+<td>传统库加向量插件</td>
+<td>pgvector &#x2F; Elasticsearch 8+</td>
+<td>已有 PG&#x2F;ES 栈</td>
+</tr>
+</tbody></table>
+<h3 id="3-在线阶段详解"><a href="#3-在线阶段详解" class="headerlink" title="3. 在线阶段详解"></a>3. 在线阶段详解</h3><p><strong>① 检索(Retrieval)</strong></p>
+<p>常见检索模式:</p>
+<ul>
+<li><strong>稠密向量检索(Dense Retrieval)</strong>:用向量相似度(余弦、内积)找 top-K</li>
+<li><strong>稀疏检索(Sparse Retrieval)</strong>:BM25、TF-IDF,关键词匹配</li>
+<li><strong>混合检索(Hybrid)</strong>:两者结合 + Reranker 精排(2026 年最主流)</li>
+</ul>
+<p><strong>② Prompt 拼接(Prompt Augmentation)</strong></p>
+<p>最关键的 prompt 模板示例:</p>
+<figure class="highlight markdown"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br></pre></td><td class="code"><pre><span class="line">你是一个专业的 AI 助手。请严格根据下面的参考资料回答用户问题。</span><br><span class="line"></span><br><span class="line">如果参考资料里没有答案,请直接说&quot;根据已知信息无法回答&quot;,不要编造。</span><br><span class="line">回答时,在引用的事实后面用 [<span class="string">1</span>][<span class="symbol">2</span>] 标注来源。</span><br><span class="line"></span><br><span class="line">参考资料:</span><br><span class="line">[1] &#123;chunk<span class="emphasis">_1&#125;</span></span><br><span class="line"><span class="emphasis">[2] &#123;chunk_</span>2&#125;</span><br><span class="line">[3] &#123;chunk<span class="emphasis">_3&#125;</span></span><br><span class="line"><span class="emphasis"></span></span><br><span class="line"><span class="emphasis">用户问题:&#123;user_</span>question&#125;</span><br></pre></td></tr></table></figure>
+
+<p><strong>这个模板的三个要点</strong>:</p>
+<ol>
+<li>明确”允许拒答”,而不是被迫胡编</li>
+<li>强制带引用,提升可解释性</li>
+<li>资料有序编号,LLM 容易对齐</li>
+</ol>
+<p><strong>③ 生成(Generation)与后处理</strong></p>
+<p>LLM 生成后,通常需要:</p>
+<ul>
+<li>提取答案 + 引用的链接</li>
+<li>加拒答检测(“我不确定”类回答高亮给用户)</li>
+<li>流式输出(SSE&#x2F;WebSocket)</li>
+<li>评估 &#x2F; 缓存等横切关注点</li>
+</ul>
+<hr>
+<h2 id="四、Grounding-机制-——-为什么-RAG-能把幻觉率从-13-压到-2"><a href="#四、Grounding-机制-——-为什么-RAG-能把幻觉率从-13-压到-2" class="headerlink" title="四、Grounding 机制 —— 为什么 RAG 能把幻觉率从 13% 压到 2%?"></a>四、Grounding 机制 —— 为什么 RAG 能把幻觉率从 13% 压到 2%?</h2><p>回到 1.1 的数据,对照看:</p>
+<table>
+<thead>
+<tr>
+<th>模型</th>
+<th>无 RAG 幻觉率</th>
+<th>加 RAG 后幻觉率</th>
+<th>下降幅度</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Claude Sonnet 4.6</td>
+<td>~6%</td>
+<td>~2%</td>
+<td><strong>-67%</strong></td>
+</tr>
+<tr>
+<td>GPT-5.4</td>
+<td>~7%</td>
+<td>~3%</td>
+<td><strong>-57%</strong></td>
+</tr>
+<tr>
+<td>Gemini 3.1 Pro</td>
+<td>~13%</td>
+<td>~5%</td>
+<td><strong>-62%</strong></td>
+</tr>
+</tbody></table>
+<h3 id="1-原理-让模型”看着资料写答案”"><a href="#1-原理-让模型”看着资料写答案”" class="headerlink" title="1. 原理:让模型”看着资料写答案”"></a>1. 原理:让模型”看着资料写答案”</h3><p><strong>Grounding(接地)</strong>:让 LLM 的回答<strong>有明确的、可追溯的、可验证的事实依据</strong>,而不是从参数分布里”猜”。</p>
+<p>RAG 实现 grounding 的方式很直接:<strong>把检索到的真实文档片段塞进 prompt</strong>,让 LLM 在生成时被这些片段”锚定”。回答的内容必须能在这些片段里找到对应。</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line">无 RAG:</span><br><span class="line">   LLM: 我&quot;凭记忆&quot;猜 GLM-5.2 可能是 2025 年 12 月发布的……(从参数里采样)</span><br><span class="line">   → 模糊、随机、可能错</span><br><span class="line"></span><br><span class="line">有 RAG:</span><br><span class="line">   LLM: 看着参考资料 [1] 里写的&quot;2026 年 6 月 17 日发布&quot;,照实写出</span><br><span class="line">   → 准确、可追溯、不会编</span><br></pre></td></tr></table></figure>
+
+<h3 id="2-为什么-grounding-这么有效"><a href="#2-为什么-grounding-这么有效" class="headerlink" title="2. 为什么 grounding 这么有效?"></a>2. 为什么 grounding 这么有效?</h3><p><strong>根因:把 LLM 从”开卷猜测”变成”开卷作答”。</strong></p>
+<ul>
+<li>LLM 训练目标:<strong>最大化下一个 token 的概率</strong></li>
+<li>在无 grounding 时,这个概率由参数里学到的模糊分布给出,自然会产生幻觉</li>
+<li>在有 grounding 时,prompt 里出现的事实片段<strong>强烈偏向于让模型复述&#x2F;总结这些内容</strong>——概率分布被”压”到了真实片段上</li>
+</ul>
+<p><strong>这就像给学生两种考试</strong>:</p>
+<ul>
+<li>闭卷:全凭记忆 → 大概率会记错&#x2F;编造</li>
+<li>开卷:可以翻书 → 答案准确率高很多,而且能引用页码</li>
+</ul>
+<p>RAG &#x3D; <strong>给 LLM 开卷考试</strong>。</p>
+<h3 id="3-grounding-的副作用-over-reliance-过度依赖"><a href="#3-grounding-的副作用-over-reliance-过度依赖" class="headerlink" title="3. grounding 的副作用:over-reliance(过度依赖)"></a>3. grounding 的副作用:over-reliance(过度依赖)</h3><p>RAG 不是万能的。如果检索的片段本身就是错的、过时的、或问题与片段不相关,LLM 会<strong>努力从这些片段里”硬挤”出一个答案</strong>——这就是 **context-injected hallucination(上下文注入型幻觉)**。</p>
+<p>这正是 1.4 要讲的”标准 RAG 缺陷”之一。</p>
+<div class="note danger"><p><strong>反直觉观察:</strong> 检索质量差的 RAG 系统,幻觉率可能<strong>反而高于</strong>纯 LLM。因为模型”勉强回答”会比”诚实拒答”更危险。</p>
+</div>
+
+<hr>
+<h2 id="五、标准-RAG-自身的-3-个固有缺陷-——-给-1-4-铺垫"><a href="#五、标准-RAG-自身的-3-个固有缺陷-——-给-1-4-铺垫" class="headerlink" title="五、标准 RAG 自身的 3 个固有缺陷 —— 给 1.4 铺垫"></a>五、标准 RAG 自身的 3 个固有缺陷 —— 给 1.4 铺垫</h2><p><strong>重要:本节是 1.3 和 1.4 的桥。</strong> 标准 RAG(也叫 Naive RAG)虽然能把幻觉压下来,但工程上还有 3 个绕不开的问题。</p>
+<h3 id="1-召回质量差-Retrieval-Quality"><a href="#1-召回质量差-Retrieval-Quality" class="headerlink" title="1. 召回质量差(Retrieval Quality)"></a>1. 召回质量差(Retrieval Quality)</h3><p><strong>问题:</strong> 检索器找不到真正相关的文档。</p>
+<ul>
+<li><strong>常见表现</strong>:用户问”A 产品保修期”,检索返回的是 B 产品的保修政策</li>
+<li><strong>根因</strong>:Embedding 模型的语义捕捉能力有上限、Query 和文档不在同一向量空间(同义不同词)、文档切块导致上下文断裂</li>
+<li><strong>表现指标</strong>:Recall@K(前 K 个结果里包含正确答案的比例)</li>
+</ul>
+<h3 id="2-上下文污染-Context-Contamination-Lost-in-the-Middle"><a href="#2-上下文污染-Context-Contamination-Lost-in-the-Middle" class="headerlink" title="2. 上下文污染(Context Contamination &#x2F; Lost-in-the-Middle)"></a>2. 上下文污染(Context Contamination &#x2F; Lost-in-the-Middle)</h3><p><strong>问题:</strong> 检索到了片段,但 LLM 没读到或读错了。</p>
+<ul>
+<li><strong>常见表现</strong>:把片段拼进 prompt 后,LLM 忽略中间位置的事实(类似 Long Context 的 “lost in the middle”)</li>
+<li><strong>解药</strong>:LongContextReorder(把重要片段放在首尾)、Reranker 精排、上下文裁剪</li>
+</ul>
+<h3 id="3-上下文注入型幻觉-Context-Injected-Hallucination"><a href="#3-上下文注入型幻觉-Context-Injected-Hallucination" class="headerlink" title="3. 上下文注入型幻觉(Context-Injected Hallucination)"></a>3. 上下文注入型幻觉(Context-Injected Hallucination)</h3><p><strong>问题:</strong> 检索到的内容本身有问题,LLM 配合”被迫回答”时反而编得更自信。</p>
+<ul>
+<li><strong>常见表现</strong>:文档里有错别字 &#x2F; 旧版本数据 &#x2F; 模型”脑补”了文档之间的关联</li>
+<li><strong>解药</strong>:文档清洗、版本控制、拒答检测、检索评估循环</li>
+</ul>
+<h3 id="1-3-的尾声-RAG-不是终点-是起点"><a href="#1-3-的尾声-RAG-不是终点-是起点" class="headerlink" title="1.3 的尾声:RAG 不是终点,是起点"></a>1.3 的尾声:RAG 不是终点,是起点</h3><p>正是因为这 3 个缺陷,<strong>2024-2026 年才演化出了 Advanced RAG、Modular RAG、GraphRAG、Agentic RAG</strong>——它们都在优化上面 3 个环节中的某几个。</p>
+<blockquote>
+<p><strong>下一步(1.4):</strong> Naive RAG → Advanced RAG → Modular RAG 演进路线</p>
+<p>会拆解每种范式<strong>具体优化了 3 个缺陷中的哪几个</strong>,以及它们各自的适用场景。</p>
+</blockquote>
+<hr>
+<h2 id="六、最小可运行示例-30-行-Python"><a href="#六、最小可运行示例-30-行-Python" class="headerlink" title="六、最小可运行示例(30 行 Python)"></a>六、最小可运行示例(30 行 Python)</h2><p>把上面 5 步流水线落到可运行的代码上。用最少的依赖(LangChain + Chroma + OpenAI):</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># 最小可运行的 RAG 示例,2026 年 LangChain 风格</span></span><br><span class="line"><span class="keyword">from</span> langchain_community.document_loaders <span class="keyword">import</span> TextLoader</span><br><span class="line"><span class="keyword">from</span> langchain_text_splitters <span class="keyword">import</span> RecursiveCharacterTextSplitter</span><br><span class="line"><span class="keyword">from</span> langchain_openai <span class="keyword">import</span> OpenAIEmbeddings, ChatOpenAI</span><br><span class="line"><span class="keyword">from</span> langchain_community.vectorstores <span class="keyword">import</span> Chroma</span><br><span class="line"><span class="keyword">from</span> langchain_core.prompts <span class="keyword">import</span> ChatPromptTemplate</span><br><span class="line"></span><br><span class="line"><span class="comment"># ====== 离线阶段 ======</span></span><br><span class="line"><span class="comment"># ① 加载 + ② 切块</span></span><br><span class="line">docs = TextLoader(<span class="string">&quot;knowledge.txt&quot;</span>, encoding=<span class="string">&quot;utf-8&quot;</span>).load()</span><br><span class="line">splits = RecursiveCharacterTextSplitter(chunk_size=<span class="number">500</span>, chunk_overlap=<span class="number">50</span>).split_documents(docs)</span><br><span class="line"></span><br><span class="line"><span class="comment"># ③ 向量化 + ④ 入库(内存版 Chroma)</span></span><br><span class="line">vectorstore = Chroma.from_documents(splits, OpenAIEmbeddings(model=<span class="string">&quot;text-embedding-3-small&quot;</span>))</span><br><span class="line"></span><br><span class="line"><span class="comment"># ====== 在线阶段 ======</span></span><br><span class="line">retriever = vectorstore.as_retriever(search_kwargs=&#123;<span class="string">&quot;k&quot;</span>: <span class="number">3</span>&#125;)</span><br><span class="line"></span><br><span class="line">prompt = ChatPromptTemplate.from_template(<span class="string">&quot;&quot;&quot;</span></span><br><span class="line"><span class="string">请根据参考资料回答问题,不知道就说不知道。</span></span><br><span class="line"><span class="string">参考资料:&#123;context&#125;</span></span><br><span class="line"><span class="string">问题:&#123;question&#125;</span></span><br><span class="line"><span class="string">&quot;&quot;&quot;</span>.strip())</span><br><span class="line"></span><br><span class="line">llm = ChatOpenAI(model=<span class="string">&quot;gpt-4o-mini&quot;</span>, temperature=<span class="number">0</span>)</span><br><span class="line"></span><br><span class="line"><span class="comment"># LangChain 0.2+ 风格</span></span><br><span class="line"><span class="keyword">from</span> langchain_core.runnables <span class="keyword">import</span> RunnablePassthrough</span><br><span class="line"><span class="keyword">from</span> langchain_core.output_parsers <span class="keyword">import</span> StrOutputParser</span><br><span class="line"></span><br><span class="line">chain = (</span><br><span class="line">    &#123;<span class="string">&quot;context&quot;</span>: retriever, <span class="string">&quot;question&quot;</span>: RunnablePassthrough()&#125;</span><br><span class="line">    | prompt | llm | StrOutputParser()</span><br><span class="line">)</span><br><span class="line"></span><br><span class="line"><span class="built_in">print</span>(chain.invoke(<span class="string">&quot;GLM-5.2 是哪一天发布的?&quot;</span>))</span><br></pre></td></tr></table></figure>
+
+<p><strong>这个示例干了什么(对照 5 步流水线)</strong>:</p>
+<table>
+<thead>
+<tr>
+<th>代码行</th>
+<th>对应的步骤</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>TextLoader</code></td>
+<td>① 文档加载</td>
+</tr>
+<tr>
+<td><code>RecursiveCharacterTextSplitter</code></td>
+<td>② 文档切块</td>
+</tr>
+<tr>
+<td><code>OpenAIEmbeddings</code></td>
+<td>③ 向量化</td>
+</tr>
+<tr>
+<td><code>Chroma.from_documents</code></td>
+<td>④ 入库</td>
+</tr>
+<tr>
+<td><code>as_retriever + chain.invoke</code></td>
+<td>在线阶段(检索 + 拼接 + 生成)</td>
+</tr>
+</tbody></table>
+<p><strong>真实生产环境替换点</strong>:</p>
+<ul>
+<li>文档加载:<code>UnstructuredLoader</code> 处理 PDF&#x2F;Word</li>
+<li>向量库:<code>Milvus / Pinecone</code>(百万级以上)</li>
+<li>LLM:换成 Claude &#x2F; GLM &#x2F; DeepSeek 等</li>
+<li>加 Reranker:把检索结果精排</li>
+<li>加评估:<code>RAGAS</code> 或 <code>TruLens</code> 跑指标</li>
+</ul>
+<hr>
+<h2 id="七、面试快问快答-3-题覆盖-1-3-全部知识点"><a href="#七、面试快问快答-3-题覆盖-1-3-全部知识点" class="headerlink" title="七、面试快问快答(3 题覆盖 1.3 全部知识点)"></a>七、面试快问快答(3 题覆盖 1.3 全部知识点)</h2><p><strong>Q1:RAG 和微调怎么选?如果两者都要,顺序是什么?</strong></p>
+<blockquote>
+<p><strong>A:</strong> 见第二节决策矩阵。简答:</p>
+<ul>
+<li>知识更新频繁 → <strong>RAG</strong></li>
+<li>改变输出风格&#x2F;格式 → <strong>微调</strong></li>
+<li>两者都要 → <strong>先微调风格,再加 RAG 喂知识</strong>(顺序不能反)</li>
+</ul>
+<p>反着来(RAG 后接微调)的问题:微调会”覆盖”掉 RAG 喂的事实,反而把幻觉放大。</p>
+</blockquote>
+<p><strong>Q2:RAG 一定比 Long Context(百万级上下文)好吗?</strong></p>
+<blockquote>
+<p><strong>A:</strong> <strong>大多数场景下,RAG 优于 Long Context。</strong> 理由:</p>
+<ul>
+<li>成本:RAG 处理 top-5 片段 vs 1M tokens 输入,后者贵几十倍</li>
+<li>精度:Long Context 的 “lost in the middle” 问题,RAG 不存在(因为只挑相关片段)</li>
+<li>可解释:RAG 可精确到段,Long Context 答案无法溯源</li>
+</ul>
+<p><strong>Long Context 胜出的场景</strong>:需要跨多文档做整体推理(例如”比较三份合同的所有条款差异”)——这种任务 RAG top-K 检索容易漏信息。</p>
+</blockquote>
+<p><strong>Q3:RAG 的核心缺陷是什么?怎么解决?</strong></p>
+<blockquote>
+<p><strong>A:</strong> 三大缺陷(见第五节):</p>
+<ol>
+<li><strong>召回差</strong> → 改用混合检索 &#x2F; Reranker &#x2F; 微调 Embedding</li>
+<li><strong>lost in the middle</strong> → LongContextReorder &#x2F; 切片更短</li>
+<li><strong>上下文注入型幻觉</strong> → 拒答检测 &#x2F; 检索评估 &#x2F; 文档清洗</li>
+</ol>
+<p>进一步的高级范式(GraphRAG &#x2F; Agentic RAG)在 1.4 详细讲。</p>
+</blockquote>
+<hr>
+<h2 id="八、本节核心要点"><a href="#八、本节核心要点" class="headerlink" title="八、本节核心要点"></a>八、本节核心要点</h2><ol>
+<li><strong>RAG &#x3D; Retrieval + Augmented + Generation</strong>:本质是”把外部知识拼进 prompt”的工作流,不是新模型。</li>
+<li><strong>RAG vs 微调决策</strong>:动态&#x2F;私有&#x2F;事实性知识 → RAG;输出风格&#x2F;格式 → 微调;实际项目大多两者结合。</li>
+<li><strong>标准 RAG 流水线</strong>:离线 4 步(加载→切块→向量化→入库)+ 在线 3 步(检索→Prompt 拼接→生成)。</li>
+<li><strong>Grounding 的本质</strong>:让 LLM 从”凭记忆猜”变成”看着资料答”,幻觉率从 13% 压到 ~2%。</li>
+<li><strong>RAG 不是银弹</strong>:标准 RAG 自身有 3 个固有缺陷——召回差、lost in the middle、上下文注入型幻觉。</li>
+<li><strong>工程经验</strong>:文档切块是 RAG 质量的天花板,Embedding 模型必须 query 和文档同款。</li>
+</ol>
+<hr>
+<blockquote>
+<p><strong>下一步:</strong> 1.4 Naive RAG → Advanced RAG → Modular RAG 演进<br>会拆解每种范式<strong>具体优化了 1.3 末尾提到的哪几个缺陷</strong>,以及它们的适用场景。</p>
+</blockquote>
+
+    </div>
+
+    
+    
+    
+
+    <footer class="post-footer">
+          
+
+<div class="post-copyright">
+<ul>
+  <li class="post-copyright-author">
+      <strong>本文作者： </strong>陌忆
+  </li>
+  <li class="post-copyright-link">
+      <strong>本文链接：</strong>
+      <a href="https://moyi-math.github.io/2026/07/12/RAG-1.3-RAG%E5%9F%BA%E7%A1%80%E6%A6%82%E5%BF%B5%E4%B8%8E%E5%B7%A5%E4%BD%9C%E5%8E%9F%E7%90%86/" title="RAG 学习笔记 · 1.3 RAG 基础概念与工作原理">https://moyi-math.github.io/2026/07/12/RAG-1.3-RAG基础概念与工作原理/</a>
+  </li>
+  <li class="post-copyright-license">
+      <strong>版权声明： </strong>本博客所有文章除特别声明外，均采用 <a href="https://creativecommons.org/licenses/by-nc-sa/4.0/" rel="noopener" target="_blank"><i class="fab fa-fw fa-creative-commons"></i>BY-NC-SA</a> 许可协议。转载请注明出处！
+  </li>
+</ul>
+</div>
+
+          <div class="post-tags">
+              <a href="/tags/RAG/" rel="tag"># RAG</a>
+              <a href="/tags/LLM/" rel="tag"># LLM</a>
+              <a href="/tags/%E9%9D%A2%E8%AF%95/" rel="tag"># 面试</a>
+              <a href="/tags/%E5%8F%82%E6%95%B0%E8%AE%B0%E5%BF%86/" rel="tag"># 参数记忆</a>
+              <a href="/tags/%E9%9D%9E%E5%8F%82%E6%95%B0%E8%AE%B0%E5%BF%86/" rel="tag"># 非参数记忆</a>
+              <a href="/tags/%E6%A3%80%E7%B4%A2%E5%A2%9E%E5%BC%BA/" rel="tag"># 检索增强</a>
+              <a href="/tags/%E5%90%91%E9%87%8F%E6%A3%80%E7%B4%A2/" rel="tag"># 向量检索</a>
+              <a href="/tags/Grounding/" rel="tag"># Grounding</a>
+          </div>
+
+        
+
+          <div class="post-nav">
+            <div class="post-nav-item">
+                <a href="/2026/07/11/RAG-1.2-%E5%8F%82%E6%95%B0%E8%AE%B0%E5%BF%86vs%E9%9D%9E%E5%8F%82%E6%95%B0%E8%AE%B0%E5%BF%86/" rel="prev" title="RAG 学习笔记 · 1.2 参数记忆 vs 非参数记忆——RAG 的核心解法">
+                  <i class="fa fa-angle-left"></i> RAG 学习笔记 · 1.2 参数记忆 vs 非参数记忆——RAG 的核心解法
+                </a>
+            </div>
+            <div class="post-nav-item">
+            </div>
+          </div>
+    </footer>
+  </article>
+</div>
+
+
+
+
+
+
+</div>
+  </main>
+
+  <footer class="footer">
+    <div class="footer-inner">
+
+  <div class="copyright">
+    &copy; 
+    <span itemprop="copyrightYear">2026</span>
+    <span class="with-love">
+      <i class="fa fa-heart"></i>
+    </span>
+    <span class="author" itemprop="copyrightHolder">陌忆</span>
+  </div>
+<div class="wordcount">
+  <span class="post-meta-item">
+    <span class="post-meta-item-icon">
+      <i class="fa fa-chart-line"></i>
+    </span>
+    <span title="站点总字数">9k</span>
+  </span>
+  <span class="post-meta-item">
+    <span class="post-meta-item-icon">
+      <i class="fa fa-coffee"></i>
+    </span>
+    <span title="站点阅读时长">34 分钟</span>
+  </span>
+</div>
+
+    </div>
+  </footer>
+
+  
+  <div class="toggle sidebar-toggle" role="button">
+    <span class="toggle-line"></span>
+    <span class="toggle-line"></span>
+    <span class="toggle-line"></span>
+  </div>
+  <div class="sidebar-dimmer"></div>
+  <div class="back-to-top" role="button" aria-label="返回顶部">
+    <i class="fa fa-arrow-up fa-lg"></i>
+    <span>0%</span>
+  </div>
+
+<noscript>
+  <div class="noscript-warning">Theme NexT works best with JavaScript enabled</div>
+</noscript>
+<!-- canvas-nest particle background -->
+<script defer>
+(function() {
+  var s = document.createElement("script");
+  s.src = "//cdn.bootcss.com/canvas-nest.js/1.0.0/canvas-nest.min.js";
+  s.setAttribute("count", "150");
+  s.setAttribute("opacity", "1");
+  document.body.appendChild(s);
+})();
+</script>
+
+<!-- Live2D widget -->
+<script defer src="/live2dw/lib/L2Dwidget.min.js"></script>
+<script defer>
+L2Dwidget.init({
+  "pluginRootPath": "live2dw/",
+  "pluginJsPath": "lib/",
+  "pluginModelPath": "assets/",
+  "tagMode": false,
+  "debug": false,
+  "model": {"jsonPath": "/live2dw/assets/assets/shizuku.model.json"},
+  "display": {"position": "right", "width": 150, "height": 300},
+  "mobile": {"show": true},
+  "log": false
+});
+</script>
+
+<!-- Page click heart effect -->
+<script defer src="/js/clicklove.js"></script>
+
+<!-- Site running time -->
+<span id="timeDate"></span>
+<script>
+var now = new Date();
+function createtime() {
+  var grt = new Date("11/17/2022 8:00:00");
+  now.setTime(now.getTime() + 250);
+  var days = (now - grt) / 1000 / 60 / 60 / 24;
+  var dnum = Math.floor(days);
+  var hours = (now - grt) / 1000 / 60 / 60 - (24 * dnum);
+  var hnum = Math.floor(hours);
+  if (String(hnum).length == 1) hnum = "0" + hnum;
+  var minutes = (now - grt) / 1000 / 60 - (24 * 60 * dnum) - (60 * hnum);
+  var mnum = Math.floor(minutes);
+  if (String(mnum).length == 1) mnum = "0" + mnum;
+  var seconds = (now - grt) / 1000 - (24 * 60 * 60 * dnum) - (60 * 60 * hnum) - (60 * mnum);
+  var snum = Math.round(seconds);
+  if (String(snum).length == 1) snum = "0" + snum;
+  document.getElementById("timeDate").innerHTML = "本站已安全运行 " + dnum + " 天 " + hnum + " 小时 " + mnum + " 分 " + snum + " 秒";
+}
+setInterval(createtime, 1000);
+</script>
+
+</body>
+</html>
