@@ -1,0 +1,718 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width">
+<meta name="theme-color" content="#222"><meta name="generator" content="Hexo 7.3.0">
+<link rel="preconnect" href="https://cdnjs.cloudflare.com" crossorigin>
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon-next.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32-next.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next.png">
+  <link rel="mask-icon" href="/images/logo.svg" color="#222">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/7.0.0/css/all.min.css" integrity="sha256-VHqXKFhhMxcpubYf9xiWdCiojEbY9NexQ4jh8AxbvcM=" crossorigin="anonymous">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/animate.css/3.1.1/animate.min.css" integrity="sha256-PR7ttpcvz8qrF57fur/yAx1qXMFJeJFiA6pSzWi0OIE=" crossorigin="anonymous">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/pace/1.2.4/themes/blue/pace-theme-minimal.css">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pace/1.2.4/pace.min.js" integrity="sha256-gqd7YTjg/BtfqWSwsJOvndl0Bxc8gFImLEkXQT8+qj0=" crossorigin="anonymous" defer></script>
+
+<script class="next-config" data-name="main" type="application/json">{"hostname":"moyi-math.github.io","root":"/","images":"/images","scheme":"Gemini","darkmode":false,"version":"8.28.0","exturl":false,"sidebar":{"position":"left","width_expanded":320,"width_dual_column":240,"display":"post","padding":18,"offset":12},"hljswrap":true,"codeblock":{"theme":{"light":"default","dark":"stackoverflow-dark"},"prism":{"light":"prism","dark":"prism-dark"},"copy_button":{"enable":true,"style":null},"fold":{"enable":false,"height":500},"language":false},"bookmark":{"enable":false,"color":"#222","save":"auto"},"mediumzoom":false,"lazyload":false,"pangu":false,"comments":{"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},"stickytabs":false,"motion":{"enable":true,"async":false,"duration":200,"transition":{"menu_item":"fadeInDown","post_block":"fadeIn","post_header":"fadeInDown","post_body":"fadeInDown","coll_header":"fadeInLeft","sidebar":"fadeInUp"}},"prism":false,"i18n":{"placeholder":"搜索...","empty":"没有找到任何搜索结果：${query}","hits_time":"找到 ${hits} 个搜索结果（用时 ${time} 毫秒）","hits":"找到 ${hits} 个搜索结果"},"path":"/search.json","localsearch":{"enable":true,"top_n_per_article":1,"unescape":false,"preload":false}}</script><script src="/js/config.js" defer></script>
+
+    <meta name="description" content="用户提问后，LightRAG 如何用 LLM 提取 hl_keywords 和 ll_keywords？从 prompt 模板到 JSON 解析，从缓存设计到&quot;为什么不直接用 query 嵌入&quot;，一步步拆干净。">
+<meta property="og:type" content="article">
+<meta property="og:title" content="LightRAG 源码分析 · 1.1 关键词提取——从用户问题到图检索的第一跳">
+<meta property="og:url" content="https://moyi-math.github.io/2026/07/12/LightRAG-1.1-%E5%85%B3%E9%94%AE%E8%AF%8D%E6%8F%90%E5%8F%96/index.html">
+<meta property="og:site_name" content="陌忆的博客">
+<meta property="og:description" content="用户提问后，LightRAG 如何用 LLM 提取 hl_keywords 和 ll_keywords？从 prompt 模板到 JSON 解析，从缓存设计到&quot;为什么不直接用 query 嵌入&quot;，一步步拆干净。">
+<meta property="og:locale" content="zh_CN">
+<meta property="article:published_time" content="2026-07-12T06:00:00.000Z">
+<meta property="article:modified_time" content="2026-07-12T06:00:00.000Z">
+<meta property="article:author" content="陌忆">
+<meta property="article:tag" content="RAG">
+<meta property="article:tag" content="LightRAG">
+<meta property="article:tag" content="GraphRAG">
+<meta property="article:tag" content="源码分析">
+<meta property="article:tag" content="Query">
+<meta property="article:tag" content="检索增强生成">
+<meta property="article:tag" content="知识图谱">
+<meta property="article:tag" content="关键词提取">
+<meta name="twitter:card" content="summary">
+
+
+<link rel="canonical" href="https://moyi-math.github.io/2026/07/12/LightRAG-1.1-%E5%85%B3%E9%94%AE%E8%AF%8D%E6%8F%90%E5%8F%96/">
+
+
+<script class="next-config" data-name="page" type="application/json">{"sidebar":"","isHome":false,"isPost":true,"lang":"zh-CN","comments":true,"permalink":"https://moyi-math.github.io/2026/07/12/LightRAG-1.1-%E5%85%B3%E9%94%AE%E8%AF%8D%E6%8F%90%E5%8F%96/","path":"2026/07/12/LightRAG-1.1-关键词提取/","title":"LightRAG 源码分析 · 1.1 关键词提取——从用户问题到图检索的第一跳"}</script>
+
+<script class="next-config" data-name="calendar" type="application/json">""</script>
+<title>LightRAG 源码分析 · 1.1 关键词提取——从用户问题到图检索的第一跳 | 陌忆的博客</title>
+  
+
+
+
+
+
+
+
+
+  
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/animejs/3.2.1/anime.min.js" integrity="sha256-XL2inqUJaslATFnHdJOi9GfQ60on8Wx1C2H8DYiN1xY=" crossorigin="anonymous" defer></script>
+<script src="/js/utils.js" defer></script><script src="/js/motion.js" defer></script><script src="/js/sidebar.js" defer></script><script src="/js/next-boot.js" defer></script>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/hexo-generator-searchdb/1.5.0/search.js" integrity="sha256-xFC6PJ82SL9b3WkGjFavNiA9gm5z6UBxWPiu4CYjptg=" crossorigin="anonymous" defer></script>
+<script src="/js/third-party/search/local-search.js" defer></script>
+
+
+
+
+
+  <script src="/js/third-party/pace.js" defer></script>
+
+
+  
+
+
+
+
+  
+
+  <script class="next-config" data-name="enableMath" type="application/json">false</script><link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/katex.min.css" integrity="sha256-UF1fgpAiu3tPJN/uCqEUHNe7pnr+QR0SQDNfgglgtcM=" crossorigin="anonymous">
+
+
+<link rel="preconnect" href="https://cdn.jsdelivr.net">
+<link rel="preconnect" href="https://cdn.bootcss.com">
+
+  <noscript>
+    <link rel="stylesheet" href="/css/noscript.css">
+  </noscript>
+<!-- hexo injector head_end start --><link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/katex.min.css" integrity="sha512-fHwaWebuwA7NSF5Qg/af4UeDx9XqUpYpOGgubo3yWu+b2IQR4UeQwbb42Ti7gVAjNtVoI/I9TEoYeu9omwcC6g==" crossorigin="anonymous" referrerpolicy="no-referrer" /><!-- hexo injector head_end end --></head>
+
+<body itemscope itemtype="http://schema.org/WebPage" class="use-motion">
+  <div class="headband"></div>
+
+  <main class="main">
+    <div class="column">
+      <header class="header" itemscope itemtype="http://schema.org/WPHeader"><div class="site-brand-container">
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="切换导航栏" role="button">
+        <span class="toggle-line"></span>
+        <span class="toggle-line"></span>
+        <span class="toggle-line"></span>
+    </div>
+  </div>
+
+  <div class="site-meta">
+
+    <a href="/" class="brand" rel="start">
+      <i class="logo-line"></i>
+      <p class="site-title">陌忆的博客</p>
+      <i class="logo-line"></i>
+    </a>
+      <p class="site-subtitle" itemprop="description">数据库无法得出结论</p>
+  </div>
+
+  <div class="site-nav-right">
+    <div class="toggle popup-trigger" aria-label="搜索" role="button">
+        <i class="fa fa-search fa-fw fa-lg"></i>
+    </div>
+  </div>
+</div>
+
+
+
+<nav class="site-nav">
+  <ul class="main-menu menu"><li class="menu-item menu-item-home"><a href="/" rel="section"><i class="fa fa-home fa-fw"></i>首页</a></li><li class="menu-item menu-item-about"><a href="/about/" rel="section"><i class="fa fa-user fa-fw"></i>关于</a></li><li class="menu-item menu-item-tags"><a href="/tags/" rel="section"><i class="fa fa-tags fa-fw"></i>标签</a></li><li class="menu-item menu-item-categories"><a href="/categories/" rel="section"><i class="fa fa-th fa-fw"></i>分类</a></li><li class="menu-item menu-item-archives"><a href="/archives/" rel="section"><i class="fa fa-archive fa-fw"></i>归档</a></li>
+      <li class="menu-item menu-item-search">
+        <a role="button" class="popup-trigger"><i class="fa fa-search fa-fw"></i>搜索
+        </a>
+      </li>
+  </ul>
+</nav>
+
+
+
+  <div class="search-pop-overlay">
+    <div class="popup search-popup">
+      <div class="search-header">
+        <span class="search-icon">
+          <i class="fa fa-search"></i>
+        </span>
+        <div class="search-input-container">
+          <input autocomplete="off" autocapitalize="off" maxlength="80"
+                placeholder="搜索..." spellcheck="false"
+                type="search" class="search-input">
+        </div>
+        <span class="popup-btn-close" role="button">
+          <i class="fa fa-times-circle"></i>
+        </span>
+      </div>
+      <div class="search-result-container">
+        <div class="search-result-icon">
+          <i class="fa fa-spinner fa-pulse fa-5x"></i>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</header>
+        
+  
+  <aside class="sidebar">
+
+    <div class="sidebar-inner sidebar-nav-active sidebar-toc-active">
+      <ul class="sidebar-nav">
+        <li class="sidebar-nav-toc">
+          文章目录
+        </li>
+        <li class="sidebar-nav-overview">
+          站点概览
+        </li>
+      </ul>
+
+      <div class="sidebar-panel-container">
+        <!--noindex-->
+        <div class="post-toc-wrap sidebar-panel">
+            <div class="post-toc animated"><ol class="nav"><li class="nav-item nav-level-2"><a class="nav-link" href="#%E9%9B%B6%E3%80%81%E5%89%8D%E7%BD%AE%E7%9F%A5%E8%AF%86%EF%BC%9A%E4%B8%BA%E4%BB%80%E4%B9%88%E9%9C%80%E8%A6%81%E5%85%B3%E9%94%AE%E8%AF%8D%EF%BC%9F"><span class="nav-text">零、前置知识：为什么需要关键词？</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E4%B8%80%E3%80%81%E5%85%A5%E5%8F%A3%EF%BC%9Aget-keywords-from-query"><span class="nav-text">一、入口：get_keywords_from_query</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E4%BA%8C%E3%80%81%E6%A0%B8%E5%BF%83%E5%87%BD%E6%95%B0%EF%BC%9Aextract-keywords-only"><span class="nav-text">二、核心函数：extract_keywords_only</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#2-1-%E5%87%86%E5%A4%87-examples-%E5%92%8C-language"><span class="nav-text">2.1 准备 examples 和 language</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#2-2-Cache-key-%E8%AE%A1%E7%AE%97"><span class="nav-text">2.2 Cache key 计算</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#2-3-Cache-%E6%A3%80%E6%9F%A5"><span class="nav-text">2.3 Cache 检查</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#2-4-Prompt-%E7%BB%84%E8%A3%85"><span class="nav-text">2.4 Prompt 组装</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#2-5-LLM-%E8%B0%83%E7%94%A8"><span class="nav-text">2.5 LLM 调用</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#2-6-JSON-%E8%A7%A3%E6%9E%90%EF%BC%9A-parse-keywords-payload"><span class="nav-text">2.6 JSON 解析：_parse_keywords_payload</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#2-7-%E5%86%99%E5%9B%9E-cache"><span class="nav-text">2.7 写回 cache</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E4%B8%89%E3%80%81%E6%95%B0%E6%8D%AE%E6%B5%81%E5%85%A8%E6%99%AF"><span class="nav-text">三、数据流全景</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%9B%9B%E3%80%81%E6%B6%89%E5%8F%8A%E6%96%87%E4%BB%B6%E4%B8%8E%E5%87%BD%E6%95%B0%E7%B4%A2%E5%BC%95"><span class="nav-text">四、涉及文件与函数索引</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E4%BA%94%E3%80%81%E8%AE%BE%E8%AE%A1%E8%A6%81%E7%82%B9%E6%80%BB%E7%BB%93"><span class="nav-text">五、设计要点总结</span></a></li></ol></div>
+        </div>
+        <!--/noindex-->
+
+        <div class="site-overview-wrap sidebar-panel">
+          <div class="site-author animated" itemprop="author" itemscope itemtype="http://schema.org/Person">
+    <img class="site-author-image" itemprop="image" alt="陌忆"
+      src="/images/avatar.webp">
+  <p class="site-author-name" itemprop="name">陌忆</p>
+  <div class="site-description" itemprop="description">欢迎来到我的世界💜</div>
+</div>
+<div class="site-state-wrap animated">
+  <nav class="site-state">
+      <div class="site-state-item site-state-posts">
+        <a href="/archives/">
+          <span class="site-state-item-count">7</span>
+          <span class="site-state-item-name">日志</span>
+        </a>
+      </div>
+      <div class="site-state-item site-state-categories">
+          <a href="/categories/">
+        <span class="site-state-item-count">3</span>
+        <span class="site-state-item-name">分类</span></a>
+      </div>
+      <div class="site-state-item site-state-tags">
+          <a href="/tags/">
+        <span class="site-state-item-count">28</span>
+        <span class="site-state-item-name">标签</span></a>
+      </div>
+  </nav>
+</div>
+  <div class="cc-license animated" itemprop="license">
+    <a href="https://creativecommons.org/licenses/by-nc-sa/4.0/" class="cc-opacity" rel="noopener" target="_blank"><img src="https://cdnjs.cloudflare.com/ajax/libs/creativecommons-vocabulary/2020.11.3/assets/license_badges/small/by_nc_sa.svg" alt="Creative Commons"></a>
+  </div>
+
+        </div>
+      </div>
+    </div>
+
+    
+  </aside>
+
+
+    </div>
+
+    <div class="main-inner post posts-expand">
+
+
+  
+
+
+<div class="post-block">
+  
+  
+
+  <article itemscope itemtype="http://schema.org/Article" class="post-content" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="https://moyi-math.github.io/2026/07/12/LightRAG-1.1-%E5%85%B3%E9%94%AE%E8%AF%8D%E6%8F%90%E5%8F%96/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.webp">
+      <meta itemprop="name" content="陌忆">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="陌忆的博客">
+      <meta itemprop="description" content="欢迎来到我的世界💜">
+    </span>
+
+    <span hidden itemprop="post" itemscope itemtype="http://schema.org/CreativeWork">
+      <meta itemprop="name" content="LightRAG 源码分析 · 1.1 关键词提取——从用户问题到图检索的第一跳 | 陌忆的博客">
+      <meta itemprop="description" content="用户提问后，LightRAG 如何用 LLM 提取 hl_keywords 和 ll_keywords？从 prompt 模板到 JSON 解析，从缓存设计到&quot;为什么不直接用 query 嵌入&quot;，一步步拆干净。">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          LightRAG 源码分析 · 1.1 关键词提取——从用户问题到图检索的第一跳
+        </h1>
+
+        <div class="post-meta-container">
+          <div class="post-meta">
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-calendar"></i>
+      </span>
+      <span class="post-meta-item-text">发表于</span>
+
+      <time title="创建时间：2026-07-12 14:00:00" itemprop="dateCreated datePublished" datetime="2026-07-12T14:00:00+08:00">2026-07-12</time>
+    </span>
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-folder"></i>
+      </span>
+      <span class="post-meta-item-text">分类于</span>
+        <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+          <a href="/categories/LightRAG%E6%BA%90%E7%A0%81%E5%88%86%E6%9E%90/" itemprop="url" rel="index"><span itemprop="name">LightRAG源码分析</span></a>
+        </span>
+    </span>
+
+  
+    <span class="post-meta-break"></span>
+    <span class="post-meta-item" title="本文字数">
+      <span class="post-meta-item-icon">
+        <i class="far fa-file-word"></i>
+      </span>
+      <span class="post-meta-item-text">本文字数：</span>
+      <span>3k</span>
+    </span>
+    <span class="post-meta-item" title="阅读时长">
+      <span class="post-meta-item-icon">
+        <i class="far fa-clock"></i>
+      </span>
+      <span class="post-meta-item-text">阅读时长 &asymp;</span>
+      <span>11 分钟</span>
+    </span>
+</div>
+
+            <div class="post-description">用户提问后，LightRAG 如何用 LLM 提取 hl_keywords 和 ll_keywords？从 prompt 模板到 JSON 解析，从缓存设计到"为什么不直接用 query 嵌入"，一步步拆干净。</div>
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody"><blockquote>
+<p><strong>章节定位：</strong> 本系列聚焦 LightRAG 内部机制的逐层拆解。本文是 Query 方向的第一篇——关键词提取。接下来会陆续覆盖向量检索、图存储、Token 裁剪、Chunk 汇聚、LLM 调用与缓存等环节。</p>
+</blockquote>
+<span id="more"></span>
+
+<h2 id="零、前置知识：为什么需要关键词？"><a href="#零、前置知识：为什么需要关键词？" class="headerlink" title="零、前置知识：为什么需要关键词？"></a>零、前置知识：为什么需要关键词？</h2><p>在深入代码之前，先理解一个设计问题：<strong>LightRAG 为什么不用 query 嵌入直接搜图？</strong></p>
+<p>传统 naive RAG 的做法是：query → 嵌入 → 搜 chunks VDB（文本块的向量库）。但 LightRAG 的 KG 路径（local &#x2F; global &#x2F; hybrid &#x2F; mix）走的不是这条路。它需要从知识图谱中找到与问题<strong>相关的实体和关系</strong>。</p>
+<p>知识图谱中存储的是<strong>概念</strong>（实体名、关系描述），不是完整的句子。用 “苹果公司今年的营收如何” 这个完整句子去搜 entities VDB，嵌入距离上最接近的可能是 “我今天吃了苹果”（因为都有”苹果”和动词结构），而不是 <code>实体: &quot;苹果公司&quot;</code>。</p>
+<p>解决方案：先用 LLM 从 query 中<strong>抽取出核心概念</strong>（关键词），用这些概念去搜图的 VDB。关键词越精准，图检索的命中率越高。</p>
+<p>LightRAG 将关键词分为两层：</p>
+<table>
+<thead>
+<tr>
+<th>层级</th>
+<th>缩写</th>
+<th>含义</th>
+<th>检索目标</th>
+<th>示例</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>high-level</strong></td>
+<td>hl_keywords</td>
+<td>高层概念、主题领域</td>
+<td>relationships VDB（关系库）</td>
+<td><code>&quot;苹果, 科技公司, 财报&quot;</code></td>
+</tr>
+<tr>
+<td><strong>low-level</strong></td>
+<td>ll_keywords</td>
+<td>具体实体、专有名词</td>
+<td>entities VDB（实体库）</td>
+<td><code>&quot;苹果公司, 2024 年营收, 财务报表&quot;</code></td>
+</tr>
+</tbody></table>
+<p>接下来看代码如何实现这一设计。</p>
+<hr>
+<h2 id="一、入口：get-keywords-from-query"><a href="#一、入口：get-keywords-from-query" class="headerlink" title="一、入口：get_keywords_from_query"></a>一、入口：<code>get_keywords_from_query</code></h2><p><strong>文件：</strong> <code>operate.py:4009</code></p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">async</span> <span class="keyword">def</span> <span class="title function_">get_keywords_from_query</span>(<span class="params"></span></span><br><span class="line"><span class="params">    query: <span class="built_in">str</span>,</span></span><br><span class="line"><span class="params">    query_param: QueryParam,</span></span><br><span class="line"><span class="params">    global_config: <span class="built_in">dict</span>[<span class="built_in">str</span>, <span class="built_in">str</span>],</span></span><br><span class="line"><span class="params">    hashing_kv: BaseKVStorage | <span class="literal">None</span> = <span class="literal">None</span>,</span></span><br><span class="line"><span class="params"></span>) -&gt; <span class="built_in">tuple</span>[<span class="built_in">list</span>[<span class="built_in">str</span>], <span class="built_in">list</span>[<span class="built_in">str</span>]]:</span><br><span class="line">    <span class="comment"># 用户显式提供了关键词？直接跳过 LLM</span></span><br><span class="line">    <span class="keyword">if</span> query_param.hl_keywords <span class="keyword">or</span> query_param.ll_keywords:</span><br><span class="line">        <span class="keyword">return</span> query_param.hl_keywords, query_param.ll_keywords</span><br><span class="line"></span><br><span class="line">    hl_keywords, ll_keywords = <span class="keyword">await</span> extract_keywords_only(</span><br><span class="line">        query, query_param, global_config, hashing_kv</span><br><span class="line">    )</span><br><span class="line">    <span class="keyword">return</span> hl_keywords, ll_keywords</span><br></pre></td></tr></table></figure>
+
+<p>逻辑极简——两条路径：</p>
+<ol>
+<li><strong>短路径：</strong> <code>QueryParam</code> 中已传入 <code>hl_keywords</code> &#x2F; <code>ll_keywords</code>，直接返回，不调 LLM</li>
+<li><strong>长路径：</strong> 调 <code>extract_keywords_only</code> 让 LLM 抽取</li>
+</ol>
+<p>短路径的设计意图：高级用户可以在 <code>QueryParam</code> 中预指定关键词，精确控制检索方向，绕过 LLM 抽取的不确定性。</p>
+<p>调用方（<code>kg_query</code>，第 3794 行）中，<code>extract_keywords_only</code> 的传参也很清晰：</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">hl_keywords, ll_keywords = <span class="keyword">await</span> get_keywords_from_query(</span><br><span class="line">    query, query_param, global_config, hashing_kv</span><br><span class="line">)</span><br></pre></td></tr></table></figure>
+
+<p>多了一个 <code>hashing_kv</code>——这是 KV 存储实例，用于缓存 LLM 的抽取结果。下一次相同的 query 进来，直接从缓存取关键词，不再调 LLM。</p>
+<hr>
+<h2 id="二、核心函数：extract-keywords-only"><a href="#二、核心函数：extract-keywords-only" class="headerlink" title="二、核心函数：extract_keywords_only"></a>二、核心函数：<code>extract_keywords_only</code></h2><p><strong>文件：</strong> <code>operate.py:4164</code></p>
+<p>这个函数负责所有实际工作，流程分 6 步：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line">构建 examples → 计算 args_hash → cache 检查</span><br><span class="line">    → 命中？解析 payload，返回</span><br><span class="line">    → 未命中？组装 prompt → 调 LLM → JSON 解析</span><br><span class="line">    → 写入 cache → 返回</span><br></pre></td></tr></table></figure>
+
+<p>下面逐段展开。</p>
+<h3 id="2-1-准备-examples-和-language"><a href="#2-1-准备-examples-和-language" class="headerlink" title="2.1 准备 examples 和 language"></a>2.1 准备 examples 和 language</h3><figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line">examples = <span class="string">&quot;\n&quot;</span>.join(PROMPTS[<span class="string">&quot;keywords_extraction_examples&quot;</span>])</span><br><span class="line"></span><br><span class="line">addon_params = global_config.get(<span class="string">&quot;addon_params&quot;</span>) <span class="keyword">or</span> &#123;&#125;</span><br><span class="line">language = global_config.get(<span class="string">&quot;_resolved_summary_language&quot;</span>)</span><br><span class="line"><span class="keyword">if</span> language <span class="keyword">is</span> <span class="literal">None</span>:</span><br><span class="line">    language = addon_params.get(<span class="string">&quot;language&quot;</span>, DEFAULT_SUMMARY_LANGUAGE)</span><br></pre></td></tr></table></figure>
+
+<p><code>keywords_extraction_examples</code> 在 <code>prompt.py:517</code>，内容是一个简单的 JSON 模板：</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line">PROMPTS[<span class="string">&quot;keywords_extraction_examples&quot;</span>] = [</span><br><span class="line">    <span class="string">&quot;&quot;&quot;&#123;</span></span><br><span class="line"><span class="string">  &quot;high_level_keywords&quot;: [&quot;&lt;high_level_keyword&gt;&quot;],</span></span><br><span class="line"><span class="string">  &quot;low_level_keywords&quot;: [&quot;&lt;low_level_keyword&gt;&quot;]</span></span><br><span class="line"><span class="string">&#125;</span></span><br><span class="line"><span class="string">&quot;&quot;&quot;</span>,</span><br><span class="line">]</span><br></pre></td></tr></table></figure>
+
+<p>这个 example 会被嵌入到 prompt 的 <code>---Output Format Template---</code> 部分，给 LLM 示范输出格式。</p>
+<p><code>language</code> 决定了 LLM 抽取关键词时应该用什么语言输出。默认值由 <code>DEFAULT_SUMMARY_LANGUAGE</code> 常量指定（通常为英文）。如果用户配置了 <code>addon_params.language</code> 或 <code>_resolved_summary_language</code>，则用配置值。</p>
+<h3 id="2-2-Cache-key-计算"><a href="#2-2-Cache-key-计算" class="headerlink" title="2.2 Cache key 计算"></a>2.2 Cache key 计算</h3><p>在调 LLM 之前，先算 cache key：</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line">llm_cache_identity = get_llm_cache_identity(global_config, <span class="string">&quot;keyword&quot;</span>)</span><br><span class="line">args_hash = compute_args_hash(</span><br><span class="line">    param.mode,</span><br><span class="line">    text,</span><br><span class="line">    language,</span><br><span class="line">    <span class="string">&quot;\n&lt;llm_identity&gt;\n&quot;</span>,</span><br><span class="line">    serialize_llm_cache_identity(llm_cache_identity),</span><br><span class="line">)</span><br></pre></td></tr></table></figure>
+
+<p><code>compute_args_hash</code>（<code>utils.py:638</code>）将所有参数顺序拼接后做 MD5：</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">def</span> <span class="title function_">compute_args_hash</span>(<span class="params">*args: <span class="type">Any</span></span>) -&gt; <span class="built_in">str</span>:</span><br><span class="line">    args_str = <span class="string">&quot;&quot;</span>.join([<span class="built_in">str</span>(arg) <span class="keyword">for</span> arg <span class="keyword">in</span> args])</span><br><span class="line">    <span class="keyword">try</span>:</span><br><span class="line">        <span class="keyword">return</span> md5(args_str.encode(<span class="string">&quot;utf-8&quot;</span>)).hexdigest()</span><br><span class="line">    <span class="keyword">except</span> UnicodeEncodeError:</span><br><span class="line">        safe_bytes = args_str.encode(<span class="string">&quot;utf-8&quot;</span>, errors=<span class="string">&quot;replace&quot;</span>)</span><br><span class="line">        <span class="keyword">return</span> md5(safe_bytes).hexdigest()</span><br></pre></td></tr></table></figure>
+
+<p>MD5 的安全性不是这里关心的事——只要碰撞概率足够低即可。可读性、速度、确定性才是目标。</p>
+<p>cache key 包含 5 个维度：</p>
+<table>
+<thead>
+<tr>
+<th>维度</th>
+<th>来源</th>
+<th>作用</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>param.mode</code></td>
+<td>查询模式</td>
+<td>不同模式下相同 query 可能提取不同关键词</td>
+</tr>
+<tr>
+<td><code>text</code></td>
+<td>用户 query 原文</td>
+<td>不同 query 不同关键词</td>
+</tr>
+<tr>
+<td><code>language</code></td>
+<td>语言配置</td>
+<td>同 query 不同语言可能提取不同关键词</td>
+</tr>
+<tr>
+<td>分隔符</td>
+<td>硬编码</td>
+<td>分隔 identity 防注入</td>
+</tr>
+<tr>
+<td><code>llm_cache_identity</code></td>
+<td>模型身份</td>
+<td>切换 LLM 模型后旧缓存失效</td>
+</tr>
+</tbody></table>
+<p><code>get_llm_cache_identity</code>（<code>utils.py:685</code>）从 <code>global_config[&quot;llm_cache_identities&quot;]</code> 中取当前 role 的模型身份：</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">def</span> <span class="title function_">get_llm_cache_identity</span>(<span class="params">global_config, role</span>):</span><br><span class="line">    config = global_config <span class="keyword">or</span> &#123;&#125;</span><br><span class="line">    identities = config.get(<span class="string">&quot;llm_cache_identities&quot;</span>)</span><br><span class="line">    <span class="keyword">if</span> <span class="built_in">isinstance</span>(identities, <span class="built_in">dict</span>):</span><br><span class="line">        identity = identities.get(role)</span><br><span class="line">        <span class="keyword">if</span> <span class="built_in">isinstance</span>(identity, <span class="built_in">dict</span>):</span><br><span class="line">            <span class="keyword">return</span> <span class="built_in">dict</span>(identity)</span><br><span class="line"></span><br><span class="line">    <span class="keyword">return</span> &#123;</span><br><span class="line">        <span class="string">&quot;role&quot;</span>: role,</span><br><span class="line">        <span class="string">&quot;binding&quot;</span>: <span class="literal">None</span>,</span><br><span class="line">        <span class="string">&quot;model&quot;</span>: config.get(<span class="string">&quot;llm_model_name&quot;</span>),</span><br><span class="line">        <span class="string">&quot;host&quot;</span>: <span class="literal">None</span>,</span><br><span class="line">    &#125;</span><br></pre></td></tr></table></figure>
+
+<p><strong>关键设计：</strong> <code>llm_cache_identity</code> 明确排除了 <code>api_key</code> 和 <code>provider_options</code>。这意味着 cache key 不包含敏感信息，可以安全地持久化存储、跨会话复用，甚至共享。</p>
+<h3 id="2-3-Cache-检查"><a href="#2-3-Cache-检查" class="headerlink" title="2.3 Cache 检查"></a>2.3 Cache 检查</h3><figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br></pre></td><td class="code"><pre><span class="line">cached_result = <span class="keyword">await</span> handle_cache(</span><br><span class="line">    hashing_kv, args_hash, text, param.mode, cache_type=<span class="string">&quot;keywords&quot;</span></span><br><span class="line">)</span><br><span class="line"><span class="keyword">if</span> cached_result <span class="keyword">is</span> <span class="keyword">not</span> <span class="literal">None</span>:</span><br><span class="line">    cached_response, _ = cached_result</span><br><span class="line">    is_valid_payload, hl_keywords, ll_keywords = _parse_keywords_payload(</span><br><span class="line">        cached_response</span><br><span class="line">    )</span><br><span class="line">    <span class="keyword">if</span> is_valid_payload:</span><br><span class="line">        <span class="keyword">return</span> hl_keywords, ll_keywords</span><br><span class="line">    <span class="keyword">else</span>:</span><br><span class="line">        logger.warning(<span class="string">&quot;Invalid cache format for keywords, proceeding with extraction&quot;</span>)</span><br></pre></td></tr></table></figure>
+
+<p>cache 命中的结果不能直接信任——要用 <code>_parse_keywords_payload</code> 重新解析验证。如果缓存数据损坏了（比如旧版本格式变更），会优雅降级到重新调用 LLM。</p>
+<h3 id="2-4-Prompt-组装"><a href="#2-4-Prompt-组装" class="headerlink" title="2.4 Prompt 组装"></a>2.4 Prompt 组装</h3><figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line">kw_prompt = PROMPTS[<span class="string">&quot;keywords_extraction&quot;</span>].<span class="built_in">format</span>(</span><br><span class="line">    query=text,</span><br><span class="line">    examples=examples,</span><br><span class="line">    language=language,</span><br><span class="line">)</span><br></pre></td></tr></table></figure>
+
+<p><code>kw_prompt</code> 是一个 12 条规则约束的 LLM prompt。完整内容在 <code>prompt.py:484</code>，核心结构如下：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br></pre></td><td class="code"><pre><span class="line">---Role---</span><br><span class="line">你是专业的关键词提取器...</span><br><span class="line"></span><br><span class="line">---Goal---</span><br><span class="line">提取两种关键词：</span><br><span class="line">1. high_level_keywords：高层概念、用户核心意图</span><br><span class="line">2. low_level_keywords：具体实体、专有名词、技术术语</span><br><span class="line"></span><br><span class="line">---Instructions &amp; Constraints---</span><br><span class="line">1. 输出必须是合法 JSON，不要任何额外文本</span><br><span class="line">2. 精确 JSON 结构：&#123;&quot;high_level_keywords&quot;: [...], &quot;low_level_keywords&quot;: [...]&#125;</span><br><span class="line">3. 第一个字符必须是 &#123;，最后一个字符必须是 &#125;</span><br><span class="line">4. 所有关键词必须从 User Query 中推导，不能捏造</span><br><span class="line">5. 关键词要简洁有意义，优先使用短语而非拆分单词</span><br><span class="line">6. 对于简单、模糊或无意义的 query（如 &quot;hello&quot;，&quot;ok&quot;，&quot;asdfghjkl&quot;），返回空列表</span><br><span class="line">7. 同一列表内不要重复</span><br><span class="line">8. 所有关键词必须用 &#123;language&#125; 输出，专有名词保留原文</span><br><span class="line">9. 不要从 Output Format Template 中提取关键词（那是模板不是源文本）</span><br><span class="line"></span><br><span class="line">---Output Format Template---</span><br><span class="line">&#123;examples&#125;</span><br><span class="line"></span><br><span class="line">---Real Data---</span><br><span class="line">User Query: &#123;query&#125;</span><br><span class="line"></span><br><span class="line">---Output---</span><br><span class="line">Output:</span><br></pre></td></tr></table></figure>
+
+<p>看几个值得注意的约束：</p>
+<ul>
+<li><strong>规则 5（短语优先）：</strong> “Machine Learning” 应该作为单个短语保留，而不是拆成 “Machine” 和 “Learning”。这是 prompt 级别的防劣化设计。</li>
+<li><strong>规则 6（空查询容忍）：</strong> 对无意义 query 返回空列表，而不是胡乱编造关键词。这是 prompt 级别的安全边界。</li>
+<li><strong>规则 8（语言控制）：</strong> 提取结果的语言与 query 语言解耦，可以配置。专有名词保留原文。</li>
+<li><strong>规则 9（模板隔离）：</strong> 显式声明 <code>---Output Format Template---</code> 里的内容不是源文本。防止 LLM 把 <code>&quot;&lt;high_level_keyword&gt;&quot;</code> 这个占位符当关键词提取出来。</li>
+</ul>
+<h3 id="2-5-LLM-调用"><a href="#2-5-LLM-调用" class="headerlink" title="2.5 LLM 调用"></a>2.5 LLM 调用</h3><figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line">use_model_func = partial(</span><br><span class="line">    global_config[<span class="string">&quot;role_llm_funcs&quot;</span>][<span class="string">&quot;keyword&quot;</span>], _priority=DEFAULT_QUERY_PRIORITY</span><br><span class="line">)</span><br><span class="line">result = <span class="keyword">await</span> use_model_func(kw_prompt, response_format=&#123;<span class="string">&quot;type&quot;</span>: <span class="string">&quot;json_object&quot;</span>&#125;)</span><br></pre></td></tr></table></figure>
+
+<p>两个关键点：</p>
+<p><strong>role 隔离：</strong> LightRAG 的 LLM 调用体系按 role 分配不同的 LLM 函数。关键词提取用的是 <code>role_llm_funcs[&quot;keyword&quot;]</code>——可以配置独立的模型、端点和参数，与主回答 LLM 分离。这意味着你可以让关键词提取走更便宜的小模型，主回答走更强的模型。</p>
+<p><strong>结构化输出：</strong> 传入 <code>response_format=&#123;&quot;type&quot;: &quot;json_object&quot;&#125;</code>，要求 LLM 以 JSON 格式返回。这是 OpenAI-compatible 接口的标准做法，能大幅降 parse 失败率。但并非所有 LLM provider 都支持此参数——不支持的 provider 会在后续 JSON 解析阶段通过 <code>json_repair</code> 做容错恢复。</p>
+<h3 id="2-6-JSON-解析：-parse-keywords-payload"><a href="#2-6-JSON-解析：-parse-keywords-payload" class="headerlink" title="2.6 JSON 解析：_parse_keywords_payload"></a>2.6 JSON 解析：<code>_parse_keywords_payload</code></h3><p><strong>文件：</strong> <code>operate.py:4103</code></p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">def</span> <span class="title function_">_parse_keywords_payload</span>(<span class="params">result: <span class="type">Any</span></span>) -&gt; <span class="built_in">tuple</span>[<span class="built_in">bool</span>, <span class="built_in">list</span>[<span class="built_in">str</span>], <span class="built_in">list</span>[<span class="built_in">str</span>]]:</span><br></pre></td></tr></table></figure>
+
+<p>这是全系列<strong>容错最精细的解析函数之一</strong>，因为 LLM 的输出格式五花八门，必须层层兜底。</p>
+<p>解析流程：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br></pre></td><td class="code"><pre><span class="line">result 的类型？</span><br><span class="line">    ├── Pydantic BaseModel → model_dump()</span><br><span class="line">    ├── dict → 直接使用</span><br><span class="line">    ├── str → 按以下顺序尝试解析</span><br><span class="line">    │   1. remove_think_tags（剥离 &lt;｜end▁of▁thinking｜&gt; 内的 &lt;｜end▁of▁thinking｜&gt;... 思维链标记）</span><br><span class="line">    │   2. _strip_markdown_code_fence（剥离 ```json ... ``` 围栏）</span><br><span class="line">    │   3. json.loads（标准解析）</span><br><span class="line">    │   4. json_repair.loads（容错修复——引号、多逗号等）</span><br><span class="line">    │   5. 全部失败 → 返回 False, [], []</span><br><span class="line">    └── 其他类型 → 返回 False, [], []</span><br><span class="line"></span><br><span class="line">提取 high_level_keywords / low_level_keywords</span><br><span class="line">    → _normalize_keyword_list 做规范化和清洗</span><br></pre></td></tr></table></figure>
+
+<p>逐层看。</p>
+<p><strong><code>_strip_markdown_code_fence</code> 处理：</strong></p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">unfenced_result = _strip_markdown_code_fence(cleaned_result)</span><br><span class="line"><span class="keyword">if</span> unfenced_result <span class="keyword">is</span> <span class="keyword">not</span> cleaned_result:</span><br><span class="line">    logger.debug(<span class="string">&quot;Stripped markdown code fence from keyword extraction response&quot;</span>)</span><br></pre></td></tr></table></figure>
+
+<p>有些 LLM 虽然在 prompt 中被告知”不要 code fence”，但偶尔还是输出 <code>```json</code>。这里做静默修正，只打 debug 日志不让用户感知。</p>
+<p><strong><code>json_repair</code> 兜底：</strong></p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">try</span>:</span><br><span class="line">    payload = json.loads(cleaned_result)</span><br><span class="line"><span class="keyword">except</span> json.JSONDecodeError <span class="keyword">as</span> strict_error:</span><br><span class="line">    <span class="keyword">try</span>:</span><br><span class="line">        payload = json_repair.loads(cleaned_result)</span><br><span class="line">        logger.warning(</span><br><span class="line">            <span class="string">&quot;Keyword extraction response required JSON repair: %s; response: %r&quot;</span>,</span><br><span class="line">            strict_error,</span><br><span class="line">            cleaned_result[:<span class="number">500</span>],</span><br><span class="line">        )</span><br><span class="line">    <span class="keyword">except</span> Exception <span class="keyword">as</span> repair_error:</span><br><span class="line">        logger.error(...)</span><br><span class="line">        <span class="keyword">return</span> <span class="literal">False</span>, [], []</span><br></pre></td></tr></table></figure>
+
+<p>标准 JSON 解析失败后降级到 <code>json_repair</code>，这是一个专为 LLM 输出设计的容错 JSON 解析器，能处理末尾多余逗号、属性名缺引号、单引号代替双引号等常见问题。如果连 <code>json_repair</code> 都失败，才真正放弃——打 error 日志，返回空列表。</p>
+<p><strong>规范化：<code>_normalize_keyword_list</code>（第 4041 行）：</strong></p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">def</span> <span class="title function_">_normalize_keyword_list</span>(<span class="params">raw_values: <span class="type">Any</span>, field_name: <span class="built_in">str</span></span>) -&gt; <span class="built_in">list</span>[<span class="built_in">str</span>]:</span><br><span class="line">    <span class="keyword">if</span> raw_values <span class="keyword">is</span> <span class="literal">None</span>:</span><br><span class="line">        <span class="keyword">return</span> []</span><br><span class="line">    <span class="keyword">if</span> <span class="built_in">isinstance</span>(raw_values, <span class="built_in">str</span>):</span><br><span class="line">        <span class="comment"># 按换行/逗号/分号拆分</span></span><br><span class="line">        raw_values = [</span><br><span class="line">            part.strip()</span><br><span class="line">            <span class="keyword">for</span> part <span class="keyword">in</span> re.split(<span class="string">r&quot;[\n,;]+&quot;</span>, raw_values)</span><br><span class="line">            <span class="keyword">if</span> part <span class="keyword">and</span> part.strip()</span><br><span class="line">        ]</span><br><span class="line">    <span class="keyword">if</span> <span class="keyword">not</span> <span class="built_in">isinstance</span>(raw_values, <span class="built_in">list</span>):</span><br><span class="line">        <span class="keyword">return</span> []</span><br><span class="line">    <span class="comment"># 清洗每个元素</span></span><br><span class="line">    normalized = []</span><br><span class="line">    <span class="keyword">for</span> idx, value <span class="keyword">in</span> <span class="built_in">enumerate</span>(raw_values):</span><br><span class="line">        <span class="keyword">if</span> <span class="built_in">isinstance</span>(value, <span class="built_in">str</span>):</span><br><span class="line">            cleaned = value.strip()</span><br><span class="line">            <span class="keyword">if</span> cleaned:</span><br><span class="line">                normalized.append(cleaned)</span><br><span class="line">            <span class="keyword">continue</span></span><br><span class="line">        <span class="comment"># 非字符串元素打 warning 跳过</span></span><br><span class="line">    <span class="keyword">return</span> normalized</span><br></pre></td></tr></table></figure>
+
+<p>这个函数处理两种常见情况：</p>
+<ul>
+<li><strong>字符串型输出：</strong> 有些 LLM 不按 JSON 约定走，把关键词以逗号分隔符拼成一个字符串。这里按 <code>\n</code>、<code>,</code>、<code>;</code> 三种分隔符拆分。</li>
+<li><strong>脏数据：</strong> 空字符串、纯空白、None 都被过滤。非字符串元素（如数字、嵌套对象）被跳过并打 warning。</li>
+</ul>
+<h3 id="2-7-写回-cache"><a href="#2-7-写回-cache" class="headerlink" title="2.7 写回 cache"></a>2.7 写回 cache</h3><figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">if</span> hl_keywords <span class="keyword">or</span> ll_keywords:</span><br><span class="line">    cache_data = &#123;</span><br><span class="line">        <span class="string">&quot;high_level_keywords&quot;</span>: hl_keywords,</span><br><span class="line">        <span class="string">&quot;low_level_keywords&quot;</span>: ll_keywords,</span><br><span class="line">    &#125;</span><br><span class="line">    <span class="keyword">if</span> hashing_kv <span class="keyword">and</span> hashing_kv.global_config.get(<span class="string">&quot;enable_llm_cache&quot;</span>):</span><br><span class="line">        queryparam_dict = &#123;</span><br><span class="line">            <span class="string">&quot;mode&quot;</span>: param.mode,</span><br><span class="line">            <span class="string">&quot;response_type&quot;</span>: param.response_type,</span><br><span class="line">            <span class="string">&quot;top_k&quot;</span>: param.top_k,</span><br><span class="line">            <span class="string">&quot;chunk_top_k&quot;</span>: param.chunk_top_k,</span><br><span class="line">            <span class="string">&quot;max_entity_tokens&quot;</span>: param.max_entity_tokens,</span><br><span class="line">            <span class="string">&quot;max_relation_tokens&quot;</span>: param.max_relation_tokens,</span><br><span class="line">            <span class="string">&quot;max_total_tokens&quot;</span>: param.max_total_tokens,</span><br><span class="line">            <span class="string">&quot;user_prompt&quot;</span>: param.user_prompt <span class="keyword">or</span> <span class="string">&quot;&quot;</span>,</span><br><span class="line">            <span class="string">&quot;enable_rerank&quot;</span>: param.enable_rerank,</span><br><span class="line">        &#125;</span><br><span class="line">        <span class="keyword">await</span> save_to_cache(</span><br><span class="line">            hashing_kv,</span><br><span class="line">            CacheData(</span><br><span class="line">                args_hash=args_hash,</span><br><span class="line">                content=json.dumps(cache_data),</span><br><span class="line">                prompt=text,</span><br><span class="line">                mode=param.mode,</span><br><span class="line">                cache_type=<span class="string">&quot;keywords&quot;</span>,</span><br><span class="line">                queryparam=queryparam_dict,</span><br><span class="line">            ),</span><br><span class="line">        )</span><br></pre></td></tr></table></figure>
+
+<p>保存到 KV Store（默认是 <code>JsonKVStorage</code>，写入 <code>kv_store_llm_response_cache.json</code>）。注意写入条件：</p>
+<ul>
+<li>只在 <code>enable_llm_cache = True</code> 时写</li>
+<li>只在 <code>hl_keywords or ll_keywords</code> 非空时写（空结果不缓存，下次重新提取）</li>
+<li><code>queryparam_dict</code> 额外保存了 query 参数上下文，方便后面检索时分析命中了哪些参数组合</li>
+</ul>
+<hr>
+<h2 id="三、数据流全景"><a href="#三、数据流全景" class="headerlink" title="三、数据流全景"></a>三、数据流全景</h2><p>从用户提问到得到关键词，完整的数据流：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br></pre></td><td class="code"><pre><span class="line">用户提问：&quot;苹果公司今年的营收如何&quot;</span><br><span class="line">    │</span><br><span class="line">    ▼</span><br><span class="line">kg_query (operate.py:3794)</span><br><span class="line">    │</span><br><span class="line">    ├─ get_keywords_from_query (operate.py:4009)</span><br><span class="line">    │   │</span><br><span class="line">    │   ├─ QueryParam.hl_keywords / ll_keywords 已指定？</span><br><span class="line">    │   │   └─ 是 → 直接返回（跳过 LLM）</span><br><span class="line">    │   │</span><br><span class="line">    │   └─ extract_keywords_only (operate.py:4164)</span><br><span class="line">    │       │</span><br><span class="line">    │       ├─ 1. 加载 examples + language 配置</span><br><span class="line">    │       │</span><br><span class="line">    │       ├─ 2. 计算 args_hash</span><br><span class="line">    │       │   ├─ param.mode</span><br><span class="line">    │       │   ├─ query 原文</span><br><span class="line">    │       │   ├─ language</span><br><span class="line">    │       │   └─ llm_cache_identity</span><br><span class="line">    │       │</span><br><span class="line">    │       ├─ 3. handle_cache(hashing_kv, args_hash)</span><br><span class="line">    │       │   └─ 命中？_parse_keywords_payload → 验证 → 返回</span><br><span class="line">    │       │</span><br><span class="line">    │       ├─ 4. 组装 kw_prompt（role + goal + 12 条规则 + examples + query）</span><br><span class="line">    │       │</span><br><span class="line">    │       ├─ 5. role_llm_funcs[&quot;keyword&quot;](kw_prompt, response_format=json_object)</span><br><span class="line">    │       │</span><br><span class="line">    │       ├─ 6. _parse_keywords_payload(result)</span><br><span class="line">    │       │   ├─ remove_think_tags → _strip_markdown_code_fence</span><br><span class="line">    │       │   ├─ json.loads → json_repair.loads 兜底</span><br><span class="line">    │       │   └─ _normalize_keyword_list 清洗</span><br><span class="line">    │       │</span><br><span class="line">    │       └─ 7. save_to_cache(hashing_kv, cache_data)</span><br><span class="line">    │           └─ hl_keywords + ll_keywords → JSON → KV Store</span><br><span class="line">    │</span><br><span class="line">    └─ 返回 (hl_keywords, ll_keywords)</span><br><span class="line">        │</span><br><span class="line">        ├─ ll_keywords → local 路径 → entities_vdb.query()</span><br><span class="line">        └─ hl_keywords → global 路径 → relationships_vdb.query()</span><br></pre></td></tr></table></figure>
+
+<hr>
+<h2 id="四、涉及文件与函数索引"><a href="#四、涉及文件与函数索引" class="headerlink" title="四、涉及文件与函数索引"></a>四、涉及文件与函数索引</h2><table>
+<thead>
+<tr>
+<th>函数 &#x2F; 数据</th>
+<th>文件</th>
+<th>行号</th>
+<th>职责</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>get_keywords_from_query</code></td>
+<td>operate.py</td>
+<td>4009</td>
+<td>入口：关键词获取（短路径&#x2F;长路径）</td>
+</tr>
+<tr>
+<td><code>extract_keywords_only</code></td>
+<td>operate.py</td>
+<td>4164</td>
+<td>核心：LLM 抽取关键词</td>
+</tr>
+<tr>
+<td><code>_parse_keywords_payload</code></td>
+<td>operate.py</td>
+<td>4103</td>
+<td>解析 LLM JSON 响应（含容错兜底）</td>
+</tr>
+<tr>
+<td><code>_normalize_keyword_list</code></td>
+<td>operate.py</td>
+<td>4041</td>
+<td>关键词列表清洗与规范化</td>
+</tr>
+<tr>
+<td><code>compute_args_hash</code></td>
+<td>utils.py</td>
+<td>638</td>
+<td>Cache key 的 MD5 计算</td>
+</tr>
+<tr>
+<td><code>get_llm_cache_identity</code></td>
+<td>utils.py</td>
+<td>685</td>
+<td>获取模型身份（不含 API key）</td>
+</tr>
+<tr>
+<td><code>serialize_llm_cache_identity</code></td>
+<td>utils.py</td>
+<td>710</td>
+<td>序列化模型身份用于 hash</td>
+</tr>
+<tr>
+<td><code>handle_cache</code></td>
+<td>utils.py</td>
+<td>2877</td>
+<td>Cache 读取</td>
+</tr>
+<tr>
+<td><code>save_to_cache</code></td>
+<td>utils.py</td>
+<td>2923</td>
+<td>Cache 写入</td>
+</tr>
+<tr>
+<td><code>PROMPTS[&quot;keywords_extraction&quot;]</code></td>
+<td>prompt.py</td>
+<td>484</td>
+<td>关键词提取 prompt 模板</td>
+</tr>
+<tr>
+<td><code>PROMPTS[&quot;keywords_extraction_examples&quot;]</code></td>
+<td>prompt.py</td>
+<td>517</td>
+<td>输出格式示例</td>
+</tr>
+<tr>
+<td><code>_strip_markdown_code_fence</code></td>
+<td>operate.py</td>
+<td>—</td>
+<td>剥离 code fence 包裹</td>
+</tr>
+</tbody></table>
+<hr>
+<h2 id="五、设计要点总结"><a href="#五、设计要点总结" class="headerlink" title="五、设计要点总结"></a>五、设计要点总结</h2><ol>
+<li><p><strong>关键词 ≠ 嵌入：</strong> 关键词提取是为了”概念级匹配”，和向量检索是互补而非替代关系。关键词命中知识图谱的节点&#x2F;边，向量相似度决定排序。</p>
+</li>
+<li><p><strong>两层分离：</strong> hl（高层→关系库）和 ll（低层→实体库）对应两种不同的检索粒度，后续会进入不同的路由分支。同一组 LLM 调用同时产出两者，没有额外开销。</p>
+</li>
+<li><p><strong>Cache 是全维度的：</strong> 不只是 query 文本，mode、language、LLM 模型身份都被纳入 cache key。切换任何一个维度都不命中旧缓存。</p>
+</li>
+<li><p><strong>容错分层：</strong> <code>json.loads → json_repair.loads → 空列表</code> 三层降级，配合 <code>_normalize_keyword_list</code> 的字符串&#x2F;列表兼容，覆盖了几乎所有主流 LLM provider 的输出格式变化。</p>
+</li>
+<li><p><strong>Role 隔离：</strong> 关键词提取使用独立的 <code>role_llm_funcs[&quot;keyword&quot;]</code>，可以与主回答使用不同的模型配置。这是 LightRAG 整套 LLM 调用体系的设计基础，后续文章会深入展开。</p>
+</li>
+</ol>
+
+    </div>
+
+    
+    
+    
+
+    <footer class="post-footer">
+          
+
+<div class="post-copyright">
+<ul>
+  <li class="post-copyright-author">
+      <strong>本文作者： </strong>陌忆
+  </li>
+  <li class="post-copyright-link">
+      <strong>本文链接：</strong>
+      <a href="https://moyi-math.github.io/2026/07/12/LightRAG-1.1-%E5%85%B3%E9%94%AE%E8%AF%8D%E6%8F%90%E5%8F%96/" title="LightRAG 源码分析 · 1.1 关键词提取——从用户问题到图检索的第一跳">https://moyi-math.github.io/2026/07/12/LightRAG-1.1-关键词提取/</a>
+  </li>
+  <li class="post-copyright-license">
+      <strong>版权声明： </strong>本博客所有文章除特别声明外，均采用 <a href="https://creativecommons.org/licenses/by-nc-sa/4.0/" rel="noopener" target="_blank"><i class="fab fa-fw fa-creative-commons"></i>BY-NC-SA</a> 许可协议。转载请注明出处！
+  </li>
+</ul>
+</div>
+
+          <div class="post-tags">
+              <a href="/tags/RAG/" rel="tag"># RAG</a>
+              <a href="/tags/LightRAG/" rel="tag"># LightRAG</a>
+              <a href="/tags/GraphRAG/" rel="tag"># GraphRAG</a>
+              <a href="/tags/%E6%BA%90%E7%A0%81%E5%88%86%E6%9E%90/" rel="tag"># 源码分析</a>
+              <a href="/tags/Query/" rel="tag"># Query</a>
+              <a href="/tags/%E6%A3%80%E7%B4%A2%E5%A2%9E%E5%BC%BA%E7%94%9F%E6%88%90/" rel="tag"># 检索增强生成</a>
+              <a href="/tags/%E7%9F%A5%E8%AF%86%E5%9B%BE%E8%B0%B1/" rel="tag"># 知识图谱</a>
+              <a href="/tags/%E5%85%B3%E9%94%AE%E8%AF%8D%E6%8F%90%E5%8F%96/" rel="tag"># 关键词提取</a>
+          </div>
+
+        
+
+          <div class="post-nav">
+            <div class="post-nav-item">
+                <a href="/2026/07/12/RAG-1.4-Naive-Advanced-Modular-RAG%E6%BC%94%E8%BF%9B/" rel="prev" title="RAG 学习笔记 · 1.4 Naive RAG → Advanced RAG → Modular RAG 演进">
+                  <i class="fa fa-angle-left"></i> RAG 学习笔记 · 1.4 Naive RAG → Advanced RAG → Modular RAG 演进
+                </a>
+            </div>
+            <div class="post-nav-item">
+            </div>
+          </div>
+    </footer>
+  </article>
+</div>
+
+
+
+
+
+
+</div>
+  </main>
+
+  <footer class="footer">
+    <div class="footer-inner">
+
+  <div class="copyright">
+    &copy; 
+    <span itemprop="copyrightYear">2026</span>
+    <span class="with-love">
+      <i class="fa fa-heart"></i>
+    </span>
+    <span class="author" itemprop="copyrightHolder">陌忆</span>
+  </div>
+<div class="wordcount">
+  <span class="post-meta-item">
+    <span class="post-meta-item-icon">
+      <i class="fa fa-chart-line"></i>
+    </span>
+    <span title="站点总字数">21k</span>
+  </span>
+  <span class="post-meta-item">
+    <span class="post-meta-item-icon">
+      <i class="fa fa-coffee"></i>
+    </span>
+    <span title="站点阅读时长">1:15</span>
+  </span>
+</div>
+
+    </div>
+  </footer>
+
+  
+  <div class="toggle sidebar-toggle" role="button">
+    <span class="toggle-line"></span>
+    <span class="toggle-line"></span>
+    <span class="toggle-line"></span>
+  </div>
+  <div class="sidebar-dimmer"></div>
+  <div class="back-to-top" role="button" aria-label="返回顶部">
+    <i class="fa fa-arrow-up fa-lg"></i>
+    <span>0%</span>
+  </div>
+
+<noscript>
+  <div class="noscript-warning">Theme NexT works best with JavaScript enabled</div>
+</noscript>
+<!-- canvas-nest particle background -->
+<script defer>
+(function() {
+  var s = document.createElement("script");
+  s.src = "//cdn.bootcss.com/canvas-nest.js/1.0.0/canvas-nest.min.js";
+  s.setAttribute("count", "150");
+  s.setAttribute("opacity", "1");
+  document.body.appendChild(s);
+})();
+</script>
+
+<!-- Live2D widget -->
+<script defer src="/live2dw/lib/L2Dwidget.min.js"></script>
+<script defer>
+L2Dwidget.init({
+  "pluginRootPath": "live2dw/",
+  "pluginJsPath": "lib/",
+  "pluginModelPath": "assets/",
+  "tagMode": false,
+  "debug": false,
+  "model": {"jsonPath": "/live2dw/assets/assets/shizuku.model.json"},
+  "display": {"position": "right", "width": 150, "height": 300},
+  "mobile": {"show": true},
+  "log": false
+});
+</script>
+
+<!-- Page click heart effect -->
+<script defer src="/js/clicklove.js"></script>
+
+<!-- Site running time -->
+<span id="timeDate"></span>
+<script>
+var now = new Date();
+function createtime() {
+  var grt = new Date("11/17/2022 8:00:00");
+  now.setTime(now.getTime() + 250);
+  var days = (now - grt) / 1000 / 60 / 60 / 24;
+  var dnum = Math.floor(days);
+  var hours = (now - grt) / 1000 / 60 / 60 - (24 * dnum);
+  var hnum = Math.floor(hours);
+  if (String(hnum).length == 1) hnum = "0" + hnum;
+  var minutes = (now - grt) / 1000 / 60 - (24 * 60 * dnum) - (60 * hnum);
+  var mnum = Math.floor(minutes);
+  if (String(mnum).length == 1) mnum = "0" + mnum;
+  var seconds = (now - grt) / 1000 - (24 * 60 * 60 * dnum) - (60 * 60 * hnum) - (60 * mnum);
+  var snum = Math.round(seconds);
+  if (String(snum).length == 1) snum = "0" + snum;
+  document.getElementById("timeDate").innerHTML = "本站已安全运行 " + dnum + " 天 " + hnum + " 小时 " + mnum + " 分 " + snum + " 秒";
+}
+setInterval(createtime, 1000);
+</script>
+
+</body>
+</html>
