@@ -1,0 +1,727 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width">
+<meta name="theme-color" content="#222"><meta name="generator" content="Hexo 7.3.0">
+<link rel="preconnect" href="https://cdnjs.cloudflare.com" crossorigin>
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon-next.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32-next.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next.png">
+  <link rel="mask-icon" href="/images/logo.svg" color="#222">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/7.0.0/css/all.min.css" integrity="sha256-VHqXKFhhMxcpubYf9xiWdCiojEbY9NexQ4jh8AxbvcM=" crossorigin="anonymous">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/animate.css/3.1.1/animate.min.css" integrity="sha256-PR7ttpcvz8qrF57fur/yAx1qXMFJeJFiA6pSzWi0OIE=" crossorigin="anonymous">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/pace/1.2.4/themes/blue/pace-theme-minimal.css">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pace/1.2.4/pace.min.js" integrity="sha256-gqd7YTjg/BtfqWSwsJOvndl0Bxc8gFImLEkXQT8+qj0=" crossorigin="anonymous" defer></script>
+
+<script class="next-config" data-name="main" type="application/json">{"hostname":"moyi-math.github.io","root":"/","images":"/images","scheme":"Gemini","darkmode":false,"version":"8.28.0","exturl":false,"sidebar":{"position":"left","width_expanded":320,"width_dual_column":240,"display":"post","padding":18,"offset":12},"hljswrap":true,"codeblock":{"theme":{"light":"default","dark":"stackoverflow-dark"},"prism":{"light":"prism","dark":"prism-dark"},"copy_button":{"enable":true,"style":null},"fold":{"enable":false,"height":500},"language":false},"bookmark":{"enable":false,"color":"#222","save":"auto"},"mediumzoom":false,"lazyload":false,"pangu":false,"comments":{"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},"stickytabs":false,"motion":{"enable":true,"async":false,"duration":200,"transition":{"menu_item":"fadeInDown","post_block":"fadeIn","post_header":"fadeInDown","post_body":"fadeInDown","coll_header":"fadeInLeft","sidebar":"fadeInUp"}},"prism":false,"i18n":{"placeholder":"搜索...","empty":"没有找到任何搜索结果：${query}","hits_time":"找到 ${hits} 个搜索结果（用时 ${time} 毫秒）","hits":"找到 ${hits} 个搜索结果"},"path":"/search.json","localsearch":{"enable":true,"top_n_per_article":1,"unescape":false,"preload":false}}</script><script src="/js/config.js" defer></script>
+
+    <meta name="description" content="关键词提取后，LightRAG 如何用向量检索找到图节点和边？批嵌入策略、EmbeddingFunc 包装器、VDB 查询模式、WEIGHT vs VECTOR 两种 chunk 选择算法，逐个击破。">
+<meta property="og:type" content="article">
+<meta property="og:title" content="LightRAG 源码分析 · 1.2 批嵌入与向量检索——关键词如何找到知识图谱中的实体和关系">
+<meta property="og:url" content="https://moyi-math.github.io/2026/07/12/LightRAG-1.2-%E6%89%B9%E5%B5%8C%E5%85%A5%E4%B8%8E%E5%90%91%E9%87%8F%E6%A3%80%E7%B4%A2/index.html">
+<meta property="og:site_name" content="陌忆的博客">
+<meta property="og:description" content="关键词提取后，LightRAG 如何用向量检索找到图节点和边？批嵌入策略、EmbeddingFunc 包装器、VDB 查询模式、WEIGHT vs VECTOR 两种 chunk 选择算法，逐个击破。">
+<meta property="og:locale" content="zh_CN">
+<meta property="article:published_time" content="2026-07-12T07:00:00.000Z">
+<meta property="article:modified_time" content="2026-07-12T07:00:00.000Z">
+<meta property="article:author" content="陌忆">
+<meta property="article:tag" content="LightRAG">
+<meta property="article:tag" content="RAG">
+<meta property="article:tag" content="GraphRAG">
+<meta property="article:tag" content="源码分析">
+<meta property="article:tag" content="向量检索">
+<meta property="article:tag" content="嵌入">
+<meta property="article:tag" content="Embedding">
+<meta property="article:tag" content="VectorDB">
+<meta name="twitter:card" content="summary">
+
+
+<link rel="canonical" href="https://moyi-math.github.io/2026/07/12/LightRAG-1.2-%E6%89%B9%E5%B5%8C%E5%85%A5%E4%B8%8E%E5%90%91%E9%87%8F%E6%A3%80%E7%B4%A2/">
+
+
+<script class="next-config" data-name="page" type="application/json">{"sidebar":"","isHome":false,"isPost":true,"lang":"zh-CN","comments":true,"permalink":"https://moyi-math.github.io/2026/07/12/LightRAG-1.2-%E6%89%B9%E5%B5%8C%E5%85%A5%E4%B8%8E%E5%90%91%E9%87%8F%E6%A3%80%E7%B4%A2/","path":"2026/07/12/LightRAG-1.2-批嵌入与向量检索/","title":"LightRAG 源码分析 · 1.2 批嵌入与向量检索——关键词如何找到知识图谱中的实体和关系"}</script>
+
+<script class="next-config" data-name="calendar" type="application/json">""</script>
+<title>LightRAG 源码分析 · 1.2 批嵌入与向量检索——关键词如何找到知识图谱中的实体和关系 | 陌忆的博客</title>
+  
+
+
+
+
+
+
+
+
+  
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/animejs/3.2.1/anime.min.js" integrity="sha256-XL2inqUJaslATFnHdJOi9GfQ60on8Wx1C2H8DYiN1xY=" crossorigin="anonymous" defer></script>
+<script src="/js/utils.js" defer></script><script src="/js/motion.js" defer></script><script src="/js/sidebar.js" defer></script><script src="/js/next-boot.js" defer></script>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/hexo-generator-searchdb/1.5.0/search.js" integrity="sha256-xFC6PJ82SL9b3WkGjFavNiA9gm5z6UBxWPiu4CYjptg=" crossorigin="anonymous" defer></script>
+<script src="/js/third-party/search/local-search.js" defer></script>
+
+
+
+
+
+  <script src="/js/third-party/pace.js" defer></script>
+
+
+  
+
+
+
+
+  
+
+  <script class="next-config" data-name="enableMath" type="application/json">false</script><link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/katex.min.css" integrity="sha256-UF1fgpAiu3tPJN/uCqEUHNe7pnr+QR0SQDNfgglgtcM=" crossorigin="anonymous">
+
+
+<link rel="preconnect" href="https://cdn.jsdelivr.net">
+<link rel="preconnect" href="https://cdn.bootcss.com">
+
+  <noscript>
+    <link rel="stylesheet" href="/css/noscript.css">
+  </noscript>
+<!-- hexo injector head_end start --><link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/katex.min.css" integrity="sha512-fHwaWebuwA7NSF5Qg/af4UeDx9XqUpYpOGgubo3yWu+b2IQR4UeQwbb42Ti7gVAjNtVoI/I9TEoYeu9omwcC6g==" crossorigin="anonymous" referrerpolicy="no-referrer" /><!-- hexo injector head_end end --></head>
+
+<body itemscope itemtype="http://schema.org/WebPage" class="use-motion">
+  <div class="headband"></div>
+
+  <main class="main">
+    <div class="column">
+      <header class="header" itemscope itemtype="http://schema.org/WPHeader"><div class="site-brand-container">
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="切换导航栏" role="button">
+        <span class="toggle-line"></span>
+        <span class="toggle-line"></span>
+        <span class="toggle-line"></span>
+    </div>
+  </div>
+
+  <div class="site-meta">
+
+    <a href="/" class="brand" rel="start">
+      <i class="logo-line"></i>
+      <p class="site-title">陌忆的博客</p>
+      <i class="logo-line"></i>
+    </a>
+      <p class="site-subtitle" itemprop="description">数据库无法得出结论</p>
+  </div>
+
+  <div class="site-nav-right">
+    <div class="toggle popup-trigger" aria-label="搜索" role="button">
+        <i class="fa fa-search fa-fw fa-lg"></i>
+    </div>
+  </div>
+</div>
+
+
+
+<nav class="site-nav">
+  <ul class="main-menu menu"><li class="menu-item menu-item-home"><a href="/" rel="section"><i class="fa fa-home fa-fw"></i>首页</a></li><li class="menu-item menu-item-about"><a href="/about/" rel="section"><i class="fa fa-user fa-fw"></i>关于</a></li><li class="menu-item menu-item-tags"><a href="/tags/" rel="section"><i class="fa fa-tags fa-fw"></i>标签</a></li><li class="menu-item menu-item-categories"><a href="/categories/" rel="section"><i class="fa fa-th fa-fw"></i>分类</a></li><li class="menu-item menu-item-archives"><a href="/archives/" rel="section"><i class="fa fa-archive fa-fw"></i>归档</a></li>
+      <li class="menu-item menu-item-search">
+        <a role="button" class="popup-trigger"><i class="fa fa-search fa-fw"></i>搜索
+        </a>
+      </li>
+  </ul>
+</nav>
+
+
+
+  <div class="search-pop-overlay">
+    <div class="popup search-popup">
+      <div class="search-header">
+        <span class="search-icon">
+          <i class="fa fa-search"></i>
+        </span>
+        <div class="search-input-container">
+          <input autocomplete="off" autocapitalize="off" maxlength="80"
+                placeholder="搜索..." spellcheck="false"
+                type="search" class="search-input">
+        </div>
+        <span class="popup-btn-close" role="button">
+          <i class="fa fa-times-circle"></i>
+        </span>
+      </div>
+      <div class="search-result-container">
+        <div class="search-result-icon">
+          <i class="fa fa-spinner fa-pulse fa-5x"></i>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</header>
+        
+  
+  <aside class="sidebar">
+
+    <div class="sidebar-inner sidebar-nav-active sidebar-toc-active">
+      <ul class="sidebar-nav">
+        <li class="sidebar-nav-toc">
+          文章目录
+        </li>
+        <li class="sidebar-nav-overview">
+          站点概览
+        </li>
+      </ul>
+
+      <div class="sidebar-panel-container">
+        <!--noindex-->
+        <div class="post-toc-wrap sidebar-panel">
+            <div class="post-toc animated"><ol class="nav"><li class="nav-item nav-level-2"><a class="nav-link" href="#%E9%9B%B6%E3%80%81%E5%BC%95%E5%85%A5%EF%BC%9A%E5%85%B3%E9%94%AE%E8%AF%8D%E6%8F%90%E5%8F%96%E4%B9%8B%E5%90%8E%E5%8F%91%E7%94%9F%E4%BA%86%E4%BB%80%E4%B9%88%EF%BC%9F"><span class="nav-text">零、引入：关键词提取之后发生了什么？</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E4%B8%80%E3%80%81%E6%89%B9%E5%B5%8C%E5%85%A5%EF%BC%88Batch-Embedding%EF%BC%89%EF%BC%9A%E4%B8%BA%E4%BB%80%E4%B9%88%E8%A6%81%E4%B8%80%E8%B5%B7%E5%B5%8C%E5%85%A5%EF%BC%9F"><span class="nav-text">一、批嵌入（Batch Embedding）：为什么要一起嵌入？</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E4%BA%8C%E3%80%81EmbeddingFunc-%E5%8C%85%E8%A3%85%E5%99%A8"><span class="nav-text">二、EmbeddingFunc 包装器</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#2-1-%E8%A3%85%E9%A5%B0%E5%99%A8%E7%94%A8%E6%B3%95"><span class="nav-text">2.1 装饰器用法</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#2-2-%E8%87%AA%E5%8A%A8%E7%BB%B4%E5%BA%A6%E6%A0%A1%E9%AA%8C"><span class="nav-text">2.2 自动维度校验</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#2-3-%E8%87%AA%E5%8A%A8%E8%A7%A3%E5%B5%8C%E5%A5%97%EF%BC%88%E9%98%B2%E6%AD%A2%E4%BA%8C%E6%AC%A1%E5%8C%85%E8%A3%85%EF%BC%89"><span class="nav-text">2.3 自动解嵌套（防止二次包装）</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#2-4-%E4%B8%8A%E4%B8%8B%E6%96%87%E6%84%9F%E7%9F%A5%E5%B5%8C%E5%85%A5%EF%BC%88Asymmetric-Embedding%EF%BC%89"><span class="nav-text">2.4 上下文感知嵌入（Asymmetric Embedding）</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#2-5-%E7%BB%B4%E5%BA%A6%E4%B8%8B%E5%8F%91"><span class="nav-text">2.5 维度下发</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E4%B8%89%E3%80%81%E4%B8%89%E8%B7%AF-VDB-%E6%9F%A5%E8%AF%A2%E6%A8%A1%E5%BC%8F"><span class="nav-text">三、三路 VDB 查询模式</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#3-1-Local-%E6%A8%A1%E5%BC%8F%EF%BC%9A-get-node-data%EF%BC%88entities-VDB%EF%BC%89"><span class="nav-text">3.1 Local 模式：_get_node_data（entities VDB）</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#3-2-Global-%E6%A8%A1%E5%BC%8F%EF%BC%9A-get-edge-data%EF%BC%88relationships-VDB%EF%BC%89"><span class="nav-text">3.2 Global 模式：_get_edge_data（relationships VDB）</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#3-3-Mix-%E6%A8%A1%E5%BC%8F%EF%BC%9A-get-vector-context%EF%BC%88chunks-VDB%EF%BC%89"><span class="nav-text">3.3 Mix 模式：_get_vector_context（chunks VDB）</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%9B%9B%E3%80%81VDB-%E6%9F%A5%E8%AF%A2%EF%BC%9ABaseVectorStorage-%E6%8A%BD%E8%B1%A1"><span class="nav-text">四、VDB 查询：BaseVectorStorage 抽象</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E4%BA%94%E3%80%81WFET-%E4%B8%A4%E7%A7%8D-Chunk-%E9%80%89%E6%8B%A9%E7%AE%97%E6%B3%95"><span class="nav-text">五、WFET 两种 Chunk 选择算法</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#5-1-WEIGHT%EF%BC%9A%E5%8A%A0%E6%9D%83%E8%BD%AE%E8%AF%A2%E7%AE%97%E6%B3%95"><span class="nav-text">5.1 WEIGHT：加权轮询算法</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#5-2-VECTOR%EF%BC%9A%E5%90%91%E9%87%8F%E7%9B%B8%E4%BC%BC%E5%BA%A6%E9%80%89%E6%8B%A9"><span class="nav-text">5.2 VECTOR：向量相似度选择</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#5-3-%E8%87%AA%E5%8A%A8%E9%99%8D%E7%BA%A7"><span class="nav-text">5.3 自动降级</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%85%AD%E3%80%81%E5%AE%9E%E4%BD%93%E5%92%8C%E5%85%B3%E7%B3%BB%E7%9A%84-Round-Robin-%E5%8E%BB%E9%87%8D%E5%90%88%E5%B9%B6"><span class="nav-text">六、实体和关系的 Round-Robin 去重合并</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E4%B8%83%E3%80%81%E6%97%B6%E5%BA%8F%E5%9B%BE%EF%BC%9A%E4%BB%8E-query-%E5%88%B0%E5%8E%9F%E5%A7%8B%E6%A3%80%E7%B4%A2%E7%BB%93%E6%9E%9C"><span class="nav-text">七、时序图：从 query 到原始检索结果</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%85%AB%E3%80%81%E6%B6%89%E5%8F%8A%E6%96%87%E4%BB%B6%E4%B8%8E%E5%87%BD%E6%95%B0%E7%B4%A2%E5%BC%95"><span class="nav-text">八、涉及文件与函数索引</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E4%B9%9D%E3%80%81%E8%AE%BE%E8%AE%A1%E8%A6%81%E7%82%B9%E6%80%BB%E7%BB%93"><span class="nav-text">九、设计要点总结</span></a></li></ol></div>
+        </div>
+        <!--/noindex-->
+
+        <div class="site-overview-wrap sidebar-panel">
+          <div class="site-author animated" itemprop="author" itemscope itemtype="http://schema.org/Person">
+    <img class="site-author-image" itemprop="image" alt="陌忆"
+      src="/images/avatar.webp">
+  <p class="site-author-name" itemprop="name">陌忆</p>
+  <div class="site-description" itemprop="description">欢迎来到我的世界💜</div>
+</div>
+<div class="site-state-wrap animated">
+  <nav class="site-state">
+      <div class="site-state-item site-state-posts">
+        <a href="/archives/">
+          <span class="site-state-item-count">8</span>
+          <span class="site-state-item-name">日志</span>
+        </a>
+      </div>
+      <div class="site-state-item site-state-categories">
+          <a href="/categories/">
+        <span class="site-state-item-count">3</span>
+        <span class="site-state-item-name">分类</span></a>
+      </div>
+      <div class="site-state-item site-state-tags">
+          <a href="/tags/">
+        <span class="site-state-item-count">31</span>
+        <span class="site-state-item-name">标签</span></a>
+      </div>
+  </nav>
+</div>
+  <div class="cc-license animated" itemprop="license">
+    <a href="https://creativecommons.org/licenses/by-nc-sa/4.0/" class="cc-opacity" rel="noopener" target="_blank"><img src="https://cdnjs.cloudflare.com/ajax/libs/creativecommons-vocabulary/2020.11.3/assets/license_badges/small/by_nc_sa.svg" alt="Creative Commons"></a>
+  </div>
+
+        </div>
+      </div>
+    </div>
+
+    
+  </aside>
+
+
+    </div>
+
+    <div class="main-inner post posts-expand">
+
+
+  
+
+
+<div class="post-block">
+  
+  
+
+  <article itemscope itemtype="http://schema.org/Article" class="post-content" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="https://moyi-math.github.io/2026/07/12/LightRAG-1.2-%E6%89%B9%E5%B5%8C%E5%85%A5%E4%B8%8E%E5%90%91%E9%87%8F%E6%A3%80%E7%B4%A2/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.webp">
+      <meta itemprop="name" content="陌忆">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="陌忆的博客">
+      <meta itemprop="description" content="欢迎来到我的世界💜">
+    </span>
+
+    <span hidden itemprop="post" itemscope itemtype="http://schema.org/CreativeWork">
+      <meta itemprop="name" content="LightRAG 源码分析 · 1.2 批嵌入与向量检索——关键词如何找到知识图谱中的实体和关系 | 陌忆的博客">
+      <meta itemprop="description" content="关键词提取后，LightRAG 如何用向量检索找到图节点和边？批嵌入策略、EmbeddingFunc 包装器、VDB 查询模式、WEIGHT vs VECTOR 两种 chunk 选择算法，逐个击破。">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          LightRAG 源码分析 · 1.2 批嵌入与向量检索——关键词如何找到知识图谱中的实体和关系
+        </h1>
+
+        <div class="post-meta-container">
+          <div class="post-meta">
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-calendar"></i>
+      </span>
+      <span class="post-meta-item-text">发表于</span>
+
+      <time title="创建时间：2026-07-12 15:00:00" itemprop="dateCreated datePublished" datetime="2026-07-12T15:00:00+08:00">2026-07-12</time>
+    </span>
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-folder"></i>
+      </span>
+      <span class="post-meta-item-text">分类于</span>
+        <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+          <a href="/categories/LightRAG%E6%BA%90%E7%A0%81%E5%88%86%E6%9E%90/" itemprop="url" rel="index"><span itemprop="name">LightRAG源码分析</span></a>
+        </span>
+    </span>
+
+  
+    <span class="post-meta-break"></span>
+    <span class="post-meta-item" title="本文字数">
+      <span class="post-meta-item-icon">
+        <i class="far fa-file-word"></i>
+      </span>
+      <span class="post-meta-item-text">本文字数：</span>
+      <span>3.4k</span>
+    </span>
+    <span class="post-meta-item" title="阅读时长">
+      <span class="post-meta-item-icon">
+        <i class="far fa-clock"></i>
+      </span>
+      <span class="post-meta-item-text">阅读时长 &asymp;</span>
+      <span>12 分钟</span>
+    </span>
+</div>
+
+            <div class="post-description">关键词提取后，LightRAG 如何用向量检索找到图节点和边？批嵌入策略、EmbeddingFunc 包装器、VDB 查询模式、WEIGHT vs VECTOR 两种 chunk 选择算法，逐个击破。</div>
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody"><blockquote>
+<p><strong>系列定位：</strong> 本文是 LightRAG Query 方向的第二篇。上一篇 <a href="./LightRAG-1.1-%E5%85%B3%E9%94%AE%E8%AF%8D%E6%8F%90%E5%8F%96">1.1 关键词提取</a> 拆解了如何从用户 query 中提取 hl_keywords 和 ll_keywords；本文承接其后，展示这些关键词如何通过向量检索找到图节点、边和文本块。</p>
+</blockquote>
+<span id="more"></span>
+
+<h2 id="零、引入：关键词提取之后发生了什么？"><a href="#零、引入：关键词提取之后发生了什么？" class="headerlink" title="零、引入：关键词提取之后发生了什么？"></a>零、引入：关键词提取之后发生了什么？</h2><p>在上一篇结束时，我们得到了两组关键词：</p>
+<ul>
+<li><code>ll_keywords</code> → low-level 关键实体 → 用于 <strong>entities VDB</strong> 的检索 → local 路径</li>
+<li><code>hl_keywords</code> → high-level 领域概念 → 用于 <strong>relationships VDB</strong> 的检索 → global 路径</li>
+</ul>
+<p><code>_perform_kg_search</code>（<code>operate.py:4323</code>）是承接前后的中枢函数：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br></pre></td><td class="code"><pre><span class="line">ll_keywords, hl_keywords         ← 来自 1.1 关键词提取</span><br><span class="line">        │</span><br><span class="line">        ▼</span><br><span class="line">  _perform_kg_search             ← 本文的主角</span><br><span class="line">        │</span><br><span class="line">        ├─ batch embedding（一次 LLM 调用嵌入三个文本）</span><br><span class="line">        ├─ _get_node_data         (local)  entities VDB → graph</span><br><span class="line">        ├─ _get_edge_data         (global) relationships VDB → graph</span><br><span class="line">        ├─ _get_vector_context    (mix)    chunks VDB</span><br><span class="line">        ├─ round-robin merge 实体/关系</span><br><span class="line">        └─ _find_related_text_unit_from_entities</span><br></pre></td></tr></table></figure>
+
+<hr>
+<h2 id="一、批嵌入（Batch-Embedding）：为什么要一起嵌入？"><a href="#一、批嵌入（Batch-Embedding）：为什么要一起嵌入？" class="headerlink" title="一、批嵌入（Batch Embedding）：为什么要一起嵌入？"></a>一、批嵌入（Batch Embedding）：为什么要一起嵌入？</h2><p>通常的做法是：需要嵌入时就调一次 embedding API。但在 LightRAG 的 query 流程中，有<strong>三个</strong>文本需要嵌入：</p>
+<table>
+<thead>
+<tr>
+<th>需要嵌入的文本</th>
+<th>用途</th>
+<th>哪个 mode 需要</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>query</code> 原文</td>
+<td>搜 chunks VDB（当 <code>kg_chunk_pick_method == &quot;VECTOR&quot;</code> 或 <code>mode == &quot;mix&quot;</code>）</td>
+<td>local&#x2F;global&#x2F;hybrid&#x2F;mix</td>
+</tr>
+<tr>
+<td><code>ll_keywords</code>（字符串拼接）</td>
+<td>搜 entities VDB</td>
+<td>local&#x2F;hybrid&#x2F;mix</td>
+</tr>
+<tr>
+<td><code>hl_keywords</code>（字符串拼接）</td>
+<td>搜 relationships VDB</td>
+<td>global&#x2F;hybrid&#x2F;mix</td>
+</tr>
+</tbody></table>
+<p>如果依次调用三次 embedding API，至少多了两次网络往返。LightRAG 的做法是一<strong>次批调用</strong>：</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># operate.py:4371-4405</span></span><br><span class="line"><span class="keyword">if</span> actual_embedding_func:</span><br><span class="line">    texts_to_embed: <span class="built_in">list</span>[<span class="built_in">str</span>] = []</span><br><span class="line">    text_purposes: <span class="built_in">list</span>[<span class="built_in">str</span>] = []</span><br><span class="line"></span><br><span class="line">    <span class="keyword">if</span> query <span class="keyword">and</span> (kg_chunk_pick_method == <span class="string">&quot;VECTOR&quot;</span> <span class="keyword">or</span> chunks_vdb):</span><br><span class="line">        texts_to_embed.append(query)</span><br><span class="line">        text_purposes.append(<span class="string">&quot;query&quot;</span>)</span><br><span class="line"></span><br><span class="line">    <span class="keyword">if</span> need_ll:</span><br><span class="line">        texts_to_embed.append(ll_keywords)</span><br><span class="line">        text_purposes.append(<span class="string">&quot;ll&quot;</span>)</span><br><span class="line"></span><br><span class="line">    <span class="keyword">if</span> need_hl:</span><br><span class="line">        texts_to_embed.append(hl_keywords)</span><br><span class="line">        text_purposes.append(<span class="string">&quot;hl&quot;</span>)</span><br><span class="line"></span><br><span class="line">    <span class="keyword">if</span> texts_to_embed:</span><br><span class="line">        all_embeddings = <span class="keyword">await</span> actual_embedding_func(</span><br><span class="line">            texts_to_embed, context=<span class="string">&quot;query&quot;</span>, _priority=DEFAULT_QUERY_PRIORITY</span><br><span class="line">        )</span><br><span class="line">        <span class="keyword">for</span> i, purpose <span class="keyword">in</span> <span class="built_in">enumerate</span>(text_purposes):</span><br><span class="line">            <span class="keyword">if</span> purpose == <span class="string">&quot;query&quot;</span>:</span><br><span class="line">                query_embedding = all_embeddings[i]</span><br><span class="line">            <span class="keyword">elif</span> purpose == <span class="string">&quot;ll&quot;</span>:</span><br><span class="line">                ll_embedding = all_embeddings[i]</span><br><span class="line">            <span class="keyword">elif</span> purpose == <span class="string">&quot;hl&quot;</span>:</span><br><span class="line">                hl_embedding = all_embeddings[i]</span><br></pre></td></tr></table></figure>
+
+<p><strong>关键细节：</strong> <code>need_ll</code> 和 <code>need_hl</code> 由目前的 mode 决定：</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">need_ll = mode <span class="keyword">in</span> (<span class="string">&quot;local&quot;</span>, <span class="string">&quot;hybrid&quot;</span>, <span class="string">&quot;mix&quot;</span>) <span class="keyword">and</span> <span class="built_in">bool</span>(ll_keywords)</span><br><span class="line">need_hl = mode <span class="keyword">in</span> (<span class="string">&quot;global&quot;</span>, <span class="string">&quot;hybrid&quot;</span>, <span class="string">&quot;mix&quot;</span>) <span class="keyword">and</span> <span class="built_in">bool</span>(hl_keywords)</span><br></pre></td></tr></table></figure>
+
+<p>即：<code>local</code> 模式不会嵌入 hl_keywords，<code>global</code> 模式不会嵌入 ll_keywords。不必要的嵌入完全跳过。</p>
+<p><strong>为什么 <code>ll_keywords</code> 和 <code>hl_keywords</code> 传入时是字符串而非列表？</strong></p>
+<p>在 <code>_perform_kg_search</code> 的入口（<code>operate.py:4523</code>），它们被做了一次转换：</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">ll_keywords = <span class="string">&quot;, &quot;</span>.join(ll_keywords) <span class="keyword">if</span> <span class="built_in">isinstance</span>(ll_keywords, <span class="built_in">list</span>) <span class="keyword">else</span> ll_keywords</span><br><span class="line">hl_keywords = <span class="string">&quot;, &quot;</span>.join(hl_keywords) <span class="keyword">if</span> <span class="built_in">isinstance</span>(hl_keywords, <span class="built_in">list</span>) <span class="keyword">else</span> hl_keywords</span><br></pre></td></tr></table></figure>
+
+<p>最终传给 embedding 函数的是逗号拼接的长字符串。这样设计的原因：多个关键词组合在一起嵌入，得到的向量是整个用户意图的全景描述，在语义空间中更能精准匹配同时包含多个实体的图节点。</p>
+<hr>
+<h2 id="二、EmbeddingFunc-包装器"><a href="#二、EmbeddingFunc-包装器" class="headerlink" title="二、EmbeddingFunc 包装器"></a>二、EmbeddingFunc 包装器</h2><p>所有 embedding 函数都经过 <code>@wrap_embedding_func_with_attrs</code>（<code>utils.py:2238</code>）包装，返回一个 <code>EmbeddingFunc</code> 实例。这个包装器做的事情远比看上去多。</p>
+<h3 id="2-1-装饰器用法"><a href="#2-1-装饰器用法" class="headerlink" title="2.1 装饰器用法"></a>2.1 装饰器用法</h3><figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">@wrap_embedding_func_with_attrs(<span class="params">embedding_dim=<span class="number">1536</span>, max_token_size=<span class="number">8192</span>, model_name=<span class="string">&quot;text-embedding-3-small&quot;</span></span>)</span></span><br><span class="line"><span class="keyword">async</span> <span class="keyword">def</span> <span class="title function_">my_embed</span>(<span class="params">texts: <span class="built_in">list</span>[<span class="built_in">str</span>]</span>) -&gt; np.ndarray:</span><br><span class="line">    <span class="comment"># 实际调用 embedding API</span></span><br><span class="line">    <span class="keyword">return</span> embeddings</span><br></pre></td></tr></table></figure>
+
+<p>装饰后返回的是一个 <code>EmbeddingFunc</code> dataclass，其 <code>__call__</code> 方法做了 4 件事：</p>
+<h3 id="2-2-自动维度校验"><a href="#2-2-自动维度校验" class="headerlink" title="2.2 自动维度校验"></a>2.2 自动维度校验</h3><figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># utils.py:614-623</span></span><br><span class="line">total_elements = result.size</span><br><span class="line">expected_dim = <span class="variable language_">self</span>.embedding_dim</span><br><span class="line"></span><br><span class="line"><span class="keyword">if</span> total_elements % expected_dim != <span class="number">0</span>:</span><br><span class="line">    <span class="keyword">raise</span> ValueError(<span class="string">f&quot;Embedding dimension mismatch detected: ...&quot;</span>)</span><br><span class="line"></span><br><span class="line">actual_vectors = total_elements // expected_dim</span><br><span class="line"><span class="keyword">if</span> args <span class="keyword">and</span> <span class="built_in">isinstance</span>(args[<span class="number">0</span>], (<span class="built_in">list</span>, <span class="built_in">tuple</span>)):</span><br><span class="line">    expected_vectors = <span class="built_in">len</span>(args[<span class="number">0</span>])</span><br><span class="line">    <span class="keyword">if</span> actual_vectors != expected_vectors:</span><br><span class="line">        <span class="keyword">raise</span> ValueError(<span class="string">f&quot;Vector count mismatch: expected <span class="subst">&#123;expected_vectors&#125;</span> vectors but got <span class="subst">&#123;actual_vectors&#125;</span>.&quot;</span>)</span><br></pre></td></tr></table></figure>
+
+<p>这里的校验逻辑很轻巧：不检查 <code>shape</code>，而是通过 <code>total_elements % expected_dim != 0</code> 来判断。因为不同 provider 返回的数组 shape 可能不同（OpenAI 返回 <code>[n, 1536]</code>，Ollama 可能返回 <code>[1536]</code> 但 stacked），用元素总数整除性检查比 shape 匹配更鲁棒。</p>
+<h3 id="2-3-自动解嵌套（防止二次包装）"><a href="#2-3-自动解嵌套（防止二次包装）" class="headerlink" title="2.3 自动解嵌套（防止二次包装）"></a>2.3 自动解嵌套（防止二次包装）</h3><figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># utils.py:560-568</span></span><br><span class="line"><span class="keyword">while</span> <span class="built_in">isinstance</span>(<span class="variable language_">self</span>.func, EmbeddingFunc):</span><br><span class="line">    <span class="variable language_">self</span>.func = <span class="variable language_">self</span>.func.func</span><br></pre></td></tr></table></figure>
+
+<p>这是生产环境常见的陷阱：用户代码意外将已装饰的 embedding 函数再次包装。比如：</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">@wrap_embedding_func_with_attrs(<span class="params">embedding_dim=<span class="number">768</span></span>)</span></span><br><span class="line"><span class="keyword">async</span> <span class="keyword">def</span> <span class="title function_">my_embed</span>(<span class="params">texts</span>):</span><br><span class="line">    <span class="keyword">return</span> <span class="keyword">await</span> another_embed(texts)  <span class="comment"># another_embed 本身已装饰</span></span><br></pre></td></tr></table></figure>
+
+<p>这里的 <code>my_embed</code> 包装了已装饰的 <code>another_embed</code>，导致 <code>__call__</code> 逻辑嵌套。<code>__post_init__</code> 自动解嵌套到最深 3 层。</p>
+<h3 id="2-4-上下文感知嵌入（Asymmetric-Embedding）"><a href="#2-4-上下文感知嵌入（Asymmetric-Embedding）" class="headerlink" title="2.4 上下文感知嵌入（Asymmetric Embedding）"></a>2.4 上下文感知嵌入（Asymmetric Embedding）</h3><figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># utils.py:596-602</span></span><br><span class="line"><span class="keyword">if</span> <span class="string">&quot;context&quot;</span> <span class="keyword">in</span> kwargs <span class="keyword">and</span> <span class="keyword">not</span> <span class="variable language_">self</span>.supports_asymmetric:</span><br><span class="line">    kwargs.pop(<span class="string">&quot;context&quot;</span>)</span><br></pre></td></tr></table></figure>
+
+<p>LightRAG 在 query 时传入 <code>context=&quot;query&quot;</code>，在索引（插入）时可能传入 <code>context=&quot;document&quot;</code>。这是为了支持<strong>不对称嵌入</strong>——部分 embedding 模型（如 Cohere Embed v3）对 query 和 document 使用不同的编码前缀：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">query: &quot;search_query: what is the meaning of life?&quot;</span><br><span class="line">doc:   &quot;search_document: The meaning of life is...&quot;</span><br></pre></td></tr></table></figure>
+
+<p><code>supports_asymmetric</code> 默认自动检测——如果包装的函数签名包含 <code>context</code> 参数，则自动启用。这个设计使得<strong>同一个 embedding 函数接口</strong>既能兼容对称模型，也能适配不对称模型，无需用户显式配置。</p>
+<h3 id="2-5-维度下发"><a href="#2-5-维度下发" class="headerlink" title="2.5 维度下发"></a>2.5 维度下发</h3><figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># utils.py:579-594</span></span><br><span class="line"><span class="keyword">if</span> <span class="variable language_">self</span>.send_dimensions:</span><br><span class="line">    kwargs[<span class="string">&quot;embedding_dim&quot;</span>] = <span class="variable language_">self</span>.embedding_dim</span><br></pre></td></tr></table></figure>
+
+<p>某些模型（如 OpenAI <code>text-embedding-3-*</code>）支持 API 缩短输出维度。当 <code>send_dimensions=True</code> 时，维度和配置会一并传给底层函数。</p>
+<hr>
+<h2 id="三、三路-VDB-查询模式"><a href="#三、三路-VDB-查询模式" class="headerlink" title="三、三路 VDB 查询模式"></a>三、三路 VDB 查询模式</h2><p>预计算完嵌入后，根据 <code>query_param.mode</code> 走不同分支。</p>
+<h3 id="3-1-Local-模式：-get-node-data（entities-VDB）"><a href="#3-1-Local-模式：-get-node-data（entities-VDB）" class="headerlink" title="3.1 Local 模式：_get_node_data（entities VDB）"></a>3.1 Local 模式：<code>_get_node_data</code>（entities VDB）</h3><p><strong>文件：</strong> <code>operate.py:5152</code></p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">async</span> <span class="keyword">def</span> <span class="title function_">_get_node_data</span>(<span class="params">query, knowledge_graph_inst, entities_vdb, query_param, query_embedding=<span class="literal">None</span></span>):</span><br><span class="line">    <span class="comment"># 1. 用 ll_embedding 搜 entities VDB</span></span><br><span class="line">    results = <span class="keyword">await</span> entities_vdb.query(</span><br><span class="line">        query, top_k=query_param.top_k, query_embedding=query_embedding</span><br><span class="line">    )</span><br><span class="line">    <span class="keyword">if</span> <span class="keyword">not</span> results:</span><br><span class="line">        <span class="keyword">return</span> [], []</span><br><span class="line"></span><br><span class="line">    <span class="comment"># 2. 从 VDB 结果中提取 entity_name</span></span><br><span class="line">    node_ids = [r[<span class="string">&quot;entity_name&quot;</span>] <span class="keyword">for</span> r <span class="keyword">in</span> results]</span><br><span class="line"></span><br><span class="line">    <span class="comment"># 3. 并行查询图存储：节点属性 + 度数</span></span><br><span class="line">    nodes_dict, degrees_dict = <span class="keyword">await</span> asyncio.gather(</span><br><span class="line">        knowledge_graph_inst.get_nodes_batch(node_ids),</span><br><span class="line">        knowledge_graph_inst.node_degrees_batch(node_ids),</span><br><span class="line">    )</span><br><span class="line"></span><br><span class="line">    <span class="comment"># 4. 合并 VDB 结果与图数据</span></span><br><span class="line">    node_datas = [</span><br><span class="line">        &#123;**n, <span class="string">&quot;entity_name&quot;</span>: k[<span class="string">&quot;entity_name&quot;</span>], <span class="string">&quot;rank&quot;</span>: d, <span class="string">&quot;created_at&quot;</span>: k.get(<span class="string">&quot;created_at&quot;</span>)&#125;</span><br><span class="line">        <span class="keyword">for</span> k, n, d <span class="keyword">in</span> <span class="built_in">zip</span>(results, node_datas, node_degrees)</span><br><span class="line">        <span class="keyword">if</span> n <span class="keyword">is</span> <span class="keyword">not</span> <span class="literal">None</span></span><br><span class="line">    ]</span><br><span class="line"></span><br><span class="line">    <span class="comment"># 5. 基于实体列表，找到最相关的边</span></span><br><span class="line">    use_relations = <span class="keyword">await</span> _find_most_related_edges_from_entities(node_datas, ...)</span><br><span class="line"></span><br><span class="line">    <span class="keyword">return</span> node_datas, use_relations</span><br></pre></td></tr></table></figure>
+
+<p>流程概括为：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br></pre></td><td class="code"><pre><span class="line">ll_keywords 嵌入 → entities_vdb.query(top_k)</span><br><span class="line">    │</span><br><span class="line">    ▼  提取所有 entity_name</span><br><span class="line">    并行的两个图查询</span><br><span class="line">    ├── get_nodes_batch(node_ids):     每个实体的属性（描述、类型）</span><br><span class="line">    └── node_degrees_batch(node_ids):  每个实体的度数（图拓扑重要性）</span><br><span class="line">    │</span><br><span class="line">    ▼</span><br><span class="line">    合并结果 → node_datas（已按相似度排序）</span><br><span class="line">    │</span><br><span class="line">    ▼</span><br><span class="line">    _find_most_related_edges_from_entities</span><br><span class="line">        ├── get_nodes_edges_batch(node_names): 每个实体关联的所有边</span><br><span class="line">        ├── dedup 边（同一个 (src, tgt) 只保留一次）</span><br><span class="line">        └── 并行 get_edges_batch + edge_degrees_batch</span><br><span class="line">            → 按 (rank, weight) 倒序排序所有关联边</span><br></pre></td></tr></table></figure>
+
+<p><strong>VDB 返回的排序就是最终实体排序</strong>——余弦相似度决定了哪些实体优先。关系数据只从这些实体扩散出去，不再做第二次搜索。</p>
+<h3 id="3-2-Global-模式：-get-edge-data（relationships-VDB）"><a href="#3-2-Global-模式：-get-edge-data（relationships-VDB）" class="headerlink" title="3.2 Global 模式：_get_edge_data（relationships VDB）"></a>3.2 Global 模式：<code>_get_edge_data</code>（relationships VDB）</h3><p><strong>文件：</strong> <code>operate.py:5427</code></p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">async</span> <span class="keyword">def</span> <span class="title function_">_get_edge_data</span>(<span class="params">keywords, knowledge_graph_inst, relationships_vdb, query_param, query_embedding=<span class="literal">None</span></span>):</span><br><span class="line">    <span class="comment"># 1. 用 hl_embedding 搜 relationships VDB</span></span><br><span class="line">    results = <span class="keyword">await</span> relationships_vdb.query(</span><br><span class="line">        keywords, top_k=query_param.top_k, query_embedding=query_embedding</span><br><span class="line">    )</span><br><span class="line"></span><br><span class="line">    <span class="comment"># 2. 从 VDB 结果提取 (src_id, tgt_id) 对</span></span><br><span class="line">    edge_pairs_dicts = [&#123;<span class="string">&quot;src&quot;</span>: r[<span class="string">&quot;src_id&quot;</span>], <span class="string">&quot;tgt&quot;</span>: r[<span class="string">&quot;tgt_id&quot;</span>]&#125; <span class="keyword">for</span> r <span class="keyword">in</span> results]</span><br><span class="line">    edge_data_dict = <span class="keyword">await</span> knowledge_graph_inst.get_edges_batch(edge_pairs_dicts)</span><br><span class="line"></span><br><span class="line">    <span class="comment"># 3. 合并 VDB 结果 + 图属性（如 weight）</span></span><br><span class="line">    <span class="comment"># 注意：Global 模式的关系排序保持 VDB 的余弦相似度顺序</span></span><br><span class="line"></span><br><span class="line">    <span class="comment"># 4. 根据关系列表反向找到相关实体</span></span><br><span class="line">    use_entities = <span class="keyword">await</span> _find_most_related_entities_from_relationships(edge_datas, ...)</span><br><span class="line"></span><br><span class="line">    <span class="keyword">return</span> edge_datas, use_entities</span><br></pre></td></tr></table></figure>
+
+<p>和 Local 的方向相反：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br></pre></td><td class="code"><pre><span class="line">hl_keywords 嵌入 → relationships_vdb.query(top_k)</span><br><span class="line">    │</span><br><span class="line">    ▼  提取所有 (src_id, tgt_id)</span><br><span class="line">    get_edges_batch: 获取每条边的详细属性</span><br><span class="line">    │</span><br><span class="line">    ▼</span><br><span class="line">    edge_datas = VDB 结果 + 图属性（保持余弦排序）</span><br><span class="line">    │</span><br><span class="line">    ▼</span><br><span class="line">    _find_most_related_entities_from_relationships</span><br><span class="line">    → 从边的 src 和 tgt 收集所有实体名称（set dedup）</span><br><span class="line">    → get_nodes_batch → 按发现顺序返回实体列表</span><br></pre></td></tr></table></figure>
+
+<p>Global 模式的关系排序<strong>完全由向量相似度决定</strong>（不按 weight&#x2F;rank 重排），因为 Global 场景下”语义最相关的关系”本来就是用户的关注点。</p>
+<h3 id="3-3-Mix-模式：-get-vector-context（chunks-VDB）"><a href="#3-3-Mix-模式：-get-vector-context（chunks-VDB）" class="headerlink" title="3.3 Mix 模式：_get_vector_context（chunks VDB）"></a>3.3 Mix 模式：<code>_get_vector_context</code>（chunks VDB）</h3><p><strong>文件：</strong> <code>operate.py:4266</code></p>
+<p>在 mix 模式下，除了上述两个 KG 路径，还会多一条<strong>向量路径</strong>——直接用 query 原文搜 chunks VDB（text chunks 的向量化存储）。</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line">search_top_k = query_param.chunk_top_k <span class="keyword">or</span> query_param.top_k</span><br><span class="line">results = <span class="keyword">await</span> chunks_vdb.query(</span><br><span class="line">    query, top_k=search_top_k, query_embedding=query_embedding</span><br><span class="line">)</span><br></pre></td></tr></table></figure>
+
+<p>得到的 chunks 标记为 <code>source_type = &quot;vector&quot;</code>，在后续 chunk 汇聚阶段和实体相关的 chunks 一起去重排序。</p>
+<hr>
+<h2 id="四、VDB-查询：BaseVectorStorage-抽象"><a href="#四、VDB-查询：BaseVectorStorage-抽象" class="headerlink" title="四、VDB 查询：BaseVectorStorage 抽象"></a>四、VDB 查询：BaseVectorStorage 抽象</h2><p>所有 VDB 继承自 <code>BaseVectorStorage</code>（<code>base.py:220</code>）：</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">@abstractmethod</span></span><br><span class="line"><span class="keyword">async</span> <span class="keyword">def</span> <span class="title function_">query</span>(<span class="params"></span></span><br><span class="line"><span class="params">    self, query: <span class="built_in">str</span>, top_k: <span class="built_in">int</span>, query_embedding: <span class="built_in">list</span>[<span class="built_in">float</span>] = <span class="literal">None</span></span></span><br><span class="line"><span class="params"></span>) -&gt; <span class="built_in">list</span>[<span class="built_in">dict</span>[<span class="built_in">str</span>, <span class="type">Any</span>]]:</span><br><span class="line">    <span class="string">&quot;&quot;&quot;Query the vector storage and retrieve top_k results.&quot;&quot;&quot;</span></span><br></pre></td></tr></table></figure>
+
+<p><strong>关键参数：</strong></p>
+<ul>
+<li><code>query_embedding</code> 可选：如果外部已预计算嵌入，传入后跳过内部再次嵌入，直接搜向量</li>
+</ul>
+<p>以默认的 <code>NanoVectorDBStorage</code>（<code>kg/nano_vector_db_impl.py:414</code>）为例：</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">async</span> <span class="keyword">def</span> <span class="title function_">query</span>(<span class="params">self, query, top_k, query_embedding=<span class="literal">None</span></span>):</span><br><span class="line">    <span class="keyword">if</span> query_embedding <span class="keyword">is</span> <span class="keyword">not</span> <span class="literal">None</span>:</span><br><span class="line">        embedding = query_embedding</span><br><span class="line">    <span class="keyword">else</span>:</span><br><span class="line">        embedding = <span class="keyword">await</span> <span class="variable language_">self</span>.embedding_func(</span><br><span class="line">            [query], context=<span class="string">&quot;query&quot;</span>, _priority=DEFAULT_QUERY_PRIORITY</span><br><span class="line">        )</span><br><span class="line">        embedding = embedding[<span class="number">0</span>]</span><br><span class="line"></span><br><span class="line">    client = <span class="keyword">await</span> <span class="variable language_">self</span>._get_client()</span><br><span class="line">    results = client.query(</span><br><span class="line">        query=embedding,</span><br><span class="line">        top_k=top_k,</span><br><span class="line">        better_than_threshold=<span class="variable language_">self</span>.cosine_better_than_threshold,</span><br><span class="line">    )</span><br><span class="line">    results = [</span><br><span class="line">        &#123;</span><br><span class="line">            **&#123;k: v <span class="keyword">for</span> k, v <span class="keyword">in</span> dp.items() <span class="keyword">if</span> k != <span class="string">&quot;vector&quot;</span>&#125;,</span><br><span class="line">            <span class="string">&quot;id&quot;</span>: dp[<span class="string">&quot;__id__&quot;</span>],</span><br><span class="line">            <span class="string">&quot;distance&quot;</span>: dp[<span class="string">&quot;__metrics__&quot;</span>],</span><br><span class="line">            <span class="string">&quot;created_at&quot;</span>: dp.get(<span class="string">&quot;__created_at__&quot;</span>),</span><br><span class="line">        &#125;</span><br><span class="line">        <span class="keyword">for</span> dp <span class="keyword">in</span> results</span><br><span class="line">    ]</span><br><span class="line">    <span class="keyword">return</span> results</span><br></pre></td></tr></table></figure>
+
+<p><code>cosine_better_than_threshold</code>（默认 0.2）确保太不相似的结果不会被返回，即使 <code>top_k</code> 有剩余 slot。</p>
+<p>每一条 VDB 数据最终返回的字段中排除了 <code>vector</code> 原始向量——那是给相似度计算用的，返回给上层业务逻辑只会浪费 token。</p>
+<hr>
+<h2 id="五、WFET-两种-Chunk-选择算法"><a href="#五、WFET-两种-Chunk-选择算法" class="headerlink" title="五、WFET 两种 Chunk 选择算法"></a>五、WFET 两种 Chunk 选择算法</h2><p>在得到实体后，<code>_find_related_text_unit_from_entities</code>（<code>operate.py:5268</code>）负责找到这些实体对应的文本块（text chunks）。</p>
+<p>实体中存储的 <code>source_id</code> 包含了所有关联 chunk 的 ID。但实体的数量 × 每个实体关联的 chunk 可能很大——需要一种策略来选择最重要的。</p>
+<p>LightRAG 支持两种选择策略，由 <code>kg_chunk_pick_method</code> 配置控制：</p>
+<table>
+<thead>
+<tr>
+<th>策略</th>
+<th>配置值</th>
+<th>适用场景</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>加权轮询</strong></td>
+<td><code>WEIGHT</code>（默认）</td>
+<td>实体权重越高，分配更多 chunk</td>
+</tr>
+<tr>
+<td><strong>向量相似度</strong></td>
+<td><code>VECTOR</code></td>
+<td>需要语义对齐 + 有 chunks_vdb</td>
+</tr>
+</tbody></table>
+<h3 id="5-1-WEIGHT：加权轮询算法"><a href="#5-1-WEIGHT：加权轮询算法" class="headerlink" title="5.1 WEIGHT：加权轮询算法"></a>5.1 WEIGHT：加权轮询算法</h3><p><code>pick_by_weighted_polling</code>（<code>utils.py:3991</code>）</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br></pre></td><td class="code"><pre><span class="line">实体列表按 rank 降序排列后</span><br><span class="line"></span><br><span class="line">第一轮分配（线性梯度）：</span><br><span class="line">   实体 0（最重要）→ max_related_chunks 个</span><br><span class="line">   实体 1          → max_related_chunks - Δ 个</span><br><span class="line">   ...</span><br><span class="line">   实体 n          → min_related_chunks 个</span><br><span class="line"></span><br><span class="line">第二轮分配（余量再扫描）：</span><br><span class="line">   所有实体未用完的配额中，依次补一个 chunk</span><br><span class="line">   直到全部耗尽</span><br></pre></td></tr></table></figure>
+
+<p>举个例子，如果 <code>max_related_chunks=6, min_related_chunks=1</code>，有 5 个实体：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br></pre></td><td class="code"><pre><span class="line">第一轮：</span><br><span class="line">  E0: 期望 6 → 实际有 4 个 → 取 4，剩余配额 2</span><br><span class="line">  E1: 期望 5 → 实际有 7 个 → 取 5，剩余配额 0</span><br><span class="line">  E2: 期望 4 → 实际有 2 个 → 取 2，剩余配额 2</span><br><span class="line">  E3: 期望 2 → 实际有 3 个 → 取 2，剩余配额 0</span><br><span class="line">  E4: 期望 1 → 实际有 0 个 → 取 0，剩余配额 1</span><br><span class="line">                                   合计剩余 5</span><br><span class="line"></span><br><span class="line">第二轮：</span><br><span class="line">  E0 还剩 0 个未用 chunk → 跳过</span><br><span class="line">  E1 还剩 2 个未用 chunk → 取 1 个</span><br><span class="line">  E2 还剩 0 个 → 跳过</span><br><span class="line">  E3 还剩 1 个 → 取 1 个</span><br><span class="line">  E4 还剩 0 个 → 跳过</span><br><span class="line">  ... 继续扫描直到 5 个余量分配完</span><br></pre></td></tr></table></figure>
+
+<h3 id="5-2-VECTOR：向量相似度选择"><a href="#5-2-VECTOR：向量相似度选择" class="headerlink" title="5.2 VECTOR：向量相似度选择"></a>5.2 VECTOR：向量相似度选择</h3><p><code>pick_by_vector_similarity</code>（<code>utils.py:4071</code>）</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line">1. 收集所有实体关联的 chunk_id（set 去重）</span><br><span class="line">2. 对每个 chunk_id，从 text_chunks_db 拿内容</span><br><span class="line">3. 用 query 的嵌入，算每个 chunk 的余弦相似度</span><br><span class="line">4. 选 top N 个（N = max_related_chunks * entity_count / 2）</span><br></pre></td></tr></table></figure>
+
+<p>注意：这里嵌入的是 <code>query</code> 的原始文本（用户问题），而不是 entity 内容。选择逻辑是”哪个 chunk 跟<strong>问题</strong>最相关”。</p>
+<h3 id="5-3-自动降级"><a href="#5-3-自动降级" class="headerlink" title="5.3 自动降级"></a>5.3 自动降级</h3><p>如果 <code>VECTOR</code> 模式失败（没有 embedding function、chunks_vdb 不可用、返回空），会自动降级到 <code>WEIGHT</code>：</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">if</span> selected_chunk_ids == []:</span><br><span class="line">    kg_chunk_pick_method = <span class="string">&quot;WEIGHT&quot;</span></span><br></pre></td></tr></table></figure>
+
+<p><strong>设计意图：</strong> <code>WEIGHT</code> 不依赖任何外部服务，只要有图拓扑数据就能运行。<code>VECTOR</code> 需要嵌入 + VDB 基础——这两者有一项不可用就退回到纯图权重。</p>
+<hr>
+<h2 id="六、实体和关系的-Round-Robin-去重合并"><a href="#六、实体和关系的-Round-Robin-去重合并" class="headerlink" title="六、实体和关系的 Round-Robin 去重合并"></a>六、实体和关系的 Round-Robin 去重合并</h2><p>当 mode 是 Hybrid 或 Mix 时，local 和 global 路径各自产出了实体和关系列表。合并时采用 <strong>round-robin 交替合并 + 去重</strong>：</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># operate.py:4467-4518</span></span><br><span class="line"><span class="comment"># 实体：轮换从 local/global 各取一个，去重</span></span><br><span class="line">final_entities = []</span><br><span class="line">seen_entities = <span class="built_in">set</span>()</span><br><span class="line">max_len = <span class="built_in">max</span>(<span class="built_in">len</span>(local_entities), <span class="built_in">len</span>(global_entities))</span><br><span class="line"><span class="keyword">for</span> i <span class="keyword">in</span> <span class="built_in">range</span>(max_len):</span><br><span class="line">    <span class="keyword">if</span> i &lt; <span class="built_in">len</span>(local_entities):</span><br><span class="line">        entity = local_entities[i]</span><br><span class="line">        <span class="keyword">if</span> entity_name <span class="keyword">not</span> <span class="keyword">in</span> seen_entities:</span><br><span class="line">            final_entities.append(entity)</span><br><span class="line">            seen_entities.add(entity_name)</span><br><span class="line">    <span class="keyword">if</span> i &lt; <span class="built_in">len</span>(global_entities):</span><br><span class="line">        entity = global_entities[i]</span><br><span class="line">        <span class="keyword">if</span> entity_name <span class="keyword">not</span> <span class="keyword">in</span> seen_entities:</span><br><span class="line">            final_entities.append(entity)</span><br><span class="line">            seen_entities.add(entity_name)</span><br><span class="line"></span><br><span class="line"><span class="comment"># 关系：同样 round-robin，按 (src_tgt) 作为唯一键去重</span></span><br></pre></td></tr></table></figure>
+
+<p><strong>为什么用 round-robin 而不是先 local 再 global？</strong></p>
+<p>因为两个列表内部都是按重要性排序的（local 按 cosine，global 按 weight）。如果先全放 local 再 global，前 <code>top_k</code> 个全是 local 实体。round-robin 交替排列保证<strong>不同类型的重要实体在最终的 top N 中都有代表</strong>。</p>
+<p>去重基于 <code>entity_name</code> 或 <code>(src, tgt)</code> 元组。同一个实体被两个路径都命中时只保留第一次出现的位置。</p>
+<hr>
+<h2 id="七、时序图：从-query-到原始检索结果"><a href="#七、时序图：从-query-到原始检索结果" class="headerlink" title="七、时序图：从 query 到原始检索结果"></a>七、时序图：从 query 到原始检索结果</h2><figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br></pre></td><td class="code"><pre><span class="line">query</span><br><span class="line">  │</span><br><span class="line">  ├──→ get_keywords_from_query（上一篇）</span><br><span class="line">  │</span><br><span class="line">  ▼</span><br><span class="line">_perform_kg_search</span><br><span class="line">  │</span><br><span class="line">  ├── 0. ll_keywords = ll_keywords.join(&quot;, &quot;)</span><br><span class="line">  │     hl_keywords = hl_keywords.join(&quot;, &quot;)</span><br><span class="line">  │</span><br><span class="line">  ├── 1. 批嵌入</span><br><span class="line">  │     ├── [query]    → query_embedding（所有 mode）</span><br><span class="line">  │     ├── [ll_kw]    → ll_embedding（local/hybrid/mix）</span><br><span class="line">  │     └── [hl_kw]    → hl_embedding（global/hybrid/mix）</span><br><span class="line">  │</span><br><span class="line">  ├── 2. 模式分发</span><br><span class="line">  │</span><br><span class="line">  ├── local: _get_node_data(ll_embedding)</span><br><span class="line">  │     ├── entities_vdb.query(ll_embedding, top_k)</span><br><span class="line">  │     ├── get_nodes_batch(node_ids)</span><br><span class="line">  │     ├── node_degrees_batch(node_ids)</span><br><span class="line">  │     └── _find_most_related_edges_from_entities</span><br><span class="line">  │           ├── get_nodes_edges_batch</span><br><span class="line">  │           ├── dedup</span><br><span class="line">  │           └── get_edges_batch + edge_degrees_batch</span><br><span class="line">  │</span><br><span class="line">  ├── global: _get_edge_data(hl_embedding)</span><br><span class="line">  │     ├── relationships_vdb.query(hl_embedding, top_k)</span><br><span class="line">  │     ├── get_edges_batch(edge_pairs)</span><br><span class="line">  │     └── _find_most_related_entities_from_relationships</span><br><span class="line">  │</span><br><span class="line">  └── mix: _get_vector_context(query_embedding)</span><br><span class="line">        └── chunks_vdb.query(query_embedding, chunk_top_k)</span><br><span class="line">  │</span><br><span class="line">  ├── round-robin merge 实体</span><br><span class="line">  ├── round-robin merge 关系</span><br><span class="line">  │</span><br><span class="line">  ▼</span><br><span class="line">final_entities + final_relations + vector_chunks</span><br><span class="line">  │</span><br><span class="line">  ▼</span><br><span class="line">_find_related_text_unit_from_entities（chunk 选择）</span><br><span class="line">  ├── WEIGHT: pick_by_weighted_polling</span><br><span class="line">  └── VECTOR: pick_by_vector_similarity</span><br></pre></td></tr></table></figure>
+
+<hr>
+<h2 id="八、涉及文件与函数索引"><a href="#八、涉及文件与函数索引" class="headerlink" title="八、涉及文件与函数索引"></a>八、涉及文件与函数索引</h2><table>
+<thead>
+<tr>
+<th>函数 &#x2F; 类</th>
+<th>文件</th>
+<th>行号</th>
+<th>职责</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>_perform_kg_search</code></td>
+<td>operate.py</td>
+<td>4323</td>
+<td>中枢：批嵌入 + 三路检索 + 合并</td>
+</tr>
+<tr>
+<td><code>_get_node_data</code></td>
+<td>operate.py</td>
+<td>5152</td>
+<td>Local：实体 VDB 查询 + 图节点 + 边扩散</td>
+</tr>
+<tr>
+<td><code>_get_edge_data</code></td>
+<td>operate.py</td>
+<td>5427</td>
+<td>Global：关系 VDB 查询 + 图边 + 实体扩散</td>
+</tr>
+<tr>
+<td><code>_get_vector_context</code></td>
+<td>operate.py</td>
+<td>4266</td>
+<td>Naive&#x2F;Mix：文本块 VDB 查询</td>
+</tr>
+<tr>
+<td><code>_find_most_related_edges_from_entities</code></td>
+<td>operate.py</td>
+<td>5212</td>
+<td>从实体找到关联边（去重 + 排序）</td>
+</tr>
+<tr>
+<td><code>_find_most_related_entities_from_relationships</code></td>
+<td>operate.py</td>
+<td>5486</td>
+<td>从边找到关联实体（set 去重）</td>
+</tr>
+<tr>
+<td><code>_find_related_text_unit_from_entities</code></td>
+<td>operate.py</td>
+<td>5268</td>
+<td>Chunk 选择：WEIGHT&#x2F;VECTOR 路由</td>
+</tr>
+<tr>
+<td><code>pick_by_weighted_polling</code></td>
+<td>utils.py</td>
+<td>3991</td>
+<td>加权轮询 chunk 选择（两轮分配）</td>
+</tr>
+<tr>
+<td><code>pick_by_vector_similarity</code></td>
+<td>utils.py</td>
+<td>4071</td>
+<td>向量相似度 chunk 选择</td>
+</tr>
+<tr>
+<td><code>BaseVectorStorage</code></td>
+<td>base.py</td>
+<td>220</td>
+<td>VDB 抽象基类</td>
+</tr>
+<tr>
+<td><code>BaseVectorStorage.query</code></td>
+<td>base.py</td>
+<td>268</td>
+<td>抽象 query 接口</td>
+</tr>
+<tr>
+<td><code>NanoVectorDBStorage.query</code></td>
+<td>kg&#x2F;nano_vector_db_impl.py</td>
+<td>414</td>
+<td>默认 VDB 的 query 实现</td>
+</tr>
+<tr>
+<td><code>EmbeddingFunc</code></td>
+<td>utils.py</td>
+<td>498</td>
+<td>Embedding 调用包装器</td>
+</tr>
+<tr>
+<td><code>EmbeddingFunc.__call__</code></td>
+<td>utils.py</td>
+<td>577</td>
+<td>维度注入 + 校验 + 上下文传递</td>
+</tr>
+<tr>
+<td><code>wrap_embedding_func_with_attrs</code></td>
+<td>utils.py</td>
+<td>2238</td>
+<td>EmbeddingFunc 装饰器</td>
+</tr>
+</tbody></table>
+<hr>
+<h2 id="九、设计要点总结"><a href="#九、设计要点总结" class="headerlink" title="九、设计要点总结"></a>九、设计要点总结</h2><ol>
+<li><p><strong>一次嵌入原则：</strong> 尽量在一次 API 调用中完成所有需要嵌入的文本，减少 network round-trip。当某个 mode 不需要某条路径时，对应文本不嵌入。</p>
+</li>
+<li><p><strong>VDB + 图存储互补：</strong> VDB 负责”语义寻找”（哪些实体&#x2F;关系跟关键词语义相关），图存储负责”拓扑补充”（这些实体有哪些属性、关联了哪些边、在图中的重要性）。两者通过 <code>entity_name</code>、(src, tgt) 键关联。</p>
+</li>
+<li><p><strong>WEIGHT 作为降级底线：</strong> <code>VECTOR</code> 模式依赖 embedding API + chunks VDB，这两者任一不可用时就回退到纯图权重。图拓扑本身就携带了足够的优先级信息。</p>
+</li>
+<li><p><strong>Round-robin 去重：</strong> 不是为了最大召回，而是为了<strong>多样性</strong>——local 和 global 来源的实体在最终列表中交替出现，避免某一类主导前几名的位置。</p>
+</li>
+<li><p><strong>不对称嵌入的前瞻：</strong> 虽然当前默认 embedding 函数大多是对称的，但 <code>EmbeddingFunc</code> 的 <code>context</code> 参数为不对称 embedding 预留了完整的路由——<code>query</code> 和 <code>document</code> 使用不同的编码前缀，这在需要更精确的 query-doc 匹配时可以直接启用。</p>
+</li>
+</ol>
+<p>下一步：向量检索返回的实体和关系被转换成 token 字符串后，需要经过<strong>Token 预算与裁剪系统</strong>的管控——即 1.5 Token 预算与裁剪。</p>
+
+    </div>
+
+    
+    
+    
+
+    <footer class="post-footer">
+          
+
+<div class="post-copyright">
+<ul>
+  <li class="post-copyright-author">
+      <strong>本文作者： </strong>陌忆
+  </li>
+  <li class="post-copyright-link">
+      <strong>本文链接：</strong>
+      <a href="https://moyi-math.github.io/2026/07/12/LightRAG-1.2-%E6%89%B9%E5%B5%8C%E5%85%A5%E4%B8%8E%E5%90%91%E9%87%8F%E6%A3%80%E7%B4%A2/" title="LightRAG 源码分析 · 1.2 批嵌入与向量检索——关键词如何找到知识图谱中的实体和关系">https://moyi-math.github.io/2026/07/12/LightRAG-1.2-批嵌入与向量检索/</a>
+  </li>
+  <li class="post-copyright-license">
+      <strong>版权声明： </strong>本博客所有文章除特别声明外，均采用 <a href="https://creativecommons.org/licenses/by-nc-sa/4.0/" rel="noopener" target="_blank"><i class="fab fa-fw fa-creative-commons"></i>BY-NC-SA</a> 许可协议。转载请注明出处！
+  </li>
+</ul>
+</div>
+
+          <div class="post-tags">
+              <a href="/tags/LightRAG/" rel="tag"># LightRAG</a>
+              <a href="/tags/RAG/" rel="tag"># RAG</a>
+              <a href="/tags/GraphRAG/" rel="tag"># GraphRAG</a>
+              <a href="/tags/%E6%BA%90%E7%A0%81%E5%88%86%E6%9E%90/" rel="tag"># 源码分析</a>
+              <a href="/tags/%E5%90%91%E9%87%8F%E6%A3%80%E7%B4%A2/" rel="tag"># 向量检索</a>
+              <a href="/tags/%E5%B5%8C%E5%85%A5/" rel="tag"># 嵌入</a>
+              <a href="/tags/Embedding/" rel="tag"># Embedding</a>
+              <a href="/tags/VectorDB/" rel="tag"># VectorDB</a>
+          </div>
+
+        
+
+          <div class="post-nav">
+            <div class="post-nav-item">
+                <a href="/2026/07/12/LightRAG-1.1-%E5%85%B3%E9%94%AE%E8%AF%8D%E6%8F%90%E5%8F%96/" rel="prev" title="LightRAG 源码分析 · 1.1 关键词提取——从用户问题到图检索的第一跳">
+                  <i class="fa fa-angle-left"></i> LightRAG 源码分析 · 1.1 关键词提取——从用户问题到图检索的第一跳
+                </a>
+            </div>
+            <div class="post-nav-item">
+            </div>
+          </div>
+    </footer>
+  </article>
+</div>
+
+
+
+
+
+
+</div>
+  </main>
+
+  <footer class="footer">
+    <div class="footer-inner">
+
+  <div class="copyright">
+    &copy; 
+    <span itemprop="copyrightYear">2026</span>
+    <span class="with-love">
+      <i class="fa fa-heart"></i>
+    </span>
+    <span class="author" itemprop="copyrightHolder">陌忆</span>
+  </div>
+<div class="wordcount">
+  <span class="post-meta-item">
+    <span class="post-meta-item-icon">
+      <i class="fa fa-chart-line"></i>
+    </span>
+    <span title="站点总字数">24k</span>
+  </span>
+  <span class="post-meta-item">
+    <span class="post-meta-item-icon">
+      <i class="fa fa-coffee"></i>
+    </span>
+    <span title="站点阅读时长">1:28</span>
+  </span>
+</div>
+
+    </div>
+  </footer>
+
+  
+  <div class="toggle sidebar-toggle" role="button">
+    <span class="toggle-line"></span>
+    <span class="toggle-line"></span>
+    <span class="toggle-line"></span>
+  </div>
+  <div class="sidebar-dimmer"></div>
+  <div class="back-to-top" role="button" aria-label="返回顶部">
+    <i class="fa fa-arrow-up fa-lg"></i>
+    <span>0%</span>
+  </div>
+
+<noscript>
+  <div class="noscript-warning">Theme NexT works best with JavaScript enabled</div>
+</noscript>
+<!-- canvas-nest particle background -->
+<script defer>
+(function() {
+  var s = document.createElement("script");
+  s.src = "//cdn.bootcss.com/canvas-nest.js/1.0.0/canvas-nest.min.js";
+  s.setAttribute("count", "150");
+  s.setAttribute("opacity", "1");
+  document.body.appendChild(s);
+})();
+</script>
+
+<!-- Live2D widget -->
+<script defer src="/live2dw/lib/L2Dwidget.min.js"></script>
+<script defer>
+L2Dwidget.init({
+  "pluginRootPath": "live2dw/",
+  "pluginJsPath": "lib/",
+  "pluginModelPath": "assets/",
+  "tagMode": false,
+  "debug": false,
+  "model": {"jsonPath": "/live2dw/assets/assets/shizuku.model.json"},
+  "display": {"position": "right", "width": 150, "height": 300},
+  "mobile": {"show": true},
+  "log": false
+});
+</script>
+
+<!-- Page click heart effect -->
+<script defer src="/js/clicklove.js"></script>
+
+<!-- Site running time -->
+<span id="timeDate"></span>
+<script>
+var now = new Date();
+function createtime() {
+  var grt = new Date("11/17/2022 8:00:00");
+  now.setTime(now.getTime() + 250);
+  var days = (now - grt) / 1000 / 60 / 60 / 24;
+  var dnum = Math.floor(days);
+  var hours = (now - grt) / 1000 / 60 / 60 - (24 * dnum);
+  var hnum = Math.floor(hours);
+  if (String(hnum).length == 1) hnum = "0" + hnum;
+  var minutes = (now - grt) / 1000 / 60 - (24 * 60 * dnum) - (60 * hnum);
+  var mnum = Math.floor(minutes);
+  if (String(mnum).length == 1) mnum = "0" + mnum;
+  var seconds = (now - grt) / 1000 - (24 * 60 * 60 * dnum) - (60 * 60 * hnum) - (60 * mnum);
+  var snum = Math.round(seconds);
+  if (String(snum).length == 1) snum = "0" + snum;
+  document.getElementById("timeDate").innerHTML = "本站已安全运行 " + dnum + " 天 " + hnum + " 小时 " + mnum + " 分 " + snum + " 秒";
+}
+setInterval(createtime, 1000);
+</script>
+
+</body>
+</html>
