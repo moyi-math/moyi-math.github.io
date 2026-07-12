@@ -1,0 +1,756 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width">
+<meta name="theme-color" content="#222"><meta name="generator" content="Hexo 7.3.0">
+<link rel="preconnect" href="https://cdnjs.cloudflare.com" crossorigin>
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon-next.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32-next.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next.png">
+  <link rel="mask-icon" href="/images/logo.svg" color="#222">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/7.0.0/css/all.min.css" integrity="sha256-VHqXKFhhMxcpubYf9xiWdCiojEbY9NexQ4jh8AxbvcM=" crossorigin="anonymous">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/animate.css/3.1.1/animate.min.css" integrity="sha256-PR7ttpcvz8qrF57fur/yAx1qXMFJeJFiA6pSzWi0OIE=" crossorigin="anonymous">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/pace/1.2.4/themes/blue/pace-theme-minimal.css">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pace/1.2.4/pace.min.js" integrity="sha256-gqd7YTjg/BtfqWSwsJOvndl0Bxc8gFImLEkXQT8+qj0=" crossorigin="anonymous" defer></script>
+
+<script class="next-config" data-name="main" type="application/json">{"hostname":"moyi-math.github.io","root":"/","images":"/images","scheme":"Gemini","darkmode":false,"version":"8.28.0","exturl":false,"sidebar":{"position":"left","width_expanded":320,"width_dual_column":240,"display":"post","padding":18,"offset":12},"hljswrap":true,"codeblock":{"theme":{"light":"default","dark":"stackoverflow-dark"},"prism":{"light":"prism","dark":"prism-dark"},"copy_button":{"enable":true,"style":null},"fold":{"enable":false,"height":500},"language":false},"bookmark":{"enable":false,"color":"#222","save":"auto"},"mediumzoom":false,"lazyload":false,"pangu":false,"comments":{"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},"stickytabs":false,"motion":{"enable":true,"async":false,"duration":200,"transition":{"menu_item":"fadeInDown","post_block":"fadeIn","post_header":"fadeInDown","post_body":"fadeInDown","coll_header":"fadeInLeft","sidebar":"fadeInUp"}},"prism":false,"i18n":{"placeholder":"搜索...","empty":"没有找到任何搜索结果：${query}","hits_time":"找到 ${hits} 个搜索结果（用时 ${time} 毫秒）","hits":"找到 ${hits} 个搜索结果"},"path":"/search.json","localsearch":{"enable":true,"top_n_per_article":1,"unescape":false,"preload":false}}</script><script src="/js/config.js" defer></script>
+
+    <meta name="description" content="向量检索找到候选实体和关系后，Graph Store 层如何编排图拓扑查询、边扩散、文本块关联？NetworkX 实现细节、批量操作、跨进程同步、WEIGHT&#x2F;VECTOR chunk 选择算法，一网打尽。">
+<meta property="og:type" content="article">
+<meta property="og:title" content="LightRAG 源码分析 · 1.3 Graph Store 层编排——从 VDB 结果到图拓扑数据与文本块的全链路">
+<meta property="og:url" content="https://moyi-math.github.io/2026/07/12/LightRAG-1.3-Graph-Store%E5%B1%82%E7%BC%96%E6%8E%92/index.html">
+<meta property="og:site_name" content="陌忆的博客">
+<meta property="og:description" content="向量检索找到候选实体和关系后，Graph Store 层如何编排图拓扑查询、边扩散、文本块关联？NetworkX 实现细节、批量操作、跨进程同步、WEIGHT&#x2F;VECTOR chunk 选择算法，一网打尽。">
+<meta property="og:locale" content="zh_CN">
+<meta property="article:published_time" content="2026-07-12T08:00:00.000Z">
+<meta property="article:modified_time" content="2026-07-12T08:00:00.000Z">
+<meta property="article:author" content="陌忆">
+<meta property="article:tag" content="LightRAG">
+<meta property="article:tag" content="RAG">
+<meta property="article:tag" content="GraphRAG">
+<meta property="article:tag" content="源码分析">
+<meta property="article:tag" content="知识图谱">
+<meta property="article:tag" content="Graph Store">
+<meta property="article:tag" content="KV Store">
+<meta property="article:tag" content="NetworkX">
+<meta name="twitter:card" content="summary">
+
+
+<link rel="canonical" href="https://moyi-math.github.io/2026/07/12/LightRAG-1.3-Graph-Store%E5%B1%82%E7%BC%96%E6%8E%92/">
+
+
+<script class="next-config" data-name="page" type="application/json">{"sidebar":"","isHome":false,"isPost":true,"lang":"zh-CN","comments":true,"permalink":"https://moyi-math.github.io/2026/07/12/LightRAG-1.3-Graph-Store%E5%B1%82%E7%BC%96%E6%8E%92/","path":"2026/07/12/LightRAG-1.3-Graph-Store层编排/","title":"LightRAG 源码分析 · 1.3 Graph Store 层编排——从 VDB 结果到图拓扑数据与文本块的全链路"}</script>
+
+<script class="next-config" data-name="calendar" type="application/json">""</script>
+<title>LightRAG 源码分析 · 1.3 Graph Store 层编排——从 VDB 结果到图拓扑数据与文本块的全链路 | 陌忆的博客</title>
+  
+
+
+
+
+
+
+
+
+  
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/animejs/3.2.1/anime.min.js" integrity="sha256-XL2inqUJaslATFnHdJOi9GfQ60on8Wx1C2H8DYiN1xY=" crossorigin="anonymous" defer></script>
+<script src="/js/utils.js" defer></script><script src="/js/motion.js" defer></script><script src="/js/sidebar.js" defer></script><script src="/js/next-boot.js" defer></script>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/hexo-generator-searchdb/1.5.0/search.js" integrity="sha256-xFC6PJ82SL9b3WkGjFavNiA9gm5z6UBxWPiu4CYjptg=" crossorigin="anonymous" defer></script>
+<script src="/js/third-party/search/local-search.js" defer></script>
+
+
+
+
+
+  <script src="/js/third-party/pace.js" defer></script>
+
+
+  
+
+
+
+
+  
+
+  <script class="next-config" data-name="enableMath" type="application/json">false</script><link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/katex.min.css" integrity="sha256-UF1fgpAiu3tPJN/uCqEUHNe7pnr+QR0SQDNfgglgtcM=" crossorigin="anonymous">
+
+
+<link rel="preconnect" href="https://cdn.jsdelivr.net">
+<link rel="preconnect" href="https://cdn.bootcss.com">
+
+  <noscript>
+    <link rel="stylesheet" href="/css/noscript.css">
+  </noscript>
+<!-- hexo injector head_end start --><link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/katex.min.css" integrity="sha512-fHwaWebuwA7NSF5Qg/af4UeDx9XqUpYpOGgubo3yWu+b2IQR4UeQwbb42Ti7gVAjNtVoI/I9TEoYeu9omwcC6g==" crossorigin="anonymous" referrerpolicy="no-referrer" /><!-- hexo injector head_end end --></head>
+
+<body itemscope itemtype="http://schema.org/WebPage" class="use-motion">
+  <div class="headband"></div>
+
+  <main class="main">
+    <div class="column">
+      <header class="header" itemscope itemtype="http://schema.org/WPHeader"><div class="site-brand-container">
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="切换导航栏" role="button">
+        <span class="toggle-line"></span>
+        <span class="toggle-line"></span>
+        <span class="toggle-line"></span>
+    </div>
+  </div>
+
+  <div class="site-meta">
+
+    <a href="/" class="brand" rel="start">
+      <i class="logo-line"></i>
+      <p class="site-title">陌忆的博客</p>
+      <i class="logo-line"></i>
+    </a>
+      <p class="site-subtitle" itemprop="description">数据库无法得出结论</p>
+  </div>
+
+  <div class="site-nav-right">
+    <div class="toggle popup-trigger" aria-label="搜索" role="button">
+        <i class="fa fa-search fa-fw fa-lg"></i>
+    </div>
+  </div>
+</div>
+
+
+
+<nav class="site-nav">
+  <ul class="main-menu menu"><li class="menu-item menu-item-home"><a href="/" rel="section"><i class="fa fa-home fa-fw"></i>首页</a></li><li class="menu-item menu-item-about"><a href="/about/" rel="section"><i class="fa fa-user fa-fw"></i>关于</a></li><li class="menu-item menu-item-tags"><a href="/tags/" rel="section"><i class="fa fa-tags fa-fw"></i>标签</a></li><li class="menu-item menu-item-categories"><a href="/categories/" rel="section"><i class="fa fa-th fa-fw"></i>分类</a></li><li class="menu-item menu-item-archives"><a href="/archives/" rel="section"><i class="fa fa-archive fa-fw"></i>归档</a></li>
+      <li class="menu-item menu-item-search">
+        <a role="button" class="popup-trigger"><i class="fa fa-search fa-fw"></i>搜索
+        </a>
+      </li>
+  </ul>
+</nav>
+
+
+
+  <div class="search-pop-overlay">
+    <div class="popup search-popup">
+      <div class="search-header">
+        <span class="search-icon">
+          <i class="fa fa-search"></i>
+        </span>
+        <div class="search-input-container">
+          <input autocomplete="off" autocapitalize="off" maxlength="80"
+                placeholder="搜索..." spellcheck="false"
+                type="search" class="search-input">
+        </div>
+        <span class="popup-btn-close" role="button">
+          <i class="fa fa-times-circle"></i>
+        </span>
+      </div>
+      <div class="search-result-container">
+        <div class="search-result-icon">
+          <i class="fa fa-spinner fa-pulse fa-5x"></i>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</header>
+        
+  
+  <aside class="sidebar">
+
+    <div class="sidebar-inner sidebar-nav-active sidebar-toc-active">
+      <ul class="sidebar-nav">
+        <li class="sidebar-nav-toc">
+          文章目录
+        </li>
+        <li class="sidebar-nav-overview">
+          站点概览
+        </li>
+      </ul>
+
+      <div class="sidebar-panel-container">
+        <!--noindex-->
+        <div class="post-toc-wrap sidebar-panel">
+            <div class="post-toc animated"><ol class="nav"><li class="nav-item nav-level-2"><a class="nav-link" href="#%E9%9B%B6%E3%80%81%E5%BC%95%E5%85%A5%EF%BC%9A%E5%90%91%E9%87%8F%E6%A3%80%E7%B4%A2%E4%B9%8B%E5%90%8E%E5%8F%91%E7%94%9F%E4%BA%86%E4%BB%80%E4%B9%88%EF%BC%9F"><span class="nav-text">零、引入：向量检索之后发生了什么？</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E4%B8%80%E3%80%81LightRAG-%E7%9A%84%E4%B8%89%E5%B1%82%E5%AD%98%E5%82%A8%E6%9E%B6%E6%9E%84"><span class="nav-text">一、LightRAG 的三层存储架构</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E4%BA%8C%E3%80%81BaseGraphStorage%EF%BC%9A%E6%8A%BD%E8%B1%A1%E5%9F%BA%E7%B1%BB%E4%B8%8E%E6%89%B9%E9%87%8F%E6%93%8D%E4%BD%9C"><span class="nav-text">二、BaseGraphStorage：抽象基类与批量操作</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#2-1-%E6%A0%B8%E5%BF%83%E5%8E%9F%E5%AD%90%E6%96%B9%E6%B3%95"><span class="nav-text">2.1 核心原子方法</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#2-2-%E6%89%B9%E9%87%8F%E6%96%B9%E6%B3%95"><span class="nav-text">2.2 批量方法</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#2-3-%E4%B8%BA%E4%BB%80%E4%B9%88%E6%89%B9%E9%87%8F%E6%96%B9%E6%B3%95%E9%87%8D%E8%A6%81%EF%BC%9F"><span class="nav-text">2.3 为什么批量方法重要？</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E4%B8%89%E3%80%81NetworkXStorage%EF%BC%9A%E9%BB%98%E8%AE%A4%E5%9B%BE%E5%AD%98%E5%82%A8%E5%AE%9E%E7%8E%B0"><span class="nav-text">三、NetworkXStorage：默认图存储实现</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#3-1-%E5%AD%98%E5%82%A8%E6%A8%A1%E5%9E%8B"><span class="nav-text">3.1 存储模型</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#3-2-%E8%AF%BB%E5%86%99%E8%B7%AF%E5%BE%84%E5%88%86%E7%A6%BB"><span class="nav-text">3.2 读写路径分离</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#3-3-%E8%A6%86%E7%9B%96%E7%9A%84%E6%89%B9%E6%96%B9%E6%B3%95"><span class="nav-text">3.3 覆盖的批方法</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#3-4-%E5%8D%95%E8%8A%82%E7%82%B9%E6%93%8D%E4%BD%9C%E5%AE%9E%E7%8E%B0"><span class="nav-text">3.4 单节点操作实现</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%9B%9B%E3%80%81JsonKVStorage%EF%BC%9A%E9%BB%98%E8%AE%A4-KV-%E5%AD%98%E5%82%A8%E5%AE%9E%E7%8E%B0"><span class="nav-text">四、JsonKVStorage：默认 KV 存储实现</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#4-1-%E5%AD%98%E5%82%A8%E6%A8%A1%E5%9E%8B"><span class="nav-text">4.1 存储模型</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#4-2-%E6%A0%B8%E5%BF%83%E6%96%B9%E6%B3%95"><span class="nav-text">4.2 核心方法</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E4%BA%94%E3%80%81%E7%BC%96%E6%8E%92%E6%A0%B8%E5%BF%83%E5%87%BD%E6%95%B0%E9%80%90%E4%B8%AA%E6%8B%86%E8%A7%A3"><span class="nav-text">五、编排核心函数逐个拆解</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#5-1-get-node-data%EF%BC%88local-%E8%B7%AF%E5%BE%84%E5%85%A5%E5%8F%A3%EF%BC%89"><span class="nav-text">5.1 _get_node_data（local 路径入口）</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#5-2-find-most-related-edges-from-entities%EF%BC%88%E8%BE%B9%E6%89%A9%E6%95%A3%EF%BC%89"><span class="nav-text">5.2 _find_most_related_edges_from_entities（边扩散）</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#5-3-get-edge-data%EF%BC%88global-%E8%B7%AF%E5%BE%84%E5%85%A5%E5%8F%A3%EF%BC%89"><span class="nav-text">5.3 _get_edge_data（global 路径入口）</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#5-4-find-most-related-entities-from-relationships%EF%BC%88%E5%AE%9E%E4%BD%93%E8%BF%BD%E6%BA%AF%EF%BC%89"><span class="nav-text">5.4 _find_most_related_entities_from_relationships（实体追溯）</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%85%AD%E3%80%81%E6%96%87%E6%9C%AC%E5%9D%97%E6%94%B6%E9%9B%86%E4%B8%8E%E9%80%89%E6%8B%A9"><span class="nav-text">六、文本块收集与选择</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#6-1-find-related-text-unit-from-entities"><span class="nav-text">6.1 _find_related_text_unit_from_entities</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#6-2-pick-by-weighted-polling-%E7%9A%84-graph-store-%E8%A7%86%E8%A7%92"><span class="nav-text">6.2 pick_by_weighted_polling 的 graph store 视角</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#6-3-pick-by-vector-similarity-%E7%9A%84-graph-store-%E8%A7%86%E8%A7%92"><span class="nav-text">6.3 pick_by_vector_similarity 的 graph store 视角</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E4%B8%83%E3%80%81NetworkX-get-nodes-edges-batch-%E4%B8%8E%E8%BE%B9%E6%89%A9%E6%95%A3%E6%80%A7%E8%83%BD%E5%85%B3%E9%94%AE"><span class="nav-text">七、NetworkX get_nodes_edges_batch 与边扩散性能关键</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%85%AB%E3%80%81%E8%B7%A8%E8%BF%9B%E7%A8%8B%E5%90%8C%E6%AD%A5%E6%9C%BA%E5%88%B6"><span class="nav-text">八、跨进程同步机制</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#8-1-%E5%86%99%E5%85%A5%E7%AB%AF%EF%BC%88%E7%B4%A2%E5%BC%95%E8%BF%9B%E7%A8%8B%EF%BC%89"><span class="nav-text">8.1 写入端（索引进程）</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#8-2-%E8%AF%BB%E5%8F%96%E7%AB%AF%EF%BC%88%E6%9F%A5%E8%AF%A2%E8%BF%9B%E7%A8%8B%EF%BC%89"><span class="nav-text">8.2 读取端（查询进程）</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E4%B9%9D%E3%80%81%E6%97%B6%E5%BA%8F%E5%9B%BE%EF%BC%9AGraph-Store-%E7%BC%96%E6%8E%92%E5%85%A8%E8%B2%8C"><span class="nav-text">九、时序图：Graph Store 编排全貌</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%8D%81%E3%80%81%E8%AE%BE%E8%AE%A1%E8%A6%81%E7%82%B9%E6%80%BB%E7%BB%93"><span class="nav-text">十、设计要点总结</span></a></li></ol></div>
+        </div>
+        <!--/noindex-->
+
+        <div class="site-overview-wrap sidebar-panel">
+          <div class="site-author animated" itemprop="author" itemscope itemtype="http://schema.org/Person">
+    <img class="site-author-image" itemprop="image" alt="陌忆"
+      src="/images/avatar.webp">
+  <p class="site-author-name" itemprop="name">陌忆</p>
+  <div class="site-description" itemprop="description">欢迎来到我的世界💜</div>
+</div>
+<div class="site-state-wrap animated">
+  <nav class="site-state">
+      <div class="site-state-item site-state-posts">
+        <a href="/archives/">
+          <span class="site-state-item-count">9</span>
+          <span class="site-state-item-name">日志</span>
+        </a>
+      </div>
+      <div class="site-state-item site-state-categories">
+          <a href="/categories/">
+        <span class="site-state-item-count">3</span>
+        <span class="site-state-item-name">分类</span></a>
+      </div>
+      <div class="site-state-item site-state-tags">
+          <a href="/tags/">
+        <span class="site-state-item-count">34</span>
+        <span class="site-state-item-name">标签</span></a>
+      </div>
+  </nav>
+</div>
+  <div class="cc-license animated" itemprop="license">
+    <a href="https://creativecommons.org/licenses/by-nc-sa/4.0/" class="cc-opacity" rel="noopener" target="_blank"><img src="https://cdnjs.cloudflare.com/ajax/libs/creativecommons-vocabulary/2020.11.3/assets/license_badges/small/by_nc_sa.svg" alt="Creative Commons"></a>
+  </div>
+
+        </div>
+      </div>
+    </div>
+
+    
+  </aside>
+
+
+    </div>
+
+    <div class="main-inner post posts-expand">
+
+
+  
+
+
+<div class="post-block">
+  
+  
+
+  <article itemscope itemtype="http://schema.org/Article" class="post-content" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="https://moyi-math.github.io/2026/07/12/LightRAG-1.3-Graph-Store%E5%B1%82%E7%BC%96%E6%8E%92/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.webp">
+      <meta itemprop="name" content="陌忆">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="陌忆的博客">
+      <meta itemprop="description" content="欢迎来到我的世界💜">
+    </span>
+
+    <span hidden itemprop="post" itemscope itemtype="http://schema.org/CreativeWork">
+      <meta itemprop="name" content="LightRAG 源码分析 · 1.3 Graph Store 层编排——从 VDB 结果到图拓扑数据与文本块的全链路 | 陌忆的博客">
+      <meta itemprop="description" content="向量检索找到候选实体和关系后，Graph Store 层如何编排图拓扑查询、边扩散、文本块关联？NetworkX 实现细节、批量操作、跨进程同步、WEIGHT&#x2F;VECTOR chunk 选择算法，一网打尽。">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          LightRAG 源码分析 · 1.3 Graph Store 层编排——从 VDB 结果到图拓扑数据与文本块的全链路
+        </h1>
+
+        <div class="post-meta-container">
+          <div class="post-meta">
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-calendar"></i>
+      </span>
+      <span class="post-meta-item-text">发表于</span>
+
+      <time title="创建时间：2026-07-12 16:00:00" itemprop="dateCreated datePublished" datetime="2026-07-12T16:00:00+08:00">2026-07-12</time>
+    </span>
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-folder"></i>
+      </span>
+      <span class="post-meta-item-text">分类于</span>
+        <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+          <a href="/categories/LightRAG%E6%BA%90%E7%A0%81%E5%88%86%E6%9E%90/" itemprop="url" rel="index"><span itemprop="name">LightRAG源码分析</span></a>
+        </span>
+    </span>
+
+  
+    <span class="post-meta-break"></span>
+    <span class="post-meta-item" title="本文字数">
+      <span class="post-meta-item-icon">
+        <i class="far fa-file-word"></i>
+      </span>
+      <span class="post-meta-item-text">本文字数：</span>
+      <span>4k</span>
+    </span>
+    <span class="post-meta-item" title="阅读时长">
+      <span class="post-meta-item-icon">
+        <i class="far fa-clock"></i>
+      </span>
+      <span class="post-meta-item-text">阅读时长 &asymp;</span>
+      <span>15 分钟</span>
+    </span>
+</div>
+
+            <div class="post-description">向量检索找到候选实体和关系后，Graph Store 层如何编排图拓扑查询、边扩散、文本块关联？NetworkX 实现细节、批量操作、跨进程同步、WEIGHT/VECTOR chunk 选择算法，一网打尽。</div>
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody"><blockquote>
+<p><strong>系列定位：</strong> 本文是 LightRAG Query 方向的第三篇。前两篇分别拆解了关键词提取（1.1）和批嵌入与向量检索（1.2）。本文承接其上，深入到向量检索之后——Graph Store 层的编排逻辑。</p>
+</blockquote>
+<span id="more"></span>
+
+<h2 id="零、引入：向量检索之后发生了什么？"><a href="#零、引入：向量检索之后发生了什么？" class="headerlink" title="零、引入：向量检索之后发生了什么？"></a>零、引入：向量检索之后发生了什么？</h2><p>在 1.2 中，我们追踪到三路 VDB 查询返回了候选实体和关系的 ID。但 VDB 只存储了实体&#x2F;关系的<strong>名称和向量</strong>，（默认的 NanoVectorDB）不会存实体的完整属性描述、不会存边的权重，更不会存图拓扑结构中的度数。</p>
+<p>Graph Store 层就是补全这些缺失信息的地方——它从图存储（默认 NetworkX）中批量拉取拓扑数据，合并到 VDB 结果上，并进一步扩散到边&#x2F;实体和文本块。</p>
+<p>整个链路分为三个阶段：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br></pre></td><td class="code"><pre><span class="line">Phase 1: VDB 检索                 ← 1.2 批嵌入与向量检索</span><br><span class="line">    entities_vdb.query()       →  候选实体（名称 + 余弦相似度）</span><br><span class="line">    relationships_vdb.query()  →  候选关系（src/tgt + 余弦相似度）</span><br><span class="line"></span><br><span class="line">Phase 2: Graph Store 编排         ← 本文 1.3</span><br><span class="line">    ├── 实体 → 图节点属性 + 度数 + 边扩散</span><br><span class="line">    ├── 关系 → 图边属性 + 度数 + 实体追溯</span><br><span class="line">    └── 实体/关系 → 文本块收集 + WEIGHT/VECTOR 选择</span><br><span class="line"></span><br><span class="line">Phase 3: Token 预算裁剪           ← 1.5（后续文章）</span><br><span class="line">    └── 按 token 预算截断 + 合并 + 构建 prompt</span><br></pre></td></tr></table></figure>
+
+<hr>
+<h2 id="一、LightRAG-的三层存储架构"><a href="#一、LightRAG-的三层存储架构" class="headerlink" title="一、LightRAG 的三层存储架构"></a>一、LightRAG 的三层存储架构</h2><p>在深入编排细节之前，需要先理解 LightRAG 的存储分层。所有存储后端都定义在 <code>lightrag/kg/</code> 目录下，通过工厂模式注册：</p>
+<table>
+<thead>
+<tr>
+<th>存储层</th>
+<th>抽象基类</th>
+<th>默认实现</th>
+<th>职责</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>Graph Storage</strong></td>
+<td><code>BaseGraphStorage</code></td>
+<td><code>NetworkXStorage</code></td>
+<td>图拓扑：节点属性、边属性、度数</td>
+</tr>
+<tr>
+<td><strong>KV Storage</strong></td>
+<td><code>BaseKVStorage</code></td>
+<td><code>JsonKVStorage</code></td>
+<td>键值存储：文本块内容、文档状态</td>
+</tr>
+<tr>
+<td><strong>Vector Storage</strong></td>
+<td><code>BaseVectorStorage</code></td>
+<td><code>NanoVectorDBStorage</code></td>
+<td>向量检索：实体&#x2F;关系&#x2F;文本块的嵌入向量</td>
+</tr>
+</tbody></table>
+<p><strong>存储注册工厂</strong>（<code>kg/__init__.py:1-46</code>）：</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line">STORAGE_IMPLEMENTATIONS = &#123;</span><br><span class="line">    <span class="string">&quot;graph&quot;</span>: &#123; <span class="string">&quot;NetworkXStorage&quot;</span>: ..., <span class="string">&quot;Neo4JStorage&quot;</span>: ..., <span class="string">&quot;PGGraphStorage&quot;</span>: ..., <span class="string">&quot;MongoGraphStorage&quot;</span>: ..., <span class="string">&quot;MemgraphStorage&quot;</span>: ..., <span class="string">&quot;OpenSearchGraphStorage&quot;</span>: ... &#125;,</span><br><span class="line">    <span class="string">&quot;kv&quot;</span>: &#123; <span class="string">&quot;JsonKVStorage&quot;</span>: ..., <span class="string">&quot;RedisKVStorage&quot;</span>: ..., <span class="string">&quot;PGKVStorage&quot;</span>: ..., <span class="string">&quot;MongoKVStorage&quot;</span>: ..., <span class="string">&quot;OpenSearchKVStorage&quot;</span>: ... &#125;,</span><br><span class="line">    <span class="string">&quot;vector&quot;</span>: &#123; <span class="string">&quot;NanoVectorDBStorage&quot;</span>: ..., <span class="string">&quot;MilvusVectorDBStorage&quot;</span>: ..., <span class="string">&quot;PGVectorStorage&quot;</span>: ..., <span class="string">&quot;FaissVectorDBStorage&quot;</span>: ..., <span class="string">&quot;QdrantVectorDBStorage&quot;</span>: ..., <span class="string">&quot;MongoVectorDBStorage&quot;</span>: ..., <span class="string">&quot;OpenSearchVectorDBStorage&quot;</span>: ... &#125;,</span><br><span class="line">    <span class="string">&quot;doc_status&quot;</span>: &#123; <span class="string">&quot;JsonDocStatusStorage&quot;</span>: ..., <span class="string">&quot;RedisDocStatusStorage&quot;</span>: ..., <span class="string">&quot;PGDocStatusStorage&quot;</span>: ..., <span class="string">&quot;MongoDocStatusStorage&quot;</span>: ..., <span class="string">&quot;OpenSearchDocStatusStorage&quot;</span>: ... &#125;,</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>Query 流程中这三层按以下方式协作：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br></pre></td><td class="code"><pre><span class="line">_perform_kg_search</span><br><span class="line">    │  entities_vdb  → BaseVectorStorage (NanoVectorDB)</span><br><span class="line">    │  relationships_vdb → BaseVectorStorage</span><br><span class="line">    │  chunks_vdb    → BaseVectorStorage</span><br><span class="line">    │  knowledge_graph_inst → BaseGraphStorage (NetworkX)</span><br><span class="line">    │  text_chunks_db → BaseKVStorage (JsonKVStorage)</span><br><span class="line">    │</span><br><span class="line">    ▼   combine_signals → _get_node_data / _get_edge_data</span><br><span class="line">         ├── VDB 查候选</span><br><span class="line">         ├── Graph 补属性/度数</span><br><span class="line">         └── KV 取文本块内容</span><br></pre></td></tr></table></figure>
+
+<hr>
+<h2 id="二、BaseGraphStorage：抽象基类与批量操作"><a href="#二、BaseGraphStorage：抽象基类与批量操作" class="headerlink" title="二、BaseGraphStorage：抽象基类与批量操作"></a>二、BaseGraphStorage：抽象基类与批量操作</h2><p><strong>文件：</strong> <code>base.py:446-790</code></p>
+<p><code>BaseGraphStorage</code> 约定了所有图存储后端必须实现的方法：</p>
+<h3 id="2-1-核心原子方法"><a href="#2-1-核心原子方法" class="headerlink" title="2.1 核心原子方法"></a>2.1 核心原子方法</h3><table>
+<thead>
+<tr>
+<th>方法</th>
+<th>功能</th>
+<th>返回</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>has_node(node_id)</code></td>
+<td>节点是否存在</td>
+<td>bool</td>
+</tr>
+<tr>
+<td><code>has_edge(src, tgt)</code></td>
+<td>边是否存在</td>
+<td>bool</td>
+</tr>
+<tr>
+<td><code>node_degree(node_id)</code></td>
+<td>节点的度数</td>
+<td>int</td>
+</tr>
+<tr>
+<td><code>edge_degree(src, tgt)</code></td>
+<td>边的重要度 &#x3D; src_deg + tgt_deg</td>
+<td>int</td>
+</tr>
+<tr>
+<td><code>get_node(node_id)</code></td>
+<td>获取节点属性</td>
+<td>dict | None</td>
+</tr>
+<tr>
+<td><code>get_edge(src, tgt)</code></td>
+<td>获取边属性</td>
+<td>dict | None</td>
+</tr>
+<tr>
+<td><code>get_node_edges(node_id)</code></td>
+<td>获取某个节点的所有边</td>
+<td>list[(src,tgt)]</td>
+</tr>
+<tr>
+<td><code>upsert_node(node_id, data)</code></td>
+<td>创建&#x2F;更新节点</td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>upsert_edge(src, tgt, data)</code></td>
+<td>创建&#x2F;更新边</td>
+<td>—</td>
+</tr>
+</tbody></table>
+<h3 id="2-2-批量方法"><a href="#2-2-批量方法" class="headerlink" title="2.2 批量方法"></a>2.2 批量方法</h3><p><strong>声明在基类，默认逐个调用原子方法</strong>。后端可以重写以利用原生批能力（如 Neo4j 的 Cypher UNWIND）。</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">async</span> <span class="keyword">def</span> <span class="title function_">get_nodes_batch</span>(<span class="params">self, node_ids: <span class="built_in">list</span>[<span class="built_in">str</span>]</span>) -&gt; <span class="built_in">dict</span>[<span class="built_in">str</span>, <span class="built_in">dict</span>]:</span><br><span class="line">    <span class="string">&quot;&quot;&quot;</span></span><br><span class="line"><span class="string">    BaseGraphStorage 默认实现：</span></span><br><span class="line"><span class="string">        依次调用 get_node(id)，收集到 dict</span></span><br><span class="line"><span class="string">    &quot;&quot;&quot;</span></span><br><span class="line">    results = &#123;&#125;</span><br><span class="line">    <span class="keyword">for</span> node_id <span class="keyword">in</span> node_ids:</span><br><span class="line">        node = <span class="keyword">await</span> <span class="variable language_">self</span>.get_node(node_id)</span><br><span class="line">        <span class="keyword">if</span> node <span class="keyword">is</span> <span class="keyword">not</span> <span class="literal">None</span>:</span><br><span class="line">            results[node_id] = node</span><br><span class="line">    <span class="keyword">return</span> results</span><br><span class="line"></span><br><span class="line"><span class="keyword">async</span> <span class="keyword">def</span> <span class="title function_">node_degrees_batch</span>(<span class="params">self, node_ids</span>) -&gt; <span class="built_in">dict</span>[<span class="built_in">str</span>, <span class="built_in">int</span>]:</span><br><span class="line">    <span class="comment"># 同样逐个调用 node_degree(id)</span></span><br><span class="line"></span><br><span class="line"><span class="keyword">async</span> <span class="keyword">def</span> <span class="title function_">get_edges_batch</span>(<span class="params">self, pairs: <span class="built_in">list</span>[<span class="built_in">dict</span>]</span>) -&gt; <span class="built_in">dict</span>[<span class="built_in">tuple</span>, <span class="built_in">dict</span>]:</span><br><span class="line">    <span class="comment"># pairs = [&#123;&quot;src_id&quot;: ..., &quot;tgt_id&quot;: ...&#125;, ...]</span></span><br><span class="line">    <span class="comment"># 逐个 get_edge(src, tgt)</span></span><br><span class="line"></span><br><span class="line"><span class="keyword">async</span> <span class="keyword">def</span> <span class="title function_">edge_degrees_batch</span>(<span class="params">self, pairs</span>) -&gt; <span class="built_in">dict</span>[<span class="built_in">tuple</span>, <span class="built_in">int</span>]:</span><br><span class="line">    <span class="comment"># 逐个 edge_degree(src, tgt)</span></span><br><span class="line"></span><br><span class="line"><span class="keyword">async</span> <span class="keyword">def</span> <span class="title function_">get_nodes_edges_batch</span>(<span class="params">self, node_ids</span>) -&gt; <span class="built_in">dict</span>[<span class="built_in">str</span>, <span class="built_in">list</span>[<span class="built_in">tuple</span>]]:</span><br><span class="line">    <span class="comment"># 逐个 get_node_edges(id) → 返回 (src,tgt) 列表</span></span><br></pre></td></tr></table></figure>
+
+<p><strong>查询流程中的调用时机：</strong></p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># _get_node_data 中：两个并行批调用</span></span><br><span class="line">nodes_dict, degrees_dict = <span class="keyword">await</span> asyncio.gather(</span><br><span class="line">    knowledge_graph_inst.get_nodes_batch(node_ids),     <span class="comment"># 所有候选实体的属性</span></span><br><span class="line">    knowledge_graph_inst.node_degrees_batch(node_ids),   <span class="comment"># 所有候选实体的度数</span></span><br><span class="line">)</span><br><span class="line"></span><br><span class="line"><span class="comment"># _find_most_related_edges_from_entities 中：</span></span><br><span class="line">batch_edges_dict = <span class="keyword">await</span> knowledge_graph_inst.get_nodes_edges_batch(node_names)</span><br><span class="line"><span class="comment"># 以及：</span></span><br><span class="line">edge_props, edge_degree_props = <span class="keyword">await</span> asyncio.gather(</span><br><span class="line">    knowledge_graph_inst.get_edges_batch(edge_pairs),</span><br><span class="line">    knowledge_graph_inst.edge_degrees_batch(edge_pairs),</span><br><span class="line">)</span><br></pre></td></tr></table></figure>
+
+<h3 id="2-3-为什么批量方法重要？"><a href="#2-3-为什么批量方法重要？" class="headerlink" title="2.3 为什么批量方法重要？"></a>2.3 为什么批量方法重要？</h3><p><code>get_nodes_batch</code> 和 <code>get_node_edges_batch</code> 等批方法在默认 NetworkX 下是逐个调用，在 Neo4j&#x2F;PostgreSQL 后端下则会被重写为一条 Cypher&#x2F;SQL 查全部。接口一致，性能不同——这是<strong>策略模式</strong>在存储层的典型应用。</p>
+<hr>
+<h2 id="三、NetworkXStorage：默认图存储实现"><a href="#三、NetworkXStorage：默认图存储实现" class="headerlink" title="三、NetworkXStorage：默认图存储实现"></a>三、NetworkXStorage：默认图存储实现</h2><p><strong>文件：</strong> <code>kg/networkx_impl.py</code>，796 行</p>
+<h3 id="3-1-存储模型"><a href="#3-1-存储模型" class="headerlink" title="3.1 存储模型"></a>3.1 存储模型</h3><figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">class</span> <span class="title class_">NetworkXStorage</span>(<span class="title class_ inherited__">BaseGraphStorage</span>):</span><br><span class="line">    _graph: networkx.Graph  <span class="comment"># 进程内内存</span></span><br><span class="line">    _driver: <span class="literal">None</span>            <span class="comment"># 占位符（与 Neo4j 接口统一）</span></span><br></pre></td></tr></table></figure>
+
+<p>一个 <code>networkx.Graph()</code>（无向图），所有节点和边都存储在内存中。图持久化为 GraphML 文件：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">working_dir/</span><br><span class="line">  └── graph_&lt;namespace&gt;.graphml     # NetworkX 的 XML 序列化</span><br></pre></td></tr></table></figure>
+
+<h3 id="3-2-读写路径分离"><a href="#3-2-读写路径分离" class="headerlink" title="3.2 读写路径分离"></a>3.2 读写路径分离</h3><p><strong>写入索引时：</strong> 在 <code>index_done_callback</code>（<code>networkx_impl.py:694-753</code>）中，持有写锁将整个 <code>self._graph</code> 序列化到 GraphML 文件，然后通过 shared_storage 设置 <code>storage_updated</code> 标志。</p>
+<p><strong>查询读取时：</strong> 在 <code>_get_graph()</code>（<code>networkx_impl.py:186-221</code>）中，检查 <code>storage_updated</code> 标志。如果有更新，<strong>重新加载整个 GraphML 文件</strong>替换当前内存图。</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">async</span> <span class="keyword">def</span> <span class="title function_">_get_graph</span>(<span class="params">self</span>):</span><br><span class="line">    <span class="comment"># 1. 检查 shared_storage 中的 storage_updated 标志</span></span><br><span class="line">    <span class="comment"># 2. 如果有更新：读取 GraphML 文件替换 self._graph</span></span><br><span class="line">    <span class="comment"># 3. 取消更新标志</span></span><br><span class="line">    <span class="comment"># 4. 返回当前图</span></span><br></pre></td></tr></table></figure>
+
+<p><strong>关键设计：</strong> 这是<strong>读多写少的发布-订阅模式</strong>。索引写入是低频操作（文档入库时一次），查询是高频操作。每次查询时检查原子标志位（无需锁），只在有更新时触发重载。</p>
+<h3 id="3-3-覆盖的批方法"><a href="#3-3-覆盖的批方法" class="headerlink" title="3.3 覆盖的批方法"></a>3.3 覆盖的批方法</h3><p>默认基类的 <code>get_nodes_batch</code> 等是逐个调用原子方法——对于 NetworkX 这种纯内存结构，这并不慢。真正被显式覆盖的批方法是：</p>
+<table>
+<thead>
+<tr>
+<th>方法</th>
+<th>行号</th>
+<th>实现</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>has_nodes_batch</code></td>
+<td>307-314</td>
+<td>set 推导式 <code>&#123;n for n in node_ids if graph.has_node(n)&#125;</code></td>
+</tr>
+<tr>
+<td><code>upsert_nodes_batch</code></td>
+<td>289-305</td>
+<td>循环内 <code>graph.add_node(id, **data)</code></td>
+</tr>
+<tr>
+<td><code>upsert_edges_batch</code></td>
+<td>316-331</td>
+<td>循环内 <code>graph.add_edge(src, tgt, **data)</code></td>
+</tr>
+</tbody></table>
+<p><strong>未覆盖：</strong> <code>get_nodes_batch</code>、<code>node_degrees_batch</code>、<code>get_nodes_edges_batch</code>、<code>get_edges_batch</code>、<code>edge_degrees_batch</code>——均使用基类的顺序调用。</p>
+<h3 id="3-4-单节点操作实现"><a href="#3-4-单节点操作实现" class="headerlink" title="3.4 单节点操作实现"></a>3.4 单节点操作实现</h3><figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">def</span> <span class="title function_">get_node</span>(<span class="params">self, node_id</span>):</span><br><span class="line">    <span class="keyword">return</span> <span class="variable language_">self</span>._graph.nodes.get(node_id)  <span class="comment"># networkx 内置方法</span></span><br><span class="line"></span><br><span class="line"><span class="keyword">def</span> <span class="title function_">node_degree</span>(<span class="params">self, node_id</span>):</span><br><span class="line">    <span class="keyword">return</span> <span class="built_in">int</span>(<span class="variable language_">self</span>._graph.degree(node_id)) <span class="keyword">if</span> <span class="variable language_">self</span>._graph.has_node(node_id) <span class="keyword">else</span> <span class="number">0</span></span><br><span class="line"></span><br><span class="line"><span class="keyword">def</span> <span class="title function_">edge_degree</span>(<span class="params">self, src, tgt</span>):</span><br><span class="line">    <span class="string">&quot;&quot;&quot;edge_degree 的定义：src 的度数 + tgt 的度数&quot;&quot;&quot;</span></span><br><span class="line">    <span class="keyword">return</span> <span class="variable language_">self</span>.node_degree(src) + <span class="variable language_">self</span>.node_degree(tgt)</span><br><span class="line"></span><br><span class="line"><span class="keyword">def</span> <span class="title function_">get_edge</span>(<span class="params">self, src, tgt</span>):</span><br><span class="line">    <span class="keyword">return</span> <span class="variable language_">self</span>._graph.edges.get((src, tgt))</span><br><span class="line"></span><br><span class="line"><span class="keyword">def</span> <span class="title function_">get_node_edges</span>(<span class="params">self, node_id</span>):</span><br><span class="line">    <span class="string">&quot;&quot;&quot;返回节点关联的所有边，每条边表示为 (src, target) 元组&quot;&quot;&quot;</span></span><br><span class="line">    <span class="keyword">if</span> <span class="variable language_">self</span>._graph.has_node(node_id):</span><br><span class="line">        <span class="keyword">return</span> <span class="built_in">list</span>(<span class="variable language_">self</span>._graph.edges(node_id))</span><br><span class="line">    <span class="keyword">return</span> <span class="literal">None</span></span><br></pre></td></tr></table></figure>
+
+<hr>
+<h2 id="四、JsonKVStorage：默认-KV-存储实现"><a href="#四、JsonKVStorage：默认-KV-存储实现" class="headerlink" title="四、JsonKVStorage：默认 KV 存储实现"></a>四、JsonKVStorage：默认 KV 存储实现</h2><p><strong>文件：</strong> <code>kg/json_kv_impl.py</code>，492 行</p>
+<h3 id="4-1-存储模型"><a href="#4-1-存储模型" class="headerlink" title="4.1 存储模型"></a>4.1 存储模型</h3><figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">class</span> <span class="title class_">JsonKVStorage</span>(<span class="title class_ inherited__">BaseKVStorage</span>):</span><br><span class="line">    _data: Manager().<span class="built_in">dict</span>()  <span class="comment"># 跨进程共享内存字典</span></span><br></pre></td></tr></table></figure>
+
+<p><code>_data</code> 是一个 <code>multiprocessing.Manager().dict()</code> 代理——所有进程看到同一个字典。持久化到 JSON 文件：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">working_dir/</span><br><span class="line">  └── kv_store_&lt;namespace&gt;.json     # 纯 JSON 序列化</span><br></pre></td></tr></table></figure>
+
+<h3 id="4-2-核心方法"><a href="#4-2-核心方法" class="headerlink" title="4.2 核心方法"></a>4.2 核心方法</h3><table>
+<thead>
+<tr>
+<th>方法</th>
+<th>行号</th>
+<th>实现</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>get_by_id(id)</code></td>
+<td>252-263</td>
+<td><code>self._data.get(id)</code> 加锁后返回副本</td>
+</tr>
+<tr>
+<td><code>get_by_ids(ids)</code></td>
+<td>265-281</td>
+<td>循环调用 <code>get_by_id</code></td>
+</tr>
+<tr>
+<td><code>upsert(data: dict)</code></td>
+<td>287-346</td>
+<td>加锁→打时间戳→<code>self._data.update(data)</code>→设更新标志</td>
+</tr>
+<tr>
+<td><code>filter_keys(keys)</code></td>
+<td>283-285</td>
+<td><code>set(keys) - set(self._data.keys())</code></td>
+</tr>
+</tbody></table>
+<p><strong>文本块存储：</strong> 在 query 流程中，<code>text_chunks_db.get_by_ids(chunk_ids)</code> 用于批量获取文本块内容。chunk_id 是格式化的 ID 字符串，值是包含 <code>content</code>、<code>tokens</code>、<code>entity_name</code>、<code>source_id</code> 等字段的字典。</p>
+<hr>
+<h2 id="五、编排核心函数逐个拆解"><a href="#五、编排核心函数逐个拆解" class="headerlink" title="五、编排核心函数逐个拆解"></a>五、编排核心函数逐个拆解</h2><h3 id="5-1-get-node-data（local-路径入口）"><a href="#5-1-get-node-data（local-路径入口）" class="headerlink" title="5.1 _get_node_data（local 路径入口）"></a>5.1 <code>_get_node_data</code>（local 路径入口）</h3><p><strong>文件：</strong> <code>operate.py:5152</code>。在 1.2 中已经部分分析，这里聚焦于它与 Graph Store 的交互。</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br></pre></td><td class="code"><pre><span class="line">输入: query, graph_inst, entities_vdb, query_param, ll_embedding</span><br><span class="line">                     │</span><br><span class="line">    步骤 1 ──────────┤</span><br><span class="line">    entities_vdb.query(ll_embedding, top_k)</span><br><span class="line">        ↳ 返回 [&#123;&quot;entity_name&quot;: &quot;Albert Einstein&quot;, &quot;id&quot;: &quot;id_xxx&quot;, &quot;distance&quot;: 0.92&#125;, ...]</span><br><span class="line">                     │</span><br><span class="line">    步骤 2 ──────────┤</span><br><span class="line">    node_ids = [r[&quot;entity_name&quot;] for r in results]</span><br><span class="line">    asyncio.gather(</span><br><span class="line">        graph_inst.get_nodes_batch(node_ids),      # → &#123;&quot;Albert Einstein&quot;: &#123;&quot;description&quot;: &quot;...&quot;, ...&#125;&#125;</span><br><span class="line">        graph_inst.node_degrees_batch(node_ids),   # → &#123;&quot;Albert Einstein&quot;: 12&#125;</span><br><span class="line">    )</span><br><span class="line">                     │</span><br><span class="line">    步骤 3 ──────────┤</span><br><span class="line">    # 合并 VDB 结果 + 图属性 + 度数</span><br><span class="line">    node_datas = [</span><br><span class="line">        &#123;</span><br><span class="line">            &quot;entity_name&quot;: k[&quot;entity_name&quot;],       # 来自 VDB</span><br><span class="line">            &quot;rank&quot;: d,                               # 来自 node_degrees_batch（拓扑重要性）</span><br><span class="line">            &quot;created_at&quot;: k.get(&quot;created_at&quot;),       # 来自 VDB</span><br><span class="line">            **n,                                      # 来自 get_nodes_batch（description, source_id...）</span><br><span class="line">        &#125;</span><br><span class="line">        for k, n, d in zip(results, nodes_dict, node_degrees_dict)</span><br><span class="line">        if n is not None                             # 图中有数据的节点才保留</span><br><span class="line">    ]</span><br><span class="line">                     │</span><br><span class="line">    步骤 4 ──────────┤</span><br><span class="line">    _find_most_related_edges_from_entities(node_datas)</span><br><span class="line">                     │</span><br><span class="line">    ▼</span><br><span class="line">(node_datas, related_edges)</span><br></pre></td></tr></table></figure>
+
+<p><strong>关键设计：</strong> <code>if n is not None</code> 过滤——VDB 可能返回了 entity_name 但图存储中还没有对应节点（比如索引未完成）。跳过这些”幽灵实体”。</p>
+<h3 id="5-2-find-most-related-edges-from-entities（边扩散）"><a href="#5-2-find-most-related-edges-from-entities（边扩散）" class="headerlink" title="5.2 _find_most_related_edges_from_entities（边扩散）"></a>5.2 <code>_find_most_related_edges_from_entities</code>（边扩散）</h3><p><strong>文件：</strong> <code>operate.py:5212</code></p>
+<p>这是从实体到关系的关键桥梁。</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">async</span> <span class="keyword">def</span> <span class="title function_">_find_most_related_edges_from_entities</span>(<span class="params"></span></span><br><span class="line"><span class="params">    node_datas: <span class="built_in">list</span>[<span class="built_in">dict</span>],</span></span><br><span class="line"><span class="params">    query_param: QueryParam,</span></span><br><span class="line"><span class="params">    knowledge_graph_inst: BaseGraphStorage,</span></span><br><span class="line"><span class="params"></span>) -&gt; <span class="built_in">list</span>[<span class="built_in">dict</span>]:</span><br></pre></td></tr></table></figure>
+
+<p><strong>算法：</strong></p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br></pre></td><td class="code"><pre><span class="line">输入: [&#123;&quot;entity_name&quot;: &quot;A&quot;, ...&#125;, &#123;&quot;entity_name&quot;: &quot;B&quot;, ...&#125;, ...]</span><br><span class="line">                     │</span><br><span class="line">步骤 1 ──────────────┤</span><br><span class="line">batch_edges_dict = graph_inst.get_nodes_edges_batch(node_names)</span><br><span class="line">    # → &#123;&quot;A&quot;: [(&quot;A&quot;, &quot;B&quot;), (&quot;A&quot;, &quot;C&quot;)], &quot;B&quot;: [(&quot;B&quot;, &quot;A&quot;), (&quot;B&quot;, &quot;D&quot;)], ...&#125;</span><br><span class="line">                     │</span><br><span class="line">步骤 2 ──────────────┤ 去重（无向边）</span><br><span class="line">for each entity:</span><br><span class="line">    for each edge:</span><br><span class="line">        sorted_edge = tuple(sorted(e))  # (&quot;A&quot;,&quot;B&quot;) 和 (&quot;B&quot;,&quot;A&quot;) 归一化</span><br><span class="line">        if sorted_edge not in seen:</span><br><span class="line">            seen.add(sorted_edge)</span><br><span class="line">            all_edges.append(sorted_edge)</span><br><span class="line">    # 注意：VDB 相似度最高的实体先被处理，它们的边优先入队列</span><br><span class="line">                     │</span><br><span class="line">步骤 3 ──────────────┤ 批量查图数据</span><br><span class="line">asyncio.gather(</span><br><span class="line">    graph_inst.get_edges_batch(edge_pairs),     # → &#123;(A,B): &#123;&quot;weight&quot;: 0.8, &quot;description&quot;: &quot;...&quot;, ...&#125;&#125;</span><br><span class="line">    graph_inst.edge_degrees_batch(edge_pairs),  # → &#123;(A,B): 18&#125;  (deg(A) + deg(B))</span><br><span class="line">)</span><br><span class="line">                     │</span><br><span class="line">步骤 4 ──────────────┤ 合并排序</span><br><span class="line">sorted(edge_datas, key=lambda x: (x[&quot;rank&quot;], x[&quot;weight&quot;]), reverse=True)</span><br><span class="line">    # 先按 rank（拓扑重要度 = src_deg + tgt_deg）降序</span><br><span class="line">    # 再按 weight（语义权重）降序</span><br></pre></td></tr></table></figure>
+
+<p><strong>为什么用 <code>tuple(sorted(e))</code> 去重？</strong> 因为 <code>networkx.Graph()</code> 是无向图，<code>graph.edges(&quot;A&quot;)</code> 返回的边以 <code>(&quot;A&quot;, &quot;B&quot;)</code> 格式呈现，但 <code>graph.edges(&quot;B&quot;)</code> 会返回 <code>(&quot;B&quot;, &quot;A&quot;)</code>。两个实体各自的 <code>get_node_edges</code> 可能产生同一无向边的两个方向，必须归一化后去重。</p>
+<p><strong>为什么先处理 VDB 相似度高的实体？</strong> <code>node_names</code> 的顺序是 VDB 结果的余弦相似度降序。实体被优先扫描，它的关联边就优先进入 <code>all_edges</code> 列表。排序时虽然按 <code>(rank, weight)</code>，但<strong>等 rank+weight 的条件下，高相似度实体的边排在前面</strong>。</p>
+<h3 id="5-3-get-edge-data（global-路径入口）"><a href="#5-3-get-edge-data（global-路径入口）" class="headerlink" title="5.3 _get_edge_data（global 路径入口）"></a>5.3 <code>_get_edge_data</code>（global 路径入口）</h3><p><strong>文件：</strong> <code>operate.py:5427</code></p>
+<p>与 <code>_get_node_data</code> 对称，但方向相反：VDB 查到关系 → 补图属性 → 追溯到实体。</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br></pre></td><td class="code"><pre><span class="line">输入: hl_keywords, graph_inst, relationships_vdb, hl_embedding</span><br><span class="line">                     │</span><br><span class="line">步骤 1 ──────────────┤</span><br><span class="line">relationships_vdb.query(hl_embedding, top_k)</span><br><span class="line">    # → [&#123;&quot;src_id&quot;: &quot;A&quot;, &quot;tgt_id&quot;: &quot;B&quot;, &quot;weight&quot;: 0.85, ...&#125;, ...]</span><br><span class="line">                     │</span><br><span class="line">步骤 2 ──────────────┤</span><br><span class="line">edge_pairs_dicts = [&#123;&quot;src&quot;: r[&quot;src_id&quot;], &quot;tgt&quot;: r[&quot;tgt_id&quot;]&#125; for r in results]</span><br><span class="line">edge_props_dict = graph_inst.get_edges_batch(edge_pairs_dicts)</span><br><span class="line">    # → &#123;(&quot;A&quot;, &quot;B&quot;): &#123;&quot;keywords&quot;: &quot;...&quot;, &quot;description&quot;: &quot;...&quot;, ...&#125;, ...&#125;</span><br><span class="line">                     │</span><br><span class="line">步骤 3 ──────────────┤</span><br><span class="line"># 合并 VDB 结果 + 图属性</span><br><span class="line">edge_datas = [</span><br><span class="line">    &#123;**r, **edge_props_dict.get(pair, &#123;&#125;)&#125; for r, pair in zip(results, edge_pairs_dicts)</span><br><span class="line">]</span><br><span class="line"># 注意：保留 VDB 的余弦相似度排序（不重排）</span><br><span class="line">                     │</span><br><span class="line">步骤 4 ──────────────┤</span><br><span class="line">_find_most_related_entities_from_relationships(edge_datas)</span><br><span class="line">                     │</span><br><span class="line">    ▼</span><br><span class="line">(edge_datas, related_entities)  # 保持 VDB 的原始排序</span><br></pre></td></tr></table></figure>
+
+<p><strong>Global 模式和 Local 模式的关键区别：</strong></p>
+<table>
+<thead>
+<tr>
+<th>维度</th>
+<th>Local (<code>_get_node_data</code>)</th>
+<th>Global (<code>_get_edge_data</code>)</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>查询目标</td>
+<td>entities VDB</td>
+<td>relationships VDB</td>
+</tr>
+<tr>
+<td>扩散方向</td>
+<td>实体 → 边</td>
+<td>关系 → 实体</td>
+</tr>
+<tr>
+<td>排序依据</td>
+<td>实体：VDB 余弦；边：(rank, weight)</td>
+<td>关系：VDB 余弦；实体：无 rank</td>
+</tr>
+<tr>
+<td>拓扑重要性</td>
+<td>节点度数参与排序</td>
+<td>边的 rank 不重新计算</td>
+</tr>
+</tbody></table>
+<h3 id="5-4-find-most-related-entities-from-relationships（实体追溯）"><a href="#5-4-find-most-related-entities-from-relationships（实体追溯）" class="headerlink" title="5.4 _find_most_related_entities_from_relationships（实体追溯）"></a>5.4 <code>_find_most_related_entities_from_relationships</code>（实体追溯）</h3><p><strong>文件：</strong> <code>operate.py:5486</code></p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">async</span> <span class="keyword">def</span> <span class="title function_">_find_most_related_entities_from_relationships</span>(<span class="params"></span></span><br><span class="line"><span class="params">    edge_datas: <span class="built_in">list</span>[<span class="built_in">dict</span>],</span></span><br><span class="line"><span class="params">    query_param: QueryParam,</span></span><br><span class="line"><span class="params">    knowledge_graph_inst: BaseGraphStorage,</span></span><br><span class="line"><span class="params"></span>) -&gt; <span class="built_in">list</span>[<span class="built_in">dict</span>]:</span><br></pre></td></tr></table></figure>
+
+<p><strong>算法：</strong></p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br></pre></td><td class="code"><pre><span class="line">输入: [&#123;&quot;src_id&quot;: &quot;A&quot;, &quot;tgt_id&quot;: &quot;B&quot;, ...&#125;, &#123;&quot;src_id&quot;: &quot;C&quot;, &quot;tgt_id&quot;: &quot;D&quot;, ...&#125;, ...]</span><br><span class="line">                     │</span><br><span class="line">步骤 1 ──────────────┤</span><br><span class="line"># 按照 edge_datas 的顺序，set 去重收集实体</span><br><span class="line">entity_names = []</span><br><span class="line">seen = set()</span><br><span class="line">for e in edge_datas:</span><br><span class="line">    if e[&quot;src_id&quot;] not in seen:</span><br><span class="line">        entity_names.append(e[&quot;src_id&quot;])</span><br><span class="line">        seen.add(e[&quot;src_id&quot;])</span><br><span class="line">    # 注意：与边去重不同，这里不归一化——src 和 tgt 各自独立加入</span><br><span class="line">    # 因为同一个实体可能既是 src 也是 tgt，set 确保不重</span><br><span class="line">                     │</span><br><span class="line">步骤 2 ──────────────┤</span><br><span class="line">nodes_dict = graph_inst.get_nodes_batch(entity_names)</span><br><span class="line">    # → &#123;&quot;A&quot;: &#123;&quot;description&quot;: &quot;...&quot;, &quot;source_id&quot;: &quot;...&quot;, ...&#125;, ...&#125;</span><br><span class="line">                     │</span><br><span class="line">步骤 3 ──────────────┤</span><br><span class="line"># 按 entity_names 的顺序（即 VDB 相似度高的边优先），构建结果</span><br><span class="line"># 没有 rank 字段——与 _get_node_data 不同</span><br><span class="line">entity_datas = [&#123;&quot;entity_name&quot;: name, **nodes_dict.get(name, &#123;&#125;)&#125; for name in entity_names]</span><br><span class="line">                     │</span><br><span class="line">    ▼</span><br><span class="line">entity_datas  ← 不排序，保留 entity_names 的顺序</span><br></pre></td></tr></table></figure>
+
+<p><strong>关键观察：</strong> Global 路径返回的实体<strong>没有 rank 字段</strong>，因为 <code>_get_node_data</code> 中的 rank &#x3D; node_degree 是 local 特有——global 场景下实体只是”关系所连接的对象”，不需要按拓扑重要性重排。</p>
+<hr>
+<h2 id="六、文本块收集与选择"><a href="#六、文本块收集与选择" class="headerlink" title="六、文本块收集与选择"></a>六、文本块收集与选择</h2><h3 id="6-1-find-related-text-unit-from-entities"><a href="#6-1-find-related-text-unit-from-entities" class="headerlink" title="6.1 _find_related_text_unit_from_entities"></a>6.1 <code>_find_related_text_unit_from_entities</code></h3><p><strong>文件：</strong> <code>operate.py:5268</code></p>
+<p>实体中存有 <code>source_id</code> 字段，格式为 <code>id1,id2,id3</code>（用 <code>GRAPH_FIELD_SEP</code> 即 <code>,</code> 拼接），指向所有关联的文本块。</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br></pre></td><td class="code"><pre><span class="line">输入: node_datas, text_chunks_db, query_param, (可选的 chunks_vdb + query_embedding)</span><br><span class="line">                     │</span><br><span class="line">步骤 1 ──────────────┤ 收集所有 chunk_id</span><br><span class="line">for each entity in node_datas:</span><br><span class="line">    chunk_ids = entity.get(&quot;source_id&quot;, &quot;&quot;).split(GRAPH_FIELD_SEP)</span><br><span class="line">    for cid in chunk_ids:</span><br><span class="line">        if cid not in seen:</span><br><span class="line">            seen.add(cid)</span><br><span class="line">            all_chunk_ids.append(cid)</span><br><span class="line">            # 记录该 chunk 第一次出现的实体序号</span><br><span class="line">            chunk_entity_order[cid] = entity_index</span><br><span class="line">                     │</span><br><span class="line">步骤 2 ──────────────┤ 统计每个 chunk 在多少实体中出现</span><br><span class="line">for each entity:</span><br><span class="line">    for cid in chunk_ids:</span><br><span class="line">        occurrence_count[cid] += 1  # 跨实体出现频率</span><br><span class="line">                     │</span><br><span class="line">步骤 3 ──────────────┤ 按 kg_chunk_pick_method 选择</span><br><span class="line">                     │</span><br><span class="line">    ├── &quot;VECTOR&quot; ────┤ 向量相似度选择</span><br><span class="line">    │   # 计算 chunk 数量预算</span><br><span class="line">    │   num_of_chunks = max_related_chunks * len(entity_datas) / 2</span><br><span class="line">    │   # 对每个 chunk_id 从 text_chunks_db 取内容</span><br><span class="line">    │   # 用 query_embedding 算余弦相似度</span><br><span class="line">    │   # 选 top num_of_chunks 个</span><br><span class="line">    │   # 如果失败 → 自动降级到 WEIGHT</span><br><span class="line">    │</span><br><span class="line">    └── &quot;WEIGHT&quot; ────┤ 加权轮询（默认）</span><br><span class="line">        pick_by_weighted_polling(entities, max_related_chunks, min_related_chunks)</span><br><span class="line">                     │</span><br><span class="line">步骤 4 ──────────────┤ 批量获取文本块内容</span><br><span class="line">text_chunks_db.get_by_ids(unique_chunk_ids)</span><br><span class="line"></span><br><span class="line">步骤 5 ──────────────┤ 构建结果</span><br><span class="line">    # 每个 chunk → &#123;&quot;source_type&quot;: &quot;entity&quot;, &quot;chunk_id&quot;: cid, &quot;content&quot;: ..., &quot;tokens&quot;: ...&#125;</span><br><span class="line">    # chunk_tracking[cid] = &#123;&quot;source&quot;: &quot;E&quot;, &quot;order&quot;: entity_order, &quot;frequency&quot;: occurrence_count&#125;</span><br></pre></td></tr></table></figure>
+
+<p><code>_find_related_text_unit_from_relations</code>（<code>operate.py:5519</code>）与实体版本几乎相同，区别在于：</p>
+<ol>
+<li>Chunk 来源标记为 <code>source_type = &quot;relationship&quot;</code></li>
+<li>收集的 chunk_id 会与实体已收集的 chunk 做<strong>交集去重</strong>——实体已经找到的 chunk 不会被关系版本再次添加</li>
+<li>使用关系版本的 <code>max_related_chunks</code> 和 <code>min_related_chunks</code> 参数</li>
+</ol>
+<h3 id="6-2-pick-by-weighted-polling-的-graph-store-视角"><a href="#6-2-pick-by-weighted-polling-的-graph-store-视角" class="headerlink" title="6.2 pick_by_weighted_polling 的 graph store 视角"></a>6.2 <code>pick_by_weighted_polling</code> 的 graph store 视角</h3><p><strong>文件：</strong> <code>utils.py:3991</code></p>
+<p>在 1.2 中我们详细拆解了数学逻辑。从 Graph Store 编排的视角看，<strong>权重就是实体&#x2F;关系在列表中的位置索引</strong>——而列表的顺序是 VDB 相似度的直接体现。</p>
+<p>虽然这里用的是线性梯度分配的”token 预算”，而非网络拓扑中的 <code>rank</code>，但它间接反映了 VDB 排序：越靠前的实体获得的配额越多，对应更多的文本块。</p>
+<h3 id="6-3-pick-by-vector-similarity-的-graph-store-视角"><a href="#6-3-pick-by-vector-similarity-的-graph-store-视角" class="headerlink" title="6.3 pick_by_vector_similarity 的 graph store 视角"></a>6.3 <code>pick_by_vector_similarity</code> 的 graph store 视角</h3><p>当启用 <code>VECTOR</code> 模式时，文本块选择不再依赖图拓扑，而是完全基于语义：</p>
+<p><strong>关键区别：</strong> <code>WEIGHT</code> 只依赖 <code>entity_datas</code> 的排序（即 VDB 余弦），而 <code>VECTOR</code> 需要：</p>
+<ul>
+<li><code>query_embedding</code>（来自批嵌入阶段）</li>
+<li><code>chunks_vdb</code> 可用</li>
+</ul>
+<p>两者缺一则自动降级到 <code>WEIGHT</code>。这意味着在 graph store 编排层面，<strong>向量路径是一个可选增强</strong>，默认总是回到拓扑加权路径。</p>
+<hr>
+<h2 id="七、NetworkX-get-nodes-edges-batch-与边扩散性能关键"><a href="#七、NetworkX-get-nodes-edges-batch-与边扩散性能关键" class="headerlink" title="七、NetworkX get_nodes_edges_batch 与边扩散性能关键"></a>七、NetworkX <code>get_nodes_edges_batch</code> 与边扩散性能关键</h2><p><code>_find_most_related_edges_from_entities</code> 中的关键调用：</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">batch_edges_dict = <span class="keyword">await</span> knowledge_graph_inst.get_nodes_edges_batch(node_names)</span><br></pre></td></tr></table></figure>
+
+<p>在默认 NetworkX 下，这会逐个节点调用 <code>get_node_edges(id)</code>，每个调用内部是 <code>list(graph.edges(node_id))</code>。</p>
+<p><strong>性能特征：</strong> NetworkX 的 <code>graph.edges(node_id)</code> 是 O(度数)。如果一个高连通节点（如度数 5000）在候选列表中，<code>get_nodes_edges_batch</code> 在这个节点上的开销就是 O(5000)。但这是序列中的一次——不会阻塞其他节点。</p>
+<p><strong>后端替代：</strong> Neo4jStorage 重写了 <code>get_nodes_edges_batch</code>（<code>neo4j_impl.py:984-1041</code>），使用单条 Cypher 查询：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">UNWIND $node_ids AS nid</span><br><span class="line">OPTIONAL MATCH (n &#123;id: nid&#125;)-[r]-(connected)</span><br><span class="line">RETURN nid, collect(&#123;src: startNode(r).id, tgt: endNode(r).id&#125;) AS edges</span><br></pre></td></tr></table></figure>
+
+<p>一条查询完成所有节点的边获取，避免了 N 次网络往返。</p>
+<hr>
+<h2 id="八、跨进程同步机制"><a href="#八、跨进程同步机制" class="headerlink" title="八、跨进程同步机制"></a>八、跨进程同步机制</h2><p>在多进程索引场景下（如并行处理多个文档），<code>NetworkXStorage</code> 使用 <code>shared_storage</code> 模块实现读写同步。</p>
+<h3 id="8-1-写入端（索引进程）"><a href="#8-1-写入端（索引进程）" class="headerlink" title="8.1 写入端（索引进程）"></a>8.1 写入端（索引进程）</h3><figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># networkx_impl.py  index_done_callback</span></span><br><span class="line"><span class="keyword">with</span> <span class="variable language_">self</span>._lock:</span><br><span class="line">    networkx.write_graphml(<span class="variable language_">self</span>._graph, filepath)  <span class="comment"># 序列化到文件</span></span><br><span class="line">    <span class="variable language_">self</span>._shared_storage.<span class="built_in">set</span>(<span class="string">&quot;graph_updated&quot;</span>, <span class="literal">True</span>) <span class="comment"># 设置更新标志</span></span><br></pre></td></tr></table></figure>
+
+<h3 id="8-2-读取端（查询进程）"><a href="#8-2-读取端（查询进程）" class="headerlink" title="8.2 读取端（查询进程）"></a>8.2 读取端（查询进程）</h3><figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># networkx_impl.py  _get_graph</span></span><br><span class="line"><span class="keyword">if</span> <span class="variable language_">self</span>._shared_storage.get(<span class="string">&quot;graph_updated&quot;</span>):</span><br><span class="line">    <span class="variable language_">self</span>._graph = networkx.read_graphml(filepath)  <span class="comment"># 重载图</span></span><br><span class="line">    <span class="variable language_">self</span>._shared_storage.<span class="built_in">set</span>(<span class="string">&quot;graph_updated&quot;</span>, <span class="literal">False</span>)</span><br></pre></td></tr></table></figure>
+
+<p><strong>为什么这足够快？</strong> 查询进程在每次 <code>_get_graph()</code> 时检查标志位，但<strong>实际上只检查一次</strong>——因为 <code>_get_graph()</code> 的结果被缓存在 <code>self._graph</code> 局部变量中（函数执行期间）。在单次 <code>_perform_kg_search</code> 的完整流程中，<code>_get_graph()</code> 可能被 <code>get_nodes_batch</code>、<code>node_degrees_batch</code>、<code>get_nodes_edges_batch</code> 等多次调用，但只有第一次会触发文件加载。</p>
+<hr>
+<h2 id="九、时序图：Graph-Store-编排全貌"><a href="#九、时序图：Graph-Store-编排全貌" class="headerlink" title="九、时序图：Graph Store 编排全貌"></a>九、时序图：Graph Store 编排全貌</h2><figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br></pre></td><td class="code"><pre><span class="line">_perform_kg_search</span><br><span class="line">  │</span><br><span class="line">  ├── batch embedding（1.2）</span><br><span class="line">  │</span><br><span class="line">  ├── local path ─────────────────────────────────────────</span><br><span class="line">  │     │</span><br><span class="line">  │     ├─ entities_vdb.query(ll_embedding, top_k)</span><br><span class="line">  │     │      ↳ [&#123;&quot;entity_name&quot;: &quot;A&quot;, ...&#125;, &#123;&quot;entity_name&quot;: &quot;B&quot;, ...&#125;]</span><br><span class="line">  │     │</span><br><span class="line">  │     ├─ graph_inst.get_nodes_batch(names)         ──┐</span><br><span class="line">  │     ├─ graph_inst.node_degrees_batch(names)       ──┤  并发</span><br><span class="line">  │     │                                               │</span><br><span class="line">  │     ├─ merge: node_data = VDB_result + graph_attrs ─┘</span><br><span class="line">  │     │</span><br><span class="line">  │     └─ _find_most_related_edges_from_entities</span><br><span class="line">  │            ├─ get_nodes_edges_batch(names)     → 所有边</span><br><span class="line">  │            ├─ tuple(sorted(e)) dedup            → 归一化去重</span><br><span class="line">  │            ├─ get_edges_batch(unique_pairs)     → 边属性     ──┐</span><br><span class="line">  │            └─ edge_degrees_batch(unique_pairs)  → 边重要度   ──┤  并发</span><br><span class="line">  │                                                               │</span><br><span class="line">  │              sort by (rank DESC, weight DESC)  ←──────────────┘</span><br><span class="line">  │</span><br><span class="line">  ├── global path ─────────────────────────────────────────</span><br><span class="line">  │     │</span><br><span class="line">  │     ├─ relationships_vdb.query(hl_embedding, top_k)</span><br><span class="line">  │     │</span><br><span class="line">  │     ├─ get_edges_batch(pairs)     → 边属性</span><br><span class="line">  │     │</span><br><span class="line">  │     └─ _find_most_related_entities_from_relationships</span><br><span class="line">  │            ├─ collect entity names from src/tgt (set dedup)</span><br><span class="line">  │            └─ get_nodes_batch(names) → 节点属性</span><br><span class="line">  │</span><br><span class="line">  └── chunk collection ─────────────────────────────────────</span><br><span class="line">        │</span><br><span class="line">        ├─ _find_related_text_unit_from_entities</span><br><span class="line">        │     ├─ collect chunk_ids from source_id</span><br><span class="line">        │     ├─ count occurrence frequency</span><br><span class="line">        │     ├─ pick_by_weighted_polling / VECTOR</span><br><span class="line">        │     └─ text_chunks_db.get_by_ids(selected_ids)</span><br><span class="line">        │</span><br><span class="line">        ├─ _find_related_text_unit_from_relations</span><br><span class="line">        │     ├─ same, but dedup against entity chunks</span><br><span class="line">        │     └─ pick_by_weighted_polling (WEIGHT only)</span><br><span class="line">        │</span><br><span class="line">        └─ round-robin merge chunk lists</span><br></pre></td></tr></table></figure>
+
+<hr>
+<h2 id="十、设计要点总结"><a href="#十、设计要点总结" class="headerlink" title="十、设计要点总结"></a>十、设计要点总结</h2><ol>
+<li><p><strong>三层存储各司其职：</strong> VDB 负责”找到谁”，Graph 负责”谁有什么属性、跟谁相连”，KV 负责”内容是什么”。每一层都有可替换的后端实现。</p>
+</li>
+<li><p><strong>拓扑排序只出现在边扩散阶段：</strong> 实体和关系的首次排序完全基于 VDB 余弦。拓扑信号（<code>rank</code>）只在从实体扩散到边时介入——边的排序是 <code>(rank, weight)</code>。这保证了”语义匹配”优于”拓扑重要”。</p>
+</li>
+<li><p><strong>Global 路径更扁平：</strong> Global 路径不计算 rank，关系排序保持 VDB 原始顺序。这是合理的——high-level 关键词匹配到的本应是全局主题，不依赖局部拓扑。</p>
+</li>
+<li><p><strong>WEIGHT 是默认且可靠的：</strong> 加权轮询不依赖任何外部服务（无需 VDB、无需 embedding 函数），仅靠图拓扑就能工作。VECTOR 是可选增强，失败时自动降级。</p>
+</li>
+<li><p><strong>逐节点边的代价：</strong> 默认 NetworkX 的 <code>get_nodes_edges_batch</code> 是 O(候选数 × 平均度数)，通过并行 IO（<code>asyncio.gather</code>）隐藏延迟但无法降低计算量。高连通图建议切换到 Neo4j 等原生后端。</p>
+</li>
+<li><p><strong>跨进程同步是乐观的：</strong> 不阻塞读取、写入后发信号、读取时惰性重载。适合索引频率低、查询频率高的场景。</p>
+</li>
+</ol>
+<p>下一步：向量检索返回的实体和关系以及文本块被收集后，需要经过 <strong>Token 预算与裁剪系统</strong>——即 1.4（注：由于编排层篇幅较大，Token 预算裁剪将合并到后续文章一起讨论）。</p>
+
+    </div>
+
+    
+    
+    
+
+    <footer class="post-footer">
+          
+
+<div class="post-copyright">
+<ul>
+  <li class="post-copyright-author">
+      <strong>本文作者： </strong>陌忆
+  </li>
+  <li class="post-copyright-link">
+      <strong>本文链接：</strong>
+      <a href="https://moyi-math.github.io/2026/07/12/LightRAG-1.3-Graph-Store%E5%B1%82%E7%BC%96%E6%8E%92/" title="LightRAG 源码分析 · 1.3 Graph Store 层编排——从 VDB 结果到图拓扑数据与文本块的全链路">https://moyi-math.github.io/2026/07/12/LightRAG-1.3-Graph-Store层编排/</a>
+  </li>
+  <li class="post-copyright-license">
+      <strong>版权声明： </strong>本博客所有文章除特别声明外，均采用 <a href="https://creativecommons.org/licenses/by-nc-sa/4.0/" rel="noopener" target="_blank"><i class="fab fa-fw fa-creative-commons"></i>BY-NC-SA</a> 许可协议。转载请注明出处！
+  </li>
+</ul>
+</div>
+
+          <div class="post-tags">
+              <a href="/tags/LightRAG/" rel="tag"># LightRAG</a>
+              <a href="/tags/RAG/" rel="tag"># RAG</a>
+              <a href="/tags/GraphRAG/" rel="tag"># GraphRAG</a>
+              <a href="/tags/%E6%BA%90%E7%A0%81%E5%88%86%E6%9E%90/" rel="tag"># 源码分析</a>
+              <a href="/tags/%E7%9F%A5%E8%AF%86%E5%9B%BE%E8%B0%B1/" rel="tag"># 知识图谱</a>
+              <a href="/tags/Graph-Store/" rel="tag"># Graph Store</a>
+              <a href="/tags/KV-Store/" rel="tag"># KV Store</a>
+              <a href="/tags/NetworkX/" rel="tag"># NetworkX</a>
+          </div>
+
+        
+
+          <div class="post-nav">
+            <div class="post-nav-item">
+                <a href="/2026/07/12/LightRAG-1.2-%E6%89%B9%E5%B5%8C%E5%85%A5%E4%B8%8E%E5%90%91%E9%87%8F%E6%A3%80%E7%B4%A2/" rel="prev" title="LightRAG 源码分析 · 1.2 批嵌入与向量检索——关键词如何找到知识图谱中的实体和关系">
+                  <i class="fa fa-angle-left"></i> LightRAG 源码分析 · 1.2 批嵌入与向量检索——关键词如何找到知识图谱中的实体和关系
+                </a>
+            </div>
+            <div class="post-nav-item">
+            </div>
+          </div>
+    </footer>
+  </article>
+</div>
+
+
+
+
+
+
+</div>
+  </main>
+
+  <footer class="footer">
+    <div class="footer-inner">
+
+  <div class="copyright">
+    &copy; 
+    <span itemprop="copyrightYear">2026</span>
+    <span class="with-love">
+      <i class="fa fa-heart"></i>
+    </span>
+    <span class="author" itemprop="copyrightHolder">陌忆</span>
+  </div>
+<div class="wordcount">
+  <span class="post-meta-item">
+    <span class="post-meta-item-icon">
+      <i class="fa fa-chart-line"></i>
+    </span>
+    <span title="站点总字数">28k</span>
+  </span>
+  <span class="post-meta-item">
+    <span class="post-meta-item-icon">
+      <i class="fa fa-coffee"></i>
+    </span>
+    <span title="站点阅读时长">1:42</span>
+  </span>
+</div>
+
+    </div>
+  </footer>
+
+  
+  <div class="toggle sidebar-toggle" role="button">
+    <span class="toggle-line"></span>
+    <span class="toggle-line"></span>
+    <span class="toggle-line"></span>
+  </div>
+  <div class="sidebar-dimmer"></div>
+  <div class="back-to-top" role="button" aria-label="返回顶部">
+    <i class="fa fa-arrow-up fa-lg"></i>
+    <span>0%</span>
+  </div>
+
+<noscript>
+  <div class="noscript-warning">Theme NexT works best with JavaScript enabled</div>
+</noscript>
+<!-- canvas-nest particle background -->
+<script defer>
+(function() {
+  var s = document.createElement("script");
+  s.src = "//cdn.bootcss.com/canvas-nest.js/1.0.0/canvas-nest.min.js";
+  s.setAttribute("count", "150");
+  s.setAttribute("opacity", "1");
+  document.body.appendChild(s);
+})();
+</script>
+
+<!-- Live2D widget -->
+<script defer src="/live2dw/lib/L2Dwidget.min.js"></script>
+<script defer>
+L2Dwidget.init({
+  "pluginRootPath": "live2dw/",
+  "pluginJsPath": "lib/",
+  "pluginModelPath": "assets/",
+  "tagMode": false,
+  "debug": false,
+  "model": {"jsonPath": "/live2dw/assets/assets/shizuku.model.json"},
+  "display": {"position": "right", "width": 150, "height": 300},
+  "mobile": {"show": true},
+  "log": false
+});
+</script>
+
+<!-- Page click heart effect -->
+<script defer src="/js/clicklove.js"></script>
+
+<!-- Site running time -->
+<span id="timeDate"></span>
+<script>
+var now = new Date();
+function createtime() {
+  var grt = new Date("11/17/2022 8:00:00");
+  now.setTime(now.getTime() + 250);
+  var days = (now - grt) / 1000 / 60 / 60 / 24;
+  var dnum = Math.floor(days);
+  var hours = (now - grt) / 1000 / 60 / 60 - (24 * dnum);
+  var hnum = Math.floor(hours);
+  if (String(hnum).length == 1) hnum = "0" + hnum;
+  var minutes = (now - grt) / 1000 / 60 - (24 * 60 * dnum) - (60 * hnum);
+  var mnum = Math.floor(minutes);
+  if (String(mnum).length == 1) mnum = "0" + mnum;
+  var seconds = (now - grt) / 1000 - (24 * 60 * 60 * dnum) - (60 * 60 * hnum) - (60 * mnum);
+  var snum = Math.round(seconds);
+  if (String(snum).length == 1) snum = "0" + snum;
+  document.getElementById("timeDate").innerHTML = "本站已安全运行 " + dnum + " 天 " + hnum + " 小时 " + mnum + " 分 " + snum + " 秒";
+}
+setInterval(createtime, 1000);
+</script>
+
+</body>
+</html>
