@@ -1,0 +1,616 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width">
+<meta name="theme-color" content="#222"><meta name="generator" content="Hexo 7.3.0">
+<link rel="preconnect" href="https://cdnjs.cloudflare.com" crossorigin>
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon-next.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32-next.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next.png">
+  <link rel="mask-icon" href="/images/logo.svg" color="#222">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/7.0.0/css/all.min.css" integrity="sha256-VHqXKFhhMxcpubYf9xiWdCiojEbY9NexQ4jh8AxbvcM=" crossorigin="anonymous">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/animate.css/3.1.1/animate.min.css" integrity="sha256-PR7ttpcvz8qrF57fur/yAx1qXMFJeJFiA6pSzWi0OIE=" crossorigin="anonymous">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/pace/1.2.4/themes/blue/pace-theme-minimal.css">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pace/1.2.4/pace.min.js" integrity="sha256-gqd7YTjg/BtfqWSwsJOvndl0Bxc8gFImLEkXQT8+qj0=" crossorigin="anonymous" defer></script>
+
+<script class="next-config" data-name="main" type="application/json">{"hostname":"moyi-math.github.io","root":"/","images":"/images","scheme":"Gemini","darkmode":false,"version":"8.28.0","exturl":false,"sidebar":{"position":"left","width_expanded":320,"width_dual_column":240,"display":"post","padding":18,"offset":12},"hljswrap":true,"codeblock":{"theme":{"light":"default","dark":"stackoverflow-dark"},"prism":{"light":"prism","dark":"prism-dark"},"copy_button":{"enable":true,"style":null},"fold":{"enable":false,"height":500},"language":false},"bookmark":{"enable":false,"color":"#222","save":"auto"},"mediumzoom":false,"lazyload":false,"pangu":false,"comments":{"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},"stickytabs":false,"motion":{"enable":true,"async":false,"duration":200,"transition":{"menu_item":"fadeInDown","post_block":"fadeIn","post_header":"fadeInDown","post_body":"fadeInDown","coll_header":"fadeInLeft","sidebar":"fadeInUp"}},"prism":false,"i18n":{"placeholder":"搜索...","empty":"没有找到任何搜索结果：${query}","hits_time":"找到 ${hits} 个搜索结果（用时 ${time} 毫秒）","hits":"找到 ${hits} 个搜索结果"},"path":"/search.json","localsearch":{"enable":true,"top_n_per_article":1,"unescape":false,"preload":false}}</script><script src="/js/config.js" defer></script>
+
+    <meta name="description" content="在前三篇文章中，我们依次追踪了 LightRAG 查询流程中的关键词提取、批嵌入与向量检索、Graph Store 层编排。当检索阶段（Stage 1）完成，我们已经拿到了原始实体、关系和文本块数据。但直接把这些原始数据全部塞进 LLM 是有问题的：  Token 预算有限：LLM 有 context window 限制（通常是 32K&#x2F;128K tokens），而检索到的实体、关系和文">
+<meta property="og:type" content="article">
+<meta property="og:title" content="LightRAG 1.4：Token 预算与 Context 构建">
+<meta property="og:url" content="https://moyi-math.github.io/2026/07/12/LightRAG-1.4-Token-Budget-Context-Construction/index.html">
+<meta property="og:site_name" content="陌忆的博客">
+<meta property="og:description" content="在前三篇文章中，我们依次追踪了 LightRAG 查询流程中的关键词提取、批嵌入与向量检索、Graph Store 层编排。当检索阶段（Stage 1）完成，我们已经拿到了原始实体、关系和文本块数据。但直接把这些原始数据全部塞进 LLM 是有问题的：  Token 预算有限：LLM 有 context window 限制（通常是 32K&#x2F;128K tokens），而检索到的实体、关系和文">
+<meta property="og:locale" content="zh_CN">
+<meta property="article:published_time" content="2026-07-12T11:53:17.000Z">
+<meta property="article:modified_time" content="2026-07-12T07:06:05.174Z">
+<meta property="article:author" content="陌忆">
+<meta property="article:tag" content="LightRAG">
+<meta property="article:tag" content="RAG">
+<meta property="article:tag" content="Token Budget">
+<meta property="article:tag" content="Context Construction">
+<meta name="twitter:card" content="summary">
+
+
+<link rel="canonical" href="https://moyi-math.github.io/2026/07/12/LightRAG-1.4-Token-Budget-Context-Construction/">
+
+
+<script class="next-config" data-name="page" type="application/json">{"sidebar":"","isHome":false,"isPost":true,"lang":"zh-CN","comments":true,"permalink":"https://moyi-math.github.io/2026/07/12/LightRAG-1.4-Token-Budget-Context-Construction/","path":"2026/07/12/LightRAG-1.4-Token-Budget-Context-Construction/","title":"LightRAG 1.4：Token 预算与 Context 构建"}</script>
+
+<script class="next-config" data-name="calendar" type="application/json">""</script>
+<title>LightRAG 1.4：Token 预算与 Context 构建 | 陌忆的博客</title>
+  
+
+
+
+
+
+
+
+
+  
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/animejs/3.2.1/anime.min.js" integrity="sha256-XL2inqUJaslATFnHdJOi9GfQ60on8Wx1C2H8DYiN1xY=" crossorigin="anonymous" defer></script>
+<script src="/js/utils.js" defer></script><script src="/js/motion.js" defer></script><script src="/js/sidebar.js" defer></script><script src="/js/next-boot.js" defer></script>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/hexo-generator-searchdb/1.5.0/search.js" integrity="sha256-xFC6PJ82SL9b3WkGjFavNiA9gm5z6UBxWPiu4CYjptg=" crossorigin="anonymous" defer></script>
+<script src="/js/third-party/search/local-search.js" defer></script>
+
+
+
+
+
+  <script src="/js/third-party/pace.js" defer></script>
+
+
+  
+
+
+
+
+  
+
+  <script class="next-config" data-name="enableMath" type="application/json">false</script><link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/katex.min.css" integrity="sha256-UF1fgpAiu3tPJN/uCqEUHNe7pnr+QR0SQDNfgglgtcM=" crossorigin="anonymous">
+
+
+<link rel="preconnect" href="https://cdn.jsdelivr.net">
+<link rel="preconnect" href="https://cdn.bootcss.com">
+
+  <noscript>
+    <link rel="stylesheet" href="/css/noscript.css">
+  </noscript>
+<!-- hexo injector head_end start --><link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/katex.min.css" integrity="sha512-fHwaWebuwA7NSF5Qg/af4UeDx9XqUpYpOGgubo3yWu+b2IQR4UeQwbb42Ti7gVAjNtVoI/I9TEoYeu9omwcC6g==" crossorigin="anonymous" referrerpolicy="no-referrer" /><!-- hexo injector head_end end --></head>
+
+<body itemscope itemtype="http://schema.org/WebPage" class="use-motion">
+  <div class="headband"></div>
+
+  <main class="main">
+    <div class="column">
+      <header class="header" itemscope itemtype="http://schema.org/WPHeader"><div class="site-brand-container">
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="切换导航栏" role="button">
+        <span class="toggle-line"></span>
+        <span class="toggle-line"></span>
+        <span class="toggle-line"></span>
+    </div>
+  </div>
+
+  <div class="site-meta">
+
+    <a href="/" class="brand" rel="start">
+      <i class="logo-line"></i>
+      <p class="site-title">陌忆的博客</p>
+      <i class="logo-line"></i>
+    </a>
+      <p class="site-subtitle" itemprop="description">数据库无法得出结论</p>
+  </div>
+
+  <div class="site-nav-right">
+    <div class="toggle popup-trigger" aria-label="搜索" role="button">
+        <i class="fa fa-search fa-fw fa-lg"></i>
+    </div>
+  </div>
+</div>
+
+
+
+<nav class="site-nav">
+  <ul class="main-menu menu"><li class="menu-item menu-item-home"><a href="/" rel="section"><i class="fa fa-home fa-fw"></i>首页</a></li><li class="menu-item menu-item-about"><a href="/about/" rel="section"><i class="fa fa-user fa-fw"></i>关于</a></li><li class="menu-item menu-item-tags"><a href="/tags/" rel="section"><i class="fa fa-tags fa-fw"></i>标签</a></li><li class="menu-item menu-item-categories"><a href="/categories/" rel="section"><i class="fa fa-th fa-fw"></i>分类</a></li><li class="menu-item menu-item-archives"><a href="/archives/" rel="section"><i class="fa fa-archive fa-fw"></i>归档</a></li>
+      <li class="menu-item menu-item-search">
+        <a role="button" class="popup-trigger"><i class="fa fa-search fa-fw"></i>搜索
+        </a>
+      </li>
+  </ul>
+</nav>
+
+
+
+  <div class="search-pop-overlay">
+    <div class="popup search-popup">
+      <div class="search-header">
+        <span class="search-icon">
+          <i class="fa fa-search"></i>
+        </span>
+        <div class="search-input-container">
+          <input autocomplete="off" autocapitalize="off" maxlength="80"
+                placeholder="搜索..." spellcheck="false"
+                type="search" class="search-input">
+        </div>
+        <span class="popup-btn-close" role="button">
+          <i class="fa fa-times-circle"></i>
+        </span>
+      </div>
+      <div class="search-result-container">
+        <div class="search-result-icon">
+          <i class="fa fa-spinner fa-pulse fa-5x"></i>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</header>
+        
+  
+  <aside class="sidebar">
+
+    <div class="sidebar-inner sidebar-nav-active sidebar-toc-active">
+      <ul class="sidebar-nav">
+        <li class="sidebar-nav-toc">
+          文章目录
+        </li>
+        <li class="sidebar-nav-overview">
+          站点概览
+        </li>
+      </ul>
+
+      <div class="sidebar-panel-container">
+        <!--noindex-->
+        <div class="post-toc-wrap sidebar-panel">
+            <div class="post-toc animated"><ol class="nav"><li class="nav-item nav-level-2"><a class="nav-link" href="#1-Token-%E9%A2%84%E7%AE%97%E4%BD%93%E7%B3%BB"><span class="nav-text">1. Token 预算体系</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#1-1-QueryParam-%E4%B8%AD%E7%9A%84-Token-%E5%AD%97%E6%AE%B5"><span class="nav-text">1.1 QueryParam 中的 Token 字段</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#1-2-Token-%E8%A3%81%E5%89%AA%E7%9A%84%E5%9F%BA%E6%9C%AC%E5%B7%A5%E5%85%B7%EF%BC%9Atruncate-list-by-token-size"><span class="nav-text">1.2 Token 裁剪的基本工具：truncate_list_by_token_size</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#2-Stage-2%EF%BC%9AToken-Truncation%EF%BC%88-apply-token-truncation%EF%BC%89"><span class="nav-text">2. Stage 2：Token Truncation（_apply_token_truncation）</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#2-1-%E6%95%B4%E4%BD%93%E6%B5%81%E7%A8%8B"><span class="nav-text">2.1 整体流程</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#2-2-%E5%AE%9E%E4%BD%93%E4%B8%8A%E4%B8%8B%E6%96%87%E7%9A%84%E6%9E%84%E5%BB%BA%E4%B8%8E%E8%A3%81%E5%89%AA"><span class="nav-text">2.2 实体上下文的构建与裁剪</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#2-3-%E5%85%B3%E7%B3%BB%E4%B8%8A%E4%B8%8B%E6%96%87%E7%9A%84%E8%A3%81%E5%89%AA"><span class="nav-text">2.3 关系上下文的裁剪</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#2-4-%E5%90%8C%E6%AD%A5%E8%BF%87%E6%BB%A4%E5%8E%9F%E5%A7%8B%E6%95%B0%E6%8D%AE"><span class="nav-text">2.4 同步过滤原始数据</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#3-Stage-3%EF%BC%9AMerge-Chunks%EF%BC%88-merge-all-chunks%EF%BC%89"><span class="nav-text">3. Stage 3：Merge Chunks（_merge_all_chunks）</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#3-1-Round-Robin-%E5%90%88%E5%B9%B6"><span class="nav-text">3.1 Round-Robin 合并</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#3-2-Content-Headings-%E5%9B%9E%E5%A1%AB"><span class="nav-text">3.2 Content Headings 回填</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#4-Stage-4%EF%BC%9ABuild-Context%EF%BC%88-build-context-str%EF%BC%89"><span class="nav-text">4. Stage 4：Build Context（_build_context_str）</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#4-1-%E5%8A%A8%E6%80%81-Token-%E9%A2%84%E7%AE%97%E8%AE%A1%E7%AE%97"><span class="nav-text">4.1 动态 Token 预算计算</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#4-2-%E6%96%87%E6%9C%AC%E5%9D%97%E7%BB%9F%E4%B8%80%E5%A4%84%E7%90%86%E7%AE%A1%E9%81%93"><span class="nav-text">4.2 文本块统一处理管道</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#4-3-%E5%BC%95%E7%94%A8%E5%88%97%E8%A1%A8%E7%94%9F%E6%88%90"><span class="nav-text">4.3 引用列表生成</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#4-4-%E6%9C%80%E7%BB%88-LLM-%E5%AD%97%E7%AC%A6%E4%B8%B2%E7%BB%84%E8%A3%85"><span class="nav-text">4.4 最终 LLM 字符串组装</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#4-5-%E8%BD%AC%E6%8D%A2%E4%B8%BA%E7%94%A8%E6%88%B7%E5%8F%8B%E5%A5%BD%E6%A0%BC%E5%BC%8F"><span class="nav-text">4.5 转换为用户友好格式</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#5-4-%E9%98%B6%E6%AE%B5%E7%AE%A1%E7%BA%BF%E6%80%BB%E8%A7%88"><span class="nav-text">5. 4 阶段管线总览</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#6-%E6%80%BB%E7%BB%93"><span class="nav-text">6. 总结</span></a></li></ol></div>
+        </div>
+        <!--/noindex-->
+
+        <div class="site-overview-wrap sidebar-panel">
+          <div class="site-author animated" itemprop="author" itemscope itemtype="http://schema.org/Person">
+    <img class="site-author-image" itemprop="image" alt="陌忆"
+      src="/images/avatar.webp">
+  <p class="site-author-name" itemprop="name">陌忆</p>
+  <div class="site-description" itemprop="description">欢迎来到我的世界💜</div>
+</div>
+<div class="site-state-wrap animated">
+  <nav class="site-state">
+      <div class="site-state-item site-state-posts">
+        <a href="/archives/">
+          <span class="site-state-item-count">10</span>
+          <span class="site-state-item-name">日志</span>
+        </a>
+      </div>
+      <div class="site-state-item site-state-categories">
+          <a href="/categories/">
+        <span class="site-state-item-count">4</span>
+        <span class="site-state-item-name">分类</span></a>
+      </div>
+      <div class="site-state-item site-state-tags">
+          <a href="/tags/">
+        <span class="site-state-item-count">36</span>
+        <span class="site-state-item-name">标签</span></a>
+      </div>
+  </nav>
+</div>
+  <div class="cc-license animated" itemprop="license">
+    <a href="https://creativecommons.org/licenses/by-nc-sa/4.0/" class="cc-opacity" rel="noopener" target="_blank"><img src="https://cdnjs.cloudflare.com/ajax/libs/creativecommons-vocabulary/2020.11.3/assets/license_badges/small/by_nc_sa.svg" alt="Creative Commons"></a>
+  </div>
+
+        </div>
+      </div>
+    </div>
+
+    
+  </aside>
+
+
+    </div>
+
+    <div class="main-inner post posts-expand">
+
+
+  
+
+
+<div class="post-block">
+  
+  
+
+  <article itemscope itemtype="http://schema.org/Article" class="post-content" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="https://moyi-math.github.io/2026/07/12/LightRAG-1.4-Token-Budget-Context-Construction/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.webp">
+      <meta itemprop="name" content="陌忆">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="陌忆的博客">
+      <meta itemprop="description" content="欢迎来到我的世界💜">
+    </span>
+
+    <span hidden itemprop="post" itemscope itemtype="http://schema.org/CreativeWork">
+      <meta itemprop="name" content="LightRAG 1.4：Token 预算与 Context 构建 | 陌忆的博客">
+      <meta itemprop="description" content="">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          LightRAG 1.4：Token 预算与 Context 构建
+        </h1>
+
+        <div class="post-meta-container">
+          <div class="post-meta">
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-calendar"></i>
+      </span>
+      <span class="post-meta-item-text">发表于</span>
+      
+
+      <time title="创建时间：2026-07-12 19:53:17 / 修改时间：15:06:05" itemprop="dateCreated datePublished" datetime="2026-07-12T19:53:17+08:00">2026-07-12</time>
+    </span>
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-folder"></i>
+      </span>
+      <span class="post-meta-item-text">分类于</span>
+        <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+          <a href="/categories/LightRAG-%E6%BA%90%E7%A0%81%E8%A7%A3%E8%AF%BB/" itemprop="url" rel="index"><span itemprop="name">LightRAG 源码解读</span></a>
+        </span>
+    </span>
+
+  
+    <span class="post-meta-break"></span>
+    <span class="post-meta-item" title="本文字数">
+      <span class="post-meta-item-icon">
+        <i class="far fa-file-word"></i>
+      </span>
+      <span class="post-meta-item-text">本文字数：</span>
+      <span>3.3k</span>
+    </span>
+    <span class="post-meta-item" title="阅读时长">
+      <span class="post-meta-item-icon">
+        <i class="far fa-clock"></i>
+      </span>
+      <span class="post-meta-item-text">阅读时长 &asymp;</span>
+      <span>12 分钟</span>
+    </span>
+</div>
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody"><p>在前三篇文章中，我们依次追踪了 LightRAG 查询流程中的关键词提取、批嵌入与向量检索、Graph Store 层编排。当检索阶段（Stage 1）完成，我们已经拿到了原始实体、关系和文本块数据。但直接把这些原始数据全部塞进 LLM 是有问题的：</p>
+<ol>
+<li><strong>Token 预算有限</strong>：LLM 有 context window 限制（通常是 32K&#x2F;128K tokens），而检索到的实体、关系和文本块加起来可能远超这个数</li>
+<li><strong>信息冗余</strong>：实体描述、关系描述、文本块之间存在大量重叠</li>
+<li><strong>格式要求</strong>：LLM 需要结构化的上下文，而不是原始 JSON</li>
+</ol>
+<p>LightRAG 通过一个<strong>4 阶段的 Context 构建管线</strong>来解决这些问题：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line">Stage 1: Search (已覆盖)</span><br><span class="line">    ↓</span><br><span class="line">Stage 2: Token Truncation ← 本文重点：按 Token 预算裁剪</span><br><span class="line">    ↓</span><br><span class="line">Stage 3: Merge Chunks  ← 本文重点：多源去重合并</span><br><span class="line">    ↓</span><br><span class="line">Stage 4: Build Context ← 本文重点：动态预算分配 + 最终组装</span><br></pre></td></tr></table></figure>
+
+<p>本文深入 <code>_apply_token_truncation</code>、<code>_merge_all_chunks</code>、<code>_build_context_str</code> 三个函数，以及它们调用的 <code>truncate_list_by_token_size</code>、<code>process_chunks_unified</code>、<code>convert_to_user_format</code> 等工具函数，完整还原 Token 预算的计算与 Context 的最终构建。</p>
+<span id="more"></span>
+
+<h2 id="1-Token-预算体系"><a href="#1-Token-预算体系" class="headerlink" title="1. Token 预算体系"></a>1. Token 预算体系</h2><h3 id="1-1-QueryParam-中的-Token-字段"><a href="#1-1-QueryParam-中的-Token-字段" class="headerlink" title="1.1 QueryParam 中的 Token 字段"></a>1.1 QueryParam 中的 Token 字段</h3><p>在 <code>lightrag/base.py</code> 中，<code>QueryParam</code> 定义了三个核心的 Token 预算字段：</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">@dataclass</span></span><br><span class="line"><span class="keyword">class</span> <span class="title class_">QueryParam</span>:</span><br><span class="line">    mode: <span class="built_in">str</span> = <span class="string">&quot;hybrid&quot;</span></span><br><span class="line">    <span class="comment"># ... 其他字段</span></span><br><span class="line"></span><br><span class="line">    <span class="comment"># --- Token 预算 ---</span></span><br><span class="line">    max_token_limitation: <span class="built_in">int</span> | <span class="literal">None</span> = <span class="literal">None</span>        <span class="comment"># （注意 Typo: limitation）</span></span><br><span class="line">    max_entity_tokens: <span class="built_in">int</span> = <span class="number">6000</span>                   <span class="comment"># 实体描述的 Token 上限</span></span><br><span class="line">    max_relation_tokens: <span class="built_in">int</span> = <span class="number">8000</span>                 <span class="comment"># 关系描述的 Token 上限</span></span><br><span class="line">    max_total_tokens: <span class="built_in">int</span> | <span class="literal">None</span> = <span class="literal">None</span>             <span class="comment"># 总 Token 预算（最终覆盖三者）</span></span><br></pre></td></tr></table></figure>
+
+<p><strong>三层预算体系</strong>：</p>
+<ul>
+<li><code>max_entity_tokens</code>（默认 6000）：实体描述部分最多保留的 token 数</li>
+<li><code>max_relation_tokens</code>（默认 8000）：关系描述部分最多保留的 token 数</li>
+<li><code>max_total_tokens</code>（可选）：最终 LLM 输入的<strong>总</strong> token 预算（包含 system prompt、KG context、query、buffer 等全部开销）。当设置了 <code>max_total_tokens</code>，它实际上会覆盖所有子预算——<code>_build_context_str</code> 会用总的可用 token 减去各项固定开销后，将剩余 tokens 动态分配给文本块。</li>
+</ul>
+<p>注意 <code>max_token_limitation</code> 是一个遗留的 typo 字段（拼写应为 <code>limitation</code> 而非 <code>limitation</code>），当前版本中建议使用 <code>max_total_tokens</code>。</p>
+<h3 id="1-2-Token-裁剪的基本工具：truncate-list-by-token-size"><a href="#1-2-Token-裁剪的基本工具：truncate-list-by-token-size" class="headerlink" title="1.2 Token 裁剪的基本工具：truncate_list_by_token_size"></a>1.2 Token 裁剪的基本工具：<code>truncate_list_by_token_size</code></h3><p>所有 Token 裁剪操作都基于同一个底层函数 <code>truncate_list_by_token_size</code>（<code>lightrag/utils.py:2596</code>）：</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">def</span> <span class="title function_">truncate_list_by_token_size</span>(<span class="params"></span></span><br><span class="line"><span class="params">    list_data: <span class="built_in">list</span>[<span class="type">Any</span>],</span></span><br><span class="line"><span class="params">    key: <span class="type">Callable</span>[[<span class="type">Any</span>], <span class="built_in">str</span>],</span></span><br><span class="line"><span class="params">    max_token_size: <span class="built_in">int</span>,</span></span><br><span class="line"><span class="params">    tokenizer: Tokenizer,</span></span><br><span class="line"><span class="params"></span>) -&gt; <span class="built_in">list</span>[<span class="built_in">int</span>]:</span><br><span class="line">    <span class="string">&quot;&quot;&quot;Truncate a list of data by token size&quot;&quot;&quot;</span></span><br><span class="line">    <span class="keyword">if</span> max_token_size &lt;= <span class="number">0</span>:</span><br><span class="line">        <span class="keyword">return</span> []</span><br><span class="line">    tokens = <span class="number">0</span></span><br><span class="line">    <span class="keyword">for</span> i, data <span class="keyword">in</span> <span class="built_in">enumerate</span>(list_data):</span><br><span class="line">        tokens += <span class="built_in">len</span>(tokenizer.encode(key(data)))</span><br><span class="line">        <span class="keyword">if</span> tokens &gt; max_token_size:</span><br><span class="line">            <span class="keyword">return</span> list_data[:i]</span><br><span class="line">    <span class="keyword">return</span> list_data</span><br></pre></td></tr></table></figure>
+
+<p><strong>设计特点</strong>：</p>
+<ul>
+<li><strong>贪婪截断</strong>：从头开始累加 token 数，一旦超过预算就截断</li>
+<li><strong>按条目不可分割</strong>：要么保留整个条目，要么丢弃整个条目。不会在条目的中间截断</li>
+<li><strong>线性顺序敏感</strong>：保留的是列表前面的条目。因此<strong>条目的排序顺序直接影响哪些信息被保留</strong></li>
+<li><strong>Key 函数</strong>：通过 <code>key</code> 参数决定每个条目要编码的文本。在实体&#x2F;关系上下文中，是整个 dict 的 JSON 序列化</li>
+</ul>
+<p><strong>为什么贪婪截断足够</strong>：因为实体和关系的排序已经通过 <code>pick_by_weighted_polling</code>&#x2F;<code>pick_by_vector_similarity</code> 完成了重要性排序，所以从头开始截断就等价于保留最重要的条目。</p>
+<h2 id="2-Stage-2：Token-Truncation（-apply-token-truncation）"><a href="#2-Stage-2：Token-Truncation（-apply-token-truncation）" class="headerlink" title="2. Stage 2：Token Truncation（_apply_token_truncation）"></a>2. Stage 2：Token Truncation（<code>_apply_token_truncation</code>）</h2><p><code>_apply_token_truncation</code>（<code>lightrag/operate.py:4562</code>）是 Stage 2 的执行函数。它的输入是 Stage 1（<code>_perform_kg_search</code>）的输出，包括 <code>search_result[&quot;final_entities&quot;]</code> 和 <code>search_result[&quot;final_relations&quot;]</code>。</p>
+<h3 id="2-1-整体流程"><a href="#2-1-整体流程" class="headerlink" title="2.1 整体流程"></a>2.1 整体流程</h3><figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">async</span> <span class="keyword">def</span> <span class="title function_">_apply_token_truncation</span>(<span class="params">search_result, query_param, global_config</span>):</span><br><span class="line">    <span class="comment"># 1. 检查是否有 Token 预算覆盖</span></span><br><span class="line">    max_total_tokens = <span class="built_in">getattr</span>(query_param, <span class="string">&quot;max_total_tokens&quot;</span>, <span class="literal">None</span>)</span><br><span class="line">    <span class="keyword">if</span> max_total_tokens <span class="keyword">is</span> <span class="keyword">not</span> <span class="literal">None</span>:</span><br><span class="line">        <span class="comment"># 如果设置了总预算，用它覆盖所有子预算</span></span><br><span class="line">        max_entity_tokens = max_total_tokens // <span class="number">2</span></span><br><span class="line">        max_relation_tokens = max_total_tokens // <span class="number">2</span></span><br><span class="line">    <span class="keyword">else</span>:</span><br><span class="line">        max_entity_tokens = query_param.max_entity_tokens <span class="keyword">or</span> <span class="number">6000</span></span><br><span class="line">        max_relation_tokens = query_param.max_relation_tokens <span class="keyword">or</span> <span class="number">8000</span></span><br></pre></td></tr></table></figure>
+
+<p><strong>关键设计</strong>：当用户设置了 <code>max_total_tokens</code>，实体和关系的 token 预算被简化为各占一半。这为后续 Stage 4 中文本块的动态预算分配留下了空间。</p>
+<h3 id="2-2-实体上下文的构建与裁剪"><a href="#2-2-实体上下文的构建与裁剪" class="headerlink" title="2.2 实体上下文的构建与裁剪"></a>2.2 实体上下文的构建与裁剪</h3><figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># 构建实体上下文</span></span><br><span class="line">entities_context = []</span><br><span class="line"><span class="keyword">for</span> entity <span class="keyword">in</span> final_entities:</span><br><span class="line">    entity_name = entity.get(<span class="string">&quot;entity_name&quot;</span>, <span class="string">&quot;UNKNOWN&quot;</span>)</span><br><span class="line">    entity_type = entity.get(<span class="string">&quot;entity_type&quot;</span>, <span class="string">&quot;UNKNOWN&quot;</span>)</span><br><span class="line">    description = entity.get(<span class="string">&quot;description&quot;</span>, <span class="string">&quot;UNKNOWN&quot;</span>)</span><br><span class="line">    created_at = entity.get(<span class="string">&quot;created_at&quot;</span>, <span class="string">&quot;UNKNOWN&quot;</span>)</span><br><span class="line">    <span class="keyword">if</span> <span class="built_in">isinstance</span>(created_at, (<span class="built_in">int</span>, <span class="built_in">float</span>)):</span><br><span class="line">        created_at = time.strftime(<span class="string">&quot;%Y-%m-%d %H:%M:%S&quot;</span>, time.localtime(created_at))</span><br><span class="line"></span><br><span class="line">    entities_context.append(&#123;</span><br><span class="line">        <span class="string">&quot;entity&quot;</span>: entity_name,</span><br><span class="line">        <span class="string">&quot;type&quot;</span>: entity_type,</span><br><span class="line">        <span class="string">&quot;description&quot;</span>: description,</span><br><span class="line">        <span class="string">&quot;created_at&quot;</span>: created_at,</span><br><span class="line">        <span class="string">&quot;file_path&quot;</span>: entity.get(<span class="string">&quot;file_path&quot;</span>, <span class="string">&quot;unknown_source&quot;</span>),</span><br><span class="line">    &#125;)</span><br><span class="line"></span><br><span class="line"><span class="comment"># Token 裁剪前，移除 file_path 和 created_at（它们对语义贡献小）</span></span><br><span class="line"><span class="keyword">if</span> entities_context:</span><br><span class="line">    entities_context_for_truncation = []</span><br><span class="line">    <span class="keyword">for</span> entity <span class="keyword">in</span> entities_context:</span><br><span class="line">        entity_copy = entity.copy()</span><br><span class="line">        entity_copy.pop(<span class="string">&quot;file_path&quot;</span>, <span class="literal">None</span>)</span><br><span class="line">        entity_copy.pop(<span class="string">&quot;created_at&quot;</span>, <span class="literal">None</span>)</span><br><span class="line">        entities_context_for_truncation.append(entity_copy)</span><br><span class="line"></span><br><span class="line">    entities_context = truncate_list_by_token_size(</span><br><span class="line">        entities_context_for_truncation,</span><br><span class="line">        key=<span class="keyword">lambda</span> x: <span class="string">&quot;\n&quot;</span>.join(</span><br><span class="line">            json.dumps(item, ensure_ascii=<span class="literal">False</span>) <span class="keyword">for</span> item <span class="keyword">in</span> [x]</span><br><span class="line">        ),</span><br><span class="line">        max_token_size=max_entity_tokens,</span><br><span class="line">        tokenizer=tokenizer,</span><br><span class="line">    )</span><br></pre></td></tr></table></figure>
+
+<p><strong>细节</strong>：</p>
+<ul>
+<li>时间戳从 Unix timestamp 转为可读字符串</li>
+<li>Token 计算时<strong>排除</strong> <code>file_path</code> 和 <code>created_at</code> 这两个字段，因为它们对 LLM 理解语义的贡献极小</li>
+<li>裁剪后，<code>entities_context</code> 只保留了预算内的实体</li>
+</ul>
+<h3 id="2-3-关系上下文的裁剪"><a href="#2-3-关系上下文的裁剪" class="headerlink" title="2.3 关系上下文的裁剪"></a>2.3 关系上下文的裁剪</h3><p>关系的裁剪逻辑与实体完全对称，只是预算使用 <code>max_relation_tokens</code>：</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">if</span> relations_context:</span><br><span class="line">    relations_context_for_truncation = []</span><br><span class="line">    <span class="keyword">for</span> relation <span class="keyword">in</span> relations_context:</span><br><span class="line">        relation_copy = relation.copy()</span><br><span class="line">        relation_copy.pop(<span class="string">&quot;file_path&quot;</span>, <span class="literal">None</span>)</span><br><span class="line">        relation_copy.pop(<span class="string">&quot;created_at&quot;</span>, <span class="literal">None</span>)</span><br><span class="line">        relations_context_for_truncation.append(relation_copy)</span><br><span class="line"></span><br><span class="line">    relations_context = truncate_list_by_token_size(</span><br><span class="line">        relations_context_for_truncation,</span><br><span class="line">        key=<span class="keyword">lambda</span> x: <span class="string">&quot;\n&quot;</span>.join(</span><br><span class="line">            json.dumps(item, ensure_ascii=<span class="literal">False</span>) <span class="keyword">for</span> item <span class="keyword">in</span> [x]</span><br><span class="line">        ),</span><br><span class="line">        max_token_size=max_relation_tokens,</span><br><span class="line">        tokenizer=tokenizer,</span><br><span class="line">    )</span><br></pre></td></tr></table></figure>
+
+<h3 id="2-4-同步过滤原始数据"><a href="#2-4-同步过滤原始数据" class="headerlink" title="2.4 同步过滤原始数据"></a>2.4 同步过滤原始数据</h3><p>裁剪上下文之后，需要同步过滤原始数据，以保证后续步骤使用的原始数据与裁剪后的上下文一致：</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># 从裁剪后的实体上下文中提取保留的实体名集合</span></span><br><span class="line">final_entity_names = &#123;e[<span class="string">&quot;entity&quot;</span>] <span class="keyword">for</span> e <span class="keyword">in</span> entities_context&#125;</span><br><span class="line"></span><br><span class="line"><span class="comment"># 过滤原始实体数据</span></span><br><span class="line">filtered_entities = []</span><br><span class="line">seen_nodes = <span class="built_in">set</span>()</span><br><span class="line"><span class="keyword">for</span> entity <span class="keyword">in</span> final_entities:</span><br><span class="line">    name = entity.get(<span class="string">&quot;entity_name&quot;</span>)</span><br><span class="line">    <span class="keyword">if</span> name <span class="keyword">in</span> final_entity_names <span class="keyword">and</span> name <span class="keyword">not</span> <span class="keyword">in</span> seen_nodes:</span><br><span class="line">        filtered_entities.append(entity)</span><br><span class="line">        filtered_entity_id_to_original[name] = entity</span><br><span class="line">        seen_nodes.add(name)</span><br><span class="line"></span><br><span class="line"><span class="comment"># 同样的逻辑用于关系</span></span><br><span class="line">final_relation_pairs = &#123;(r[<span class="string">&quot;entity1&quot;</span>], r[<span class="string">&quot;entity2&quot;</span>]) <span class="keyword">for</span> r <span class="keyword">in</span> relations_context&#125;</span><br><span class="line">filtered_relations = []</span><br><span class="line"><span class="keyword">for</span> relation <span class="keyword">in</span> final_relations:</span><br><span class="line">    src, tgt = relation.get(<span class="string">&quot;src_id&quot;</span>), relation.get(<span class="string">&quot;tgt_id&quot;</span>)</span><br><span class="line">    pair = (src, tgt)</span><br><span class="line">    <span class="keyword">if</span> pair <span class="keyword">in</span> final_relation_pairs <span class="keyword">and</span> pair <span class="keyword">not</span> <span class="keyword">in</span> seen_edges:</span><br><span class="line">        filtered_relations.append(relation)</span><br><span class="line">        ...</span><br></pre></td></tr></table></figure>
+
+<p><strong>输出</strong>：<code>_apply_token_truncation</code> 返回一个包含 6 个字段的字典：<code>entities_context</code>（裁剪后的实体上下文）、<code>relations_context</code>（裁剪后的关系上下文）、<code>filtered_entities</code>（原始实体数据）、<code>filtered_relations</code>（原始关系数据）、<code>entity_id_to_original</code>、<code>relation_id_to_original</code>。</p>
+<p>后两个映射将在 Stage 4 的 <code>convert_to_user_format</code> 中被用来查找原始数据库数据，生成更丰富的格式化输出。</p>
+<h2 id="3-Stage-3：Merge-Chunks（-merge-all-chunks）"><a href="#3-Stage-3：Merge-Chunks（-merge-all-chunks）" class="headerlink" title="3. Stage 3：Merge Chunks（_merge_all_chunks）"></a>3. Stage 3：Merge Chunks（<code>_merge_all_chunks</code>）</h2><p><code>_merge_all_chunks</code>（<code>lightrag/operate.py:4739</code>）负责将来自三个不同来源的文本块合并：</p>
+<ol>
+<li><strong>vector_chunks</strong>：来自向量检索（Naive 模式）的文本块</li>
+<li><strong>entity_chunks</strong>：从裁剪后的实体通过 <code>_find_related_text_unit_from_entities</code> 获取的文本块</li>
+<li><strong>relation_chunks</strong>：从裁剪后的关系通过 <code>_find_related_text_unit_from_relations</code> 获取的文本块</li>
+</ol>
+<h3 id="3-1-Round-Robin-合并"><a href="#3-1-Round-Robin-合并" class="headerlink" title="3.1 Round-Robin 合并"></a>3.1 Round-Robin 合并</h3><figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br></pre></td><td class="code"><pre><span class="line">merged_chunks = []</span><br><span class="line">seen_chunk_ids = <span class="built_in">set</span>()</span><br><span class="line">max_len = <span class="built_in">max</span>(<span class="built_in">len</span>(vector_chunks), <span class="built_in">len</span>(entity_chunks), <span class="built_in">len</span>(relation_chunks))</span><br><span class="line"></span><br><span class="line"><span class="keyword">for</span> i <span class="keyword">in</span> <span class="built_in">range</span>(max_len):</span><br><span class="line">    <span class="comment"># Vector chunks（Naive 模式优先）</span></span><br><span class="line">    <span class="keyword">if</span> i &lt; <span class="built_in">len</span>(vector_chunks):</span><br><span class="line">        chunk = vector_chunks[i]</span><br><span class="line">        chunk_id = chunk.get(<span class="string">&quot;chunk_id&quot;</span>) <span class="keyword">or</span> chunk.get(<span class="string">&quot;id&quot;</span>)</span><br><span class="line">        <span class="keyword">if</span> chunk_id <span class="keyword">and</span> chunk_id <span class="keyword">not</span> <span class="keyword">in</span> seen_chunk_ids:</span><br><span class="line">            seen_chunk_ids.add(chunk_id)</span><br><span class="line">            merged_chunks.append(&#123;...&#125;)</span><br><span class="line"></span><br><span class="line">    <span class="comment"># Entity chunks（Local 模式）</span></span><br><span class="line">    <span class="keyword">if</span> i &lt; <span class="built_in">len</span>(entity_chunks):</span><br><span class="line">        chunk = entity_chunks[i]</span><br><span class="line">        chunk_id = chunk.get(<span class="string">&quot;chunk_id&quot;</span>) <span class="keyword">or</span> chunk.get(<span class="string">&quot;id&quot;</span>)</span><br><span class="line">        <span class="keyword">if</span> chunk_id <span class="keyword">and</span> chunk_id <span class="keyword">not</span> <span class="keyword">in</span> seen_chunk_ids:</span><br><span class="line">            ...</span><br><span class="line"></span><br><span class="line">    <span class="comment"># Relation chunks（Global 模式）</span></span><br><span class="line">    <span class="keyword">if</span> i &lt; <span class="built_in">len</span>(relation_chunks):</span><br><span class="line">        chunk = relation_chunks[i]</span><br><span class="line">        ...</span><br></pre></td></tr></table></figure>
+
+<p><strong>Round-Robin 的设计意图</strong>：三种来源的文本块按轮流取一个的方式合并，保证每种来源的信息在前 N 个合并结果中都有分布。这样即使后续 token 截断丢弃了后半部分，三种来源的信息都仍有机会被保留。</p>
+<p><strong>去重机制</strong>：通过 <code>seen_chunk_ids</code> 集合做全量去重。同一个 chunk_id 不论来自哪个来源，只出现一次。这解决了实体和关系可能引用同一文本块的问题。</p>
+<h3 id="3-2-Content-Headings-回填"><a href="#3-2-Content-Headings-回填" class="headerlink" title="3.2 Content Headings 回填"></a>3.2 Content Headings 回填</h3><p>在合并完成后，<code>_merge_all_chunks</code> 还会做一件重要的事情——回填 <code>content_headings</code>：</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">if</span> text_chunks_db <span class="keyword">and</span> text_chunks_db.global_config.get(</span><br><span class="line">    <span class="string">&quot;enable_content_headings&quot;</span>, <span class="literal">False</span></span><br><span class="line">):</span><br><span class="line">    <span class="keyword">await</span> _attach_content_headings(merged_chunks, text_chunks_db)</span><br></pre></td></tr></table></figure>
+
+<p><code>_attach_content_headings</code> 通过 <code>text_chunks_db.get_by_ids(chunk_ids)</code> 从 KV 存储中查出每个 chunk 的原始数据，提取 <code>heading</code> 层级路径（如 <code>&quot;Introduction &gt; Architecture &gt; Storage Layer&quot;</code>），并截断到 <code>DEFAULT_MAX_SECTION_CONTEXT_TOKENS</code>（约 500 tokens）。这些标题路径会被计入后续的 token 预算中。</p>
+<p><strong>为什么需要回填</strong>：向量存储（chunks_vdb）中不包含 <code>heading</code> 字段，而实体&#x2F;关系 chunk 在合并时也会丢失原先的 heading。回填让 LLM 能够理解每个文本块在原始文档中的位置层级。</p>
+<h2 id="4-Stage-4：Build-Context（-build-context-str）"><a href="#4-Stage-4：Build-Context（-build-context-str）" class="headerlink" title="4. Stage 4：Build Context（_build_context_str）"></a>4. Stage 4：Build Context（<code>_build_context_str</code>）</h2><p><code>_build_context_str</code>（<code>lightrag/operate.py:4847</code>）是整个 Context 构建管线的最后一步。它接收 Stage 2 的上下文数据和 Stage 3 的合并文本块，计算动态 Token 预算，最终产出 LLM 输入字符串和结构化的 <code>raw_data</code>。</p>
+<h3 id="4-1-动态-Token-预算计算"><a href="#4-1-动态-Token-预算计算" class="headerlink" title="4.1 动态 Token 预算计算"></a>4.1 动态 Token 预算计算</h3><p>这是 Stage 4 最核心的算法——<strong>在组装最终上下文之前，先通过预计算确定文本块的可用 Token 预算</strong>：</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># 1. 获取总 Token 预算</span></span><br><span class="line">max_total_tokens = <span class="built_in">getattr</span>(</span><br><span class="line">    query_param,</span><br><span class="line">    <span class="string">&quot;max_total_tokens&quot;</span>,</span><br><span class="line">    global_config.get(<span class="string">&quot;max_total_tokens&quot;</span>, DEFAULT_MAX_TOTAL_TOKENS),</span><br><span class="line">)</span><br><span class="line"></span><br><span class="line"><span class="comment"># 2. 构建初步的 KG 上下文（不含文本块）来估算 KGC 开销</span></span><br><span class="line">pre_kg_context = kg_context_template.<span class="built_in">format</span>(</span><br><span class="line">    entities_str=entities_str,</span><br><span class="line">    relations_str=relations_str,</span><br><span class="line">    text_chunks_str=<span class="string">&quot;&quot;</span>,        <span class="comment"># 先空着</span></span><br><span class="line">    reference_list_str=<span class="string">&quot;&quot;</span>,     <span class="comment"># 先空着</span></span><br><span class="line">)</span><br><span class="line">kg_context_tokens = <span class="built_in">len</span>(tokenizer.encode(pre_kg_context))</span><br><span class="line"></span><br><span class="line"><span class="comment"># 3. 构建初步的 System Prompt 来估算提示词开销</span></span><br><span class="line">pre_sys_prompt = sys_prompt_template.<span class="built_in">format</span>(</span><br><span class="line">    context_data=<span class="string">&quot;&quot;</span>,</span><br><span class="line">    response_type=response_type,</span><br><span class="line">    user_prompt=user_prompt,</span><br><span class="line">)</span><br><span class="line">sys_prompt_tokens = <span class="built_in">len</span>(tokenizer.encode(pre_sys_prompt))</span><br><span class="line"></span><br><span class="line"><span class="comment"># 4. 计算可用 Token</span></span><br><span class="line">query_tokens = <span class="built_in">len</span>(tokenizer.encode(query))</span><br><span class="line">buffer_tokens = <span class="number">200</span></span><br><span class="line">available_chunk_tokens = max_total_tokens - (</span><br><span class="line">    sys_prompt_tokens + kg_context_tokens + query_tokens + buffer_tokens</span><br><span class="line">)</span><br></pre></td></tr></table></figure>
+
+<p><strong>预算分配公式</strong>：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line">available_chunk_tokens = max_total_tokens</span><br><span class="line">                       - sys_prompt_tokens    （固定模板的开销）</span><br><span class="line">                       - kg_context_tokens    （实体+关系 JSON 的开销）</span><br><span class="line">                       - query_tokens         （用户查询的开销）</span><br><span class="line">                       - buffer_tokens        （200 tokens 安全缓冲）</span><br></pre></td></tr></table></figure>
+
+<p>计算公式意味着：实体和关系的 token 占用越多，文本块可用的 token 就越少。这形成了一个<strong>零和博弈</strong>——检索到的实体&#x2F;关系越多，能保留的文本块就越少。</p>
+<p>Buffer 的 200 tokens 是为了容纳 <code>reference_list_str</code>（引用列表）的额外开销，以及其他不可预测的格式损耗。</p>
+<h3 id="4-2-文本块统一处理管道"><a href="#4-2-文本块统一处理管道" class="headerlink" title="4.2 文本块统一处理管道"></a>4.2 文本块统一处理管道</h3><p>有了 <code>available_chunk_tokens</code> 后，调用 <code>process_chunks_unified</code> 对合并后的文本块进行处理：</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line">truncated_chunks = <span class="keyword">await</span> process_chunks_unified(</span><br><span class="line">    query=query,</span><br><span class="line">    unique_chunks=merged_chunks,</span><br><span class="line">    query_param=query_param,</span><br><span class="line">    global_config=global_config,</span><br><span class="line">    source_type=query_param.mode,</span><br><span class="line">    chunk_token_limit=available_chunk_tokens,</span><br><span class="line">)</span><br></pre></td></tr></table></figure>
+
+<p><code>process_chunks_unified</code>（<code>lightrag/utils.py:4335</code>）包含 5 个处理步骤：</p>
+<p><strong>Step 1 - Rerank</strong>（可选）：如果启用了 reranker，调用 <code>apply_rerank_if_enabled</code> 对所有文本块进行语义重排序。reranker 根据文本块与查询的相关性打分，分数高的排在前面。</p>
+<p><strong>Step 2 - 最低 Rerank 分数过滤</strong>：如果启用了 rerank，按 <code>global_config[&quot;min_rerank_score&quot;]</code>（默认 0.5）过滤低分文本块。</p>
+<p><strong>Step 3 - chunk_top_k 限制</strong>：如果设置了 <code>chunk_top_k</code>，只保留前 K 个文本块。</p>
+<p><strong>Step 4 - Token 截断</strong>：调用 <code>truncate_list_by_token_size</code> 按 <code>available_chunk_tokens</code> 预算截断。这是最终的 Token 预算落地。</p>
+<p><strong>Step 5 - 添加 ID</strong>：为每个保留的文本块添加 <code>id</code> 字段（<code>DC1</code>、<code>DC2</code>…），用于引用。</p>
+<h3 id="4-3-引用列表生成"><a href="#4-3-引用列表生成" class="headerlink" title="4.3 引用列表生成"></a>4.3 引用列表生成</h3><p>截断后，调用 <code>generate_reference_list_from_chunks</code> 生成引用列表：</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">reference_list, truncated_chunks = generate_reference_list_from_chunks(</span><br><span class="line">    truncated_chunks</span><br><span class="line">)</span><br></pre></td></tr></table></figure>
+
+<p>这个函数（<code>lightrag/utils.py:4929</code>）的算法：</p>
+<ol>
+<li>统计每个 <code>file_path</code> 在文本块中出现的频率</li>
+<li>按<strong>频率降序</strong>排序（频率相同时按首次出现顺序）</li>
+<li>为每个 <code>file_path</code> 分配一个 <code>reference_id</code>（1、2、3…）</li>
+<li>将 <code>reference_id</code> 回填到每个文本块中</li>
+</ol>
+<p>输出示例：</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line">reference_list = [</span><br><span class="line">    &#123;<span class="string">&quot;reference_id&quot;</span>: <span class="string">&quot;1&quot;</span>, <span class="string">&quot;file_path&quot;</span>: <span class="string">&quot;docs/architecture.md&quot;</span>&#125;,</span><br><span class="line">    &#123;<span class="string">&quot;reference_id&quot;</span>: <span class="string">&quot;2&quot;</span>, <span class="string">&quot;file_path&quot;</span>: <span class="string">&quot;docs/deployment.md&quot;</span>&#125;,</span><br><span class="line">]</span><br></pre></td></tr></table></figure>
+
+<h3 id="4-4-最终-LLM-字符串组装"><a href="#4-4-最终-LLM-字符串组装" class="headerlink" title="4.4 最终 LLM 字符串组装"></a>4.4 最终 LLM 字符串组装</h3><figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># 构建文本块上下文</span></span><br><span class="line">chunks_context = []</span><br><span class="line"><span class="keyword">for</span> chunk <span class="keyword">in</span> truncated_chunks:</span><br><span class="line">    entry = &#123;<span class="string">&quot;reference_id&quot;</span>: chunk[<span class="string">&quot;reference_id&quot;</span>], <span class="string">&quot;content&quot;</span>: chunk[<span class="string">&quot;content&quot;</span>]&#125;</span><br><span class="line">    <span class="keyword">if</span> chunk.get(<span class="string">&quot;content_headings&quot;</span>):</span><br><span class="line">        entry[<span class="string">&quot;content_headings&quot;</span>] = chunk[<span class="string">&quot;content_headings&quot;</span>]</span><br><span class="line">    chunks_context.append(entry)</span><br><span class="line"></span><br><span class="line">text_units_str = <span class="string">&quot;\n&quot;</span>.join(</span><br><span class="line">    json.dumps(text_unit, ensure_ascii=<span class="literal">False</span>) <span class="keyword">for</span> text_unit <span class="keyword">in</span> chunks_context</span><br><span class="line">)</span><br><span class="line"></span><br><span class="line">reference_list_str = <span class="string">&quot;\n&quot;</span>.join(</span><br><span class="line">    <span class="string">f&quot;[<span class="subst">&#123;ref[<span class="string">&#x27;reference_id&#x27;</span>]&#125;</span>] <span class="subst">&#123;ref[<span class="string">&#x27;file_path&#x27;</span>]&#125;</span>&quot;</span></span><br><span class="line">    <span class="keyword">for</span> ref <span class="keyword">in</span> reference_list</span><br><span class="line">    <span class="keyword">if</span> ref[<span class="string">&quot;reference_id&quot;</span>]</span><br><span class="line">)</span><br><span class="line"></span><br><span class="line"><span class="comment"># 最终组装</span></span><br><span class="line">result = kg_context_template.<span class="built_in">format</span>(</span><br><span class="line">    entities_str=entities_str,</span><br><span class="line">    relations_str=relations_str,</span><br><span class="line">    text_chunks_str=text_units_str,</span><br><span class="line">    reference_list_str=reference_list_str,</span><br><span class="line">)</span><br></pre></td></tr></table></figure>
+
+<p><code>kg_context_template</code> 的默认模板（来自 <code>PROMPTS[&quot;kg_query_context&quot;]</code>）格式大致为：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line">-----Entities-----</span><br><span class="line">[&#123;...JSON...&#125;]</span><br><span class="line">-----Relationships-----</span><br><span class="line">[&#123;...JSON...&#125;]</span><br><span class="line">-----Sources-----</span><br><span class="line">[&#123;&quot;reference_id&quot;: &quot;...&quot;, &quot;content&quot;: &quot;...&quot;, ...&#125;]</span><br></pre></td></tr></table></figure>
+
+<h3 id="4-5-转换为用户友好格式"><a href="#4-5-转换为用户友好格式" class="headerlink" title="4.5 转换为用户友好格式"></a>4.5 转换为用户友好格式</h3><p><code>_build_context_str</code> 的另一个输出是 <code>raw_data</code>，通过 <code>convert_to_user_format</code> 生成：</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br></pre></td><td class="code"><pre><span class="line">final_data = convert_to_user_format(</span><br><span class="line">    entities_context,           <span class="comment"># 裁剪后的实体</span></span><br><span class="line">    relations_context,          <span class="comment"># 裁剪后的关系</span></span><br><span class="line">    truncated_chunks,          <span class="comment"># 带 reference_id 的文本块</span></span><br><span class="line">    reference_list,            <span class="comment"># 引用列表</span></span><br><span class="line">    query_param.mode,          <span class="comment"># 查询模式</span></span><br><span class="line">    entity_id_to_original,     <span class="comment"># 实体原始数据映射</span></span><br><span class="line">    relation_id_to_original,   <span class="comment"># 关系原始数据映射</span></span><br><span class="line">)</span><br></pre></td></tr></table></figure>
+
+<p><code>convert_to_user_format</code>（<code>lightrag/utils.py:4805</code>）的关键行为：</p>
+<ul>
+<li><strong>实体格式化</strong>：优先使用 <code>entity_id_to_original</code> 中的原始数据库数据（包含 <code>entity_type</code>、<code>source_id</code>、<code>created_at</code> 等丰富字段），如果没有原始数据则降级使用 LLM 上下文中的字段</li>
+<li><strong>关系格式化</strong>：同样优先使用原始数据（包含 <code>keywords</code>、<code>weight</code>、<code>source_id</code> 等）</li>
+<li><strong>文本块格式化</strong>：直接使用已经包含完整数据的 <code>chunks</code> 列表</li>
+<li><strong>输出结构</strong>：</li>
+</ul>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br></pre></td><td class="code"><pre><span class="line">&#123;</span><br><span class="line">    <span class="string">&quot;status&quot;</span>: <span class="string">&quot;success&quot;</span>,</span><br><span class="line">    <span class="string">&quot;data&quot;</span>: &#123;</span><br><span class="line">        <span class="string">&quot;entities&quot;</span>: [...],       <span class="comment"># 格式化后的实体列表</span></span><br><span class="line">        <span class="string">&quot;relationships&quot;</span>: [...],  <span class="comment"># 格式化后的关系列表</span></span><br><span class="line">        <span class="string">&quot;chunks&quot;</span>: [...],         <span class="comment"># 格式化后的文本块列表</span></span><br><span class="line">        <span class="string">&quot;references&quot;</span>: [...]      <span class="comment"># 引用列表</span></span><br><span class="line">    &#125;,</span><br><span class="line">    <span class="string">&quot;metadata&quot;</span>: &#123;</span><br><span class="line">        <span class="string">&quot;query_mode&quot;</span>: <span class="string">&quot;hybrid&quot;</span>,</span><br><span class="line">        <span class="string">&quot;keywords&quot;</span>: &#123;<span class="string">&quot;high_level&quot;</span>: [], <span class="string">&quot;low_level&quot;</span>: []&#125;</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>这个 <code>raw_data</code> 可以被直接序列化为 JSON 返回给 API 调用者，而 <code>context</code> 字符串则被用于最终的 LLM 推理。</p>
+<h2 id="5-4-阶段管线总览"><a href="#5-4-阶段管线总览" class="headerlink" title="5. 4 阶段管线总览"></a>5. 4 阶段管线总览</h2><p><code>_build_query_context</code>（<code>lightrag/operate.py:5032</code>）是整合 4 个阶段的控制器：</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># Stage 1: Search</span></span><br><span class="line">search_result = <span class="keyword">await</span> _perform_kg_search(...)</span><br><span class="line"></span><br><span class="line"><span class="comment"># Stage 2: Truncate</span></span><br><span class="line">truncation_result = <span class="keyword">await</span> _apply_token_truncation(</span><br><span class="line">    search_result, query_param, text_chunks_db.global_config</span><br><span class="line">)</span><br><span class="line"></span><br><span class="line"><span class="comment"># Stage 3: Merge chunks</span></span><br><span class="line">merged_chunks = <span class="keyword">await</span> _merge_all_chunks(</span><br><span class="line">    filtered_entities=truncation_result[<span class="string">&quot;filtered_entities&quot;</span>],</span><br><span class="line">    filtered_relations=truncation_result[<span class="string">&quot;filtered_relations&quot;</span>],</span><br><span class="line">    vector_chunks=search_result[<span class="string">&quot;vector_chunks&quot;</span>],</span><br><span class="line">    ...</span><br><span class="line">)</span><br><span class="line"></span><br><span class="line"><span class="comment"># Stage 4: Build context</span></span><br><span class="line">context, raw_data = <span class="keyword">await</span> _build_context_str(</span><br><span class="line">    entities_context=truncation_result[<span class="string">&quot;entities_context&quot;</span>],</span><br><span class="line">    relations_context=truncation_result[<span class="string">&quot;relations_context&quot;</span>],</span><br><span class="line">    merged_chunks=merged_chunks,</span><br><span class="line">    query=query,</span><br><span class="line">    query_param=query_param,</span><br><span class="line">    global_config=text_chunks_db.global_config,</span><br><span class="line">    ...</span><br><span class="line">)</span><br><span class="line"></span><br><span class="line"><span class="comment"># 添加元数据</span></span><br><span class="line">raw_data[<span class="string">&quot;metadata&quot;</span>][<span class="string">&quot;processing_info&quot;</span>] = &#123;</span><br><span class="line">    <span class="string">&quot;total_entities_found&quot;</span>: <span class="built_in">len</span>(search_result[<span class="string">&quot;final_entities&quot;</span>]),</span><br><span class="line">    <span class="string">&quot;total_relations_found&quot;</span>: <span class="built_in">len</span>(search_result[<span class="string">&quot;final_relations&quot;</span>]),</span><br><span class="line">    <span class="string">&quot;entities_after_truncation&quot;</span>: <span class="built_in">len</span>(truncation_result[<span class="string">&quot;filtered_entities&quot;</span>]),</span><br><span class="line">    <span class="string">&quot;relations_after_truncation&quot;</span>: <span class="built_in">len</span>(truncation_result[<span class="string">&quot;filtered_relations&quot;</span>]),</span><br><span class="line">    <span class="string">&quot;merged_chunks_count&quot;</span>: <span class="built_in">len</span>(merged_chunks),</span><br><span class="line">    <span class="string">&quot;final_chunks_count&quot;</span>: <span class="built_in">len</span>(raw_data[<span class="string">&quot;data&quot;</span>][<span class="string">&quot;chunks&quot;</span>]),</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="keyword">return</span> QueryContextResult(context=context, raw_data=raw_data)</span><br></pre></td></tr></table></figure>
+
+<p><code>processing_info</code> 提供了完整的<strong>统计穿透</strong>——从检索阶段到最终输出的全链路数量变化，对调试和理解系统行为非常有价值。</p>
+<h2 id="6-总结"><a href="#6-总结" class="headerlink" title="6. 总结"></a>6. 总结</h2><p>本文深入了 LightRAG 查询流程中的 Token 预算与 Context 构建机制：</p>
+<table>
+<thead>
+<tr>
+<th>阶段</th>
+<th>函数</th>
+<th>核心职责</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Stage 1</td>
+<td><code>_perform_kg_search</code></td>
+<td>多源检索（已覆盖）</td>
+</tr>
+<tr>
+<td>Stage 2</td>
+<td><code>_apply_token_truncation</code></td>
+<td>按 <code>max_entity_tokens</code>&#x2F;<code>max_relation_tokens</code> 裁剪</td>
+</tr>
+<tr>
+<td>Stage 3</td>
+<td><code>_merge_all_chunks</code></td>
+<td>Round-robin 合并 + 去重</td>
+</tr>
+<tr>
+<td>Stage 4</td>
+<td><code>_build_context_str</code></td>
+<td>动态预算分配 + 格式化输出</td>
+</tr>
+</tbody></table>
+<p><strong>关键设计决策</strong>：</p>
+<ol>
+<li><strong>贪婪截断</strong>：用 <code>truncate_list_by_token_size</code> 做简单高效的顺序截断，依赖前序步骤已经完成重要性排序</li>
+<li><strong>零和预算</strong>：实体&#x2F;关系占用越多 Token，文本块可用的越少，通过预计算实现精准分配</li>
+<li><strong>Round-Robin 合并</strong>：保证多源文本块的公平分布</li>
+<li><strong>双输出</strong>：同时返回 LLM 字符串和结构化 JSON，兼顾推理和 API 调用</li>
+</ol>
+<p>在下一篇文章中，我们将继续追踪查询结果离开 Context 构建管线后，如何进入最终的 LLM 响应生成环节，覆盖 <code>_query_direct</code>、流式响应、以及 <code>llm_model_func</code> 的调用机制。</p>
+<hr>
+<p><strong>系列文章</strong>：</p>
+<ul>
+<li><a href="/2026/07/12/LightRAG-1.1-%E5%85%B3%E9%94%AE%E8%AF%8D%E6%8F%90%E5%8F%96/">LightRAG 1.1：关键词提取</a></li>
+<li><a href="/2026/07/12/LightRAG-1.2-%E6%89%B9%E5%B5%8C%E5%85%A5%E4%B8%8E%E5%90%91%E9%87%8F%E6%A3%80%E7%B4%A2/">LightRAG 1.2：批嵌入与向量检索</a></li>
+<li><a href="/2026/07/12/LightRAG-1.3-Graph-Store%E5%B1%82%E7%BC%96%E6%8E%92/">LightRAG 1.3：Graph Store 层编排</a></li>
+<li>LightRAG 1.4：Token 预算与 Context 构建（本文）</li>
+</ul>
+
+    </div>
+
+    
+    
+    
+
+    <footer class="post-footer">
+          
+
+<div class="post-copyright">
+<ul>
+  <li class="post-copyright-author">
+      <strong>本文作者： </strong>陌忆
+  </li>
+  <li class="post-copyright-link">
+      <strong>本文链接：</strong>
+      <a href="https://moyi-math.github.io/2026/07/12/LightRAG-1.4-Token-Budget-Context-Construction/" title="LightRAG 1.4：Token 预算与 Context 构建">https://moyi-math.github.io/2026/07/12/LightRAG-1.4-Token-Budget-Context-Construction/</a>
+  </li>
+  <li class="post-copyright-license">
+      <strong>版权声明： </strong>本博客所有文章除特别声明外，均采用 <a href="https://creativecommons.org/licenses/by-nc-sa/4.0/" rel="noopener" target="_blank"><i class="fab fa-fw fa-creative-commons"></i>BY-NC-SA</a> 许可协议。转载请注明出处！
+  </li>
+</ul>
+</div>
+
+          <div class="post-tags">
+              <a href="/tags/LightRAG/" rel="tag"># LightRAG</a>
+              <a href="/tags/RAG/" rel="tag"># RAG</a>
+              <a href="/tags/Token-Budget/" rel="tag"># Token Budget</a>
+              <a href="/tags/Context-Construction/" rel="tag"># Context Construction</a>
+          </div>
+
+        
+
+          <div class="post-nav">
+            <div class="post-nav-item">
+                <a href="/2026/07/12/LightRAG-1.3-Graph-Store%E5%B1%82%E7%BC%96%E6%8E%92/" rel="prev" title="LightRAG 源码分析 · 1.3 Graph Store 层编排——从 VDB 结果到图拓扑数据与文本块的全链路">
+                  <i class="fa fa-angle-left"></i> LightRAG 源码分析 · 1.3 Graph Store 层编排——从 VDB 结果到图拓扑数据与文本块的全链路
+                </a>
+            </div>
+            <div class="post-nav-item">
+            </div>
+          </div>
+    </footer>
+  </article>
+</div>
+
+
+
+
+
+
+</div>
+  </main>
+
+  <footer class="footer">
+    <div class="footer-inner">
+
+  <div class="copyright">
+    &copy; 
+    <span itemprop="copyrightYear">2026</span>
+    <span class="with-love">
+      <i class="fa fa-heart"></i>
+    </span>
+    <span class="author" itemprop="copyrightHolder">陌忆</span>
+  </div>
+<div class="wordcount">
+  <span class="post-meta-item">
+    <span class="post-meta-item-icon">
+      <i class="fa fa-chart-line"></i>
+    </span>
+    <span title="站点总字数">31k</span>
+  </span>
+  <span class="post-meta-item">
+    <span class="post-meta-item-icon">
+      <i class="fa fa-coffee"></i>
+    </span>
+    <span title="站点阅读时长">1:54</span>
+  </span>
+</div>
+
+    </div>
+  </footer>
+
+  
+  <div class="toggle sidebar-toggle" role="button">
+    <span class="toggle-line"></span>
+    <span class="toggle-line"></span>
+    <span class="toggle-line"></span>
+  </div>
+  <div class="sidebar-dimmer"></div>
+  <div class="back-to-top" role="button" aria-label="返回顶部">
+    <i class="fa fa-arrow-up fa-lg"></i>
+    <span>0%</span>
+  </div>
+
+<noscript>
+  <div class="noscript-warning">Theme NexT works best with JavaScript enabled</div>
+</noscript>
+<!-- canvas-nest particle background -->
+<script defer>
+(function() {
+  var s = document.createElement("script");
+  s.src = "//cdn.bootcss.com/canvas-nest.js/1.0.0/canvas-nest.min.js";
+  s.setAttribute("count", "150");
+  s.setAttribute("opacity", "1");
+  document.body.appendChild(s);
+})();
+</script>
+
+<!-- Live2D widget -->
+<script defer src="/live2dw/lib/L2Dwidget.min.js"></script>
+<script defer>
+L2Dwidget.init({
+  "pluginRootPath": "live2dw/",
+  "pluginJsPath": "lib/",
+  "pluginModelPath": "assets/",
+  "tagMode": false,
+  "debug": false,
+  "model": {"jsonPath": "/live2dw/assets/assets/shizuku.model.json"},
+  "display": {"position": "right", "width": 150, "height": 300},
+  "mobile": {"show": true},
+  "log": false
+});
+</script>
+
+<!-- Page click heart effect -->
+<script defer src="/js/clicklove.js"></script>
+
+<!-- Site running time -->
+<span id="timeDate"></span>
+<script>
+var now = new Date();
+function createtime() {
+  var grt = new Date("11/17/2022 8:00:00");
+  now.setTime(now.getTime() + 250);
+  var days = (now - grt) / 1000 / 60 / 60 / 24;
+  var dnum = Math.floor(days);
+  var hours = (now - grt) / 1000 / 60 / 60 - (24 * dnum);
+  var hnum = Math.floor(hours);
+  if (String(hnum).length == 1) hnum = "0" + hnum;
+  var minutes = (now - grt) / 1000 / 60 - (24 * 60 * dnum) - (60 * hnum);
+  var mnum = Math.floor(minutes);
+  if (String(mnum).length == 1) mnum = "0" + mnum;
+  var seconds = (now - grt) / 1000 - (24 * 60 * 60 * dnum) - (60 * 60 * hnum) - (60 * mnum);
+  var snum = Math.round(seconds);
+  if (String(snum).length == 1) snum = "0" + snum;
+  document.getElementById("timeDate").innerHTML = "本站已安全运行 " + dnum + " 天 " + hnum + " 小时 " + mnum + " 分 " + snum + " 秒";
+}
+setInterval(createtime, 1000);
+</script>
+
+</body>
+</html>
