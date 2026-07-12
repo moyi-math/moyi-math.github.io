@@ -1,0 +1,813 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width">
+<meta name="theme-color" content="#222"><meta name="generator" content="Hexo 7.3.0">
+<link rel="preconnect" href="https://cdnjs.cloudflare.com" crossorigin>
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon-next.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32-next.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next.png">
+  <link rel="mask-icon" href="/images/logo.svg" color="#222">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/7.0.0/css/all.min.css" integrity="sha256-VHqXKFhhMxcpubYf9xiWdCiojEbY9NexQ4jh8AxbvcM=" crossorigin="anonymous">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/animate.css/3.1.1/animate.min.css" integrity="sha256-PR7ttpcvz8qrF57fur/yAx1qXMFJeJFiA6pSzWi0OIE=" crossorigin="anonymous">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/pace/1.2.4/themes/blue/pace-theme-minimal.css">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pace/1.2.4/pace.min.js" integrity="sha256-gqd7YTjg/BtfqWSwsJOvndl0Bxc8gFImLEkXQT8+qj0=" crossorigin="anonymous" defer></script>
+
+<script class="next-config" data-name="main" type="application/json">{"hostname":"moyi-math.github.io","root":"/","images":"/images","scheme":"Gemini","darkmode":false,"version":"8.28.0","exturl":false,"sidebar":{"position":"left","width_expanded":320,"width_dual_column":240,"display":"post","padding":18,"offset":12},"hljswrap":true,"codeblock":{"theme":{"light":"default","dark":"stackoverflow-dark"},"prism":{"light":"prism","dark":"prism-dark"},"copy_button":{"enable":true,"style":null},"fold":{"enable":false,"height":500},"language":false},"bookmark":{"enable":false,"color":"#222","save":"auto"},"mediumzoom":false,"lazyload":false,"pangu":false,"comments":{"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},"stickytabs":false,"motion":{"enable":true,"async":false,"duration":200,"transition":{"menu_item":"fadeInDown","post_block":"fadeIn","post_header":"fadeInDown","post_body":"fadeInDown","coll_header":"fadeInLeft","sidebar":"fadeInUp"}},"prism":false,"i18n":{"placeholder":"搜索...","empty":"没有找到任何搜索结果：${query}","hits_time":"找到 ${hits} 个搜索结果（用时 ${time} 毫秒）","hits":"找到 ${hits} 个搜索结果"},"path":"/search.json","localsearch":{"enable":true,"top_n_per_article":1,"unescape":false,"preload":false}}</script><script src="/js/config.js" defer></script>
+
+    <meta name="description" content="LightRAG 中用户调用 aquery(&quot;问题&quot;) 之后，代码一步一步去了哪里、每步做了什么、产生了什么数据、最终怎么变成 LLM 看到的 prompt。">
+<meta property="og:type" content="article">
+<meta property="og:title" content="LightRAG 源码分析 · 1.1 从提问到回答——Query 全链路拆解">
+<meta property="og:url" content="https://moyi-math.github.io/2026/07/12/LightRAG-1.1-%E4%BB%8E%E6%8F%90%E9%97%AE%E5%88%B0%E5%9B%9E%E7%AD%94-Query%E5%85%A8%E9%93%BE%E8%B7%AF%E6%8B%86%E8%A7%A3/index.html">
+<meta property="og:site_name" content="陌忆的博客">
+<meta property="og:description" content="LightRAG 中用户调用 aquery(&quot;问题&quot;) 之后，代码一步一步去了哪里、每步做了什么、产生了什么数据、最终怎么变成 LLM 看到的 prompt。">
+<meta property="og:locale" content="zh_CN">
+<meta property="article:published_time" content="2026-07-11T16:30:00.000Z">
+<meta property="article:modified_time" content="2026-07-11T16:30:00.000Z">
+<meta property="article:author" content="陌忆">
+<meta property="article:tag" content="RAG">
+<meta property="article:tag" content="LightRAG">
+<meta property="article:tag" content="GraphRAG">
+<meta property="article:tag" content="源码分析">
+<meta property="article:tag" content="Query">
+<meta property="article:tag" content="检索增强生成">
+<meta property="article:tag" content="知识图谱">
+<meta name="twitter:card" content="summary">
+
+
+<link rel="canonical" href="https://moyi-math.github.io/2026/07/12/LightRAG-1.1-%E4%BB%8E%E6%8F%90%E9%97%AE%E5%88%B0%E5%9B%9E%E7%AD%94-Query%E5%85%A8%E9%93%BE%E8%B7%AF%E6%8B%86%E8%A7%A3/">
+
+
+<script class="next-config" data-name="page" type="application/json">{"sidebar":"","isHome":false,"isPost":true,"lang":"zh-CN","comments":true,"permalink":"https://moyi-math.github.io/2026/07/12/LightRAG-1.1-%E4%BB%8E%E6%8F%90%E9%97%AE%E5%88%B0%E5%9B%9E%E7%AD%94-Query%E5%85%A8%E9%93%BE%E8%B7%AF%E6%8B%86%E8%A7%A3/","path":"2026/07/12/LightRAG-1.1-从提问到回答-Query全链路拆解/","title":"LightRAG 源码分析 · 1.1 从提问到回答——Query 全链路拆解"}</script>
+
+<script class="next-config" data-name="calendar" type="application/json">""</script>
+<title>LightRAG 源码分析 · 1.1 从提问到回答——Query 全链路拆解 | 陌忆的博客</title>
+  
+
+
+
+
+
+
+
+
+  
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/animejs/3.2.1/anime.min.js" integrity="sha256-XL2inqUJaslATFnHdJOi9GfQ60on8Wx1C2H8DYiN1xY=" crossorigin="anonymous" defer></script>
+<script src="/js/utils.js" defer></script><script src="/js/motion.js" defer></script><script src="/js/sidebar.js" defer></script><script src="/js/next-boot.js" defer></script>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/hexo-generator-searchdb/1.5.0/search.js" integrity="sha256-xFC6PJ82SL9b3WkGjFavNiA9gm5z6UBxWPiu4CYjptg=" crossorigin="anonymous" defer></script>
+<script src="/js/third-party/search/local-search.js" defer></script>
+
+
+
+
+
+  <script src="/js/third-party/pace.js" defer></script>
+
+
+  
+
+
+
+
+  
+
+  <script class="next-config" data-name="enableMath" type="application/json">false</script><link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/katex.min.css" integrity="sha256-UF1fgpAiu3tPJN/uCqEUHNe7pnr+QR0SQDNfgglgtcM=" crossorigin="anonymous">
+
+
+<link rel="preconnect" href="https://cdn.jsdelivr.net">
+<link rel="preconnect" href="https://cdn.bootcss.com">
+
+  <noscript>
+    <link rel="stylesheet" href="/css/noscript.css">
+  </noscript>
+<!-- hexo injector head_end start --><link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/katex.min.css" integrity="sha512-fHwaWebuwA7NSF5Qg/af4UeDx9XqUpYpOGgubo3yWu+b2IQR4UeQwbb42Ti7gVAjNtVoI/I9TEoYeu9omwcC6g==" crossorigin="anonymous" referrerpolicy="no-referrer" /><!-- hexo injector head_end end --></head>
+
+<body itemscope itemtype="http://schema.org/WebPage" class="use-motion">
+  <div class="headband"></div>
+
+  <main class="main">
+    <div class="column">
+      <header class="header" itemscope itemtype="http://schema.org/WPHeader"><div class="site-brand-container">
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="切换导航栏" role="button">
+        <span class="toggle-line"></span>
+        <span class="toggle-line"></span>
+        <span class="toggle-line"></span>
+    </div>
+  </div>
+
+  <div class="site-meta">
+
+    <a href="/" class="brand" rel="start">
+      <i class="logo-line"></i>
+      <p class="site-title">陌忆的博客</p>
+      <i class="logo-line"></i>
+    </a>
+      <p class="site-subtitle" itemprop="description">数据库无法得出结论</p>
+  </div>
+
+  <div class="site-nav-right">
+    <div class="toggle popup-trigger" aria-label="搜索" role="button">
+        <i class="fa fa-search fa-fw fa-lg"></i>
+    </div>
+  </div>
+</div>
+
+
+
+<nav class="site-nav">
+  <ul class="main-menu menu"><li class="menu-item menu-item-home"><a href="/" rel="section"><i class="fa fa-home fa-fw"></i>首页</a></li><li class="menu-item menu-item-about"><a href="/about/" rel="section"><i class="fa fa-user fa-fw"></i>关于</a></li><li class="menu-item menu-item-tags"><a href="/tags/" rel="section"><i class="fa fa-tags fa-fw"></i>标签</a></li><li class="menu-item menu-item-categories"><a href="/categories/" rel="section"><i class="fa fa-th fa-fw"></i>分类</a></li><li class="menu-item menu-item-archives"><a href="/archives/" rel="section"><i class="fa fa-archive fa-fw"></i>归档</a></li>
+      <li class="menu-item menu-item-search">
+        <a role="button" class="popup-trigger"><i class="fa fa-search fa-fw"></i>搜索
+        </a>
+      </li>
+  </ul>
+</nav>
+
+
+
+  <div class="search-pop-overlay">
+    <div class="popup search-popup">
+      <div class="search-header">
+        <span class="search-icon">
+          <i class="fa fa-search"></i>
+        </span>
+        <div class="search-input-container">
+          <input autocomplete="off" autocapitalize="off" maxlength="80"
+                placeholder="搜索..." spellcheck="false"
+                type="search" class="search-input">
+        </div>
+        <span class="popup-btn-close" role="button">
+          <i class="fa fa-times-circle"></i>
+        </span>
+      </div>
+      <div class="search-result-container">
+        <div class="search-result-icon">
+          <i class="fa fa-spinner fa-pulse fa-5x"></i>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</header>
+        
+  
+  <aside class="sidebar">
+
+    <div class="sidebar-inner sidebar-nav-active sidebar-toc-active">
+      <ul class="sidebar-nav">
+        <li class="sidebar-nav-toc">
+          文章目录
+        </li>
+        <li class="sidebar-nav-overview">
+          站点概览
+        </li>
+      </ul>
+
+      <div class="sidebar-panel-container">
+        <!--noindex-->
+        <div class="post-toc-wrap sidebar-panel">
+            <div class="post-toc animated"><ol class="nav"><li class="nav-item nav-level-2"><a class="nav-link" href="#%E4%B8%80%E3%80%81%E5%85%A8%E6%99%AF%E8%B7%AF%E7%BA%BF%E5%9B%BE"><span class="nav-text">一、全景路线图</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E4%BA%8C%E3%80%81%E5%85%A5%E5%8F%A3%E8%B7%AF%E7%94%B1"><span class="nav-text">二、入口路由</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E4%B8%89%E3%80%81%E5%85%B3%E9%94%AE%E8%AF%8D%E6%8F%90%E5%8F%96"><span class="nav-text">三、关键词提取</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%9B%9B%E3%80%81%E6%A0%B8%E5%BF%83%EF%BC%9A4-%E9%98%B6%E6%AE%B5%E4%B8%8A%E4%B8%8B%E6%96%87%E6%9E%84%E5%BB%BA"><span class="nav-text">四、核心：4 阶段上下文构建</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#4-1-Stage-1%EF%BC%9ASearch%E2%80%94%E2%80%94%E5%90%91%E9%87%8F%E6%90%9C%E5%9B%BE-%E5%90%91%E9%87%8F%E6%90%9C%E5%9D%97"><span class="nav-text">4.1 Stage 1：Search——向量搜图 + 向量搜块</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#4-2-Stage-2%EF%BC%9ATruncation%E2%80%94%E2%80%94Token-%E9%A2%84%E7%AE%97%E8%A3%81%E5%89%AA"><span class="nav-text">4.2 Stage 2：Truncation——Token 预算裁剪</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#4-3-Stage-3%EF%BC%9AChunk-%E6%B1%87%E8%81%9A%E2%80%94%E2%80%94%E4%BB%8E%E5%9B%BE%E5%88%B0%E6%96%87%E6%9C%AC"><span class="nav-text">4.3 Stage 3：Chunk 汇聚——从图到文本</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#4-4-Stage-4%EF%BC%9AContext-%E7%BB%84%E8%A3%85%E2%80%94%E2%80%94%E6%8B%BC-prompt"><span class="nav-text">4.4 Stage 4：Context 组装——拼 prompt</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E4%BA%94%E3%80%81LLM-%E8%B0%83%E7%94%A8%E4%B8%8E%E7%BC%93%E5%AD%98"><span class="nav-text">五、LLM 调用与缓存</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%85%AD%E3%80%81Naive-%E6%A8%A1%E5%BC%8F%E7%9A%84%E5%8D%95%E7%8B%AC%E8%B7%AF%E5%BE%84"><span class="nav-text">六、Naive 模式的单独路径</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E4%B8%83%E3%80%81%E5%90%84%E6%A8%A1%E5%BC%8F%E7%9A%84%E5%AE%8C%E6%95%B4%E8%B7%AF%E5%BE%84%E4%B8%B2%E8%AE%B2"><span class="nav-text">七、各模式的完整路径串讲</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#Local-%E6%A8%A1%E5%BC%8F%EF%BC%88%E2%80%9D%E6%90%9C%E7%89%B9%E5%AE%9A%E5%AE%9E%E4%BD%93%E2%80%9D%EF%BC%89"><span class="nav-text">Local 模式（”搜特定实体”）</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#Global-%E6%A8%A1%E5%BC%8F%EF%BC%88%E2%80%9D%E6%90%9C%E5%85%A8%E5%B1%80%E4%B8%BB%E9%A2%98%E2%80%9D%EF%BC%89"><span class="nav-text">Global 模式（”搜全局主题”）</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#Hybrid-%E6%A8%A1%E5%BC%8F%EF%BC%88local-global-%E5%90%88%E5%B9%B6%EF%BC%89"><span class="nav-text">Hybrid 模式（local + global 合并）</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#Mix-%E6%A8%A1%E5%BC%8F%EF%BC%88hybrid-chunks-VDB%EF%BC%89"><span class="nav-text">Mix 模式（hybrid + chunks VDB）</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#Naive-%E6%A8%A1%E5%BC%8F%EF%BC%88%E7%BA%AF%E5%90%91%E9%87%8F%EF%BC%8C%E4%B8%8D%E8%B5%B0%E5%9B%BE%EF%BC%89"><span class="nav-text">Naive 模式（纯向量，不走图）</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E9%99%84%EF%BC%9A%E5%87%BD%E6%95%B0%E7%B4%A2%E5%BC%95%E8%A1%A8"><span class="nav-text">附：函数索引表</span></a></li></ol></div>
+        </div>
+        <!--/noindex-->
+
+        <div class="site-overview-wrap sidebar-panel">
+          <div class="site-author animated" itemprop="author" itemscope itemtype="http://schema.org/Person">
+    <img class="site-author-image" itemprop="image" alt="陌忆"
+      src="/images/avatar.webp">
+  <p class="site-author-name" itemprop="name">陌忆</p>
+  <div class="site-description" itemprop="description">欢迎来到我的世界💜</div>
+</div>
+<div class="site-state-wrap animated">
+  <nav class="site-state">
+      <div class="site-state-item site-state-posts">
+        <a href="/archives/">
+          <span class="site-state-item-count">6</span>
+          <span class="site-state-item-name">日志</span>
+        </a>
+      </div>
+      <div class="site-state-item site-state-categories">
+          <a href="/categories/">
+        <span class="site-state-item-count">3</span>
+        <span class="site-state-item-name">分类</span></a>
+      </div>
+      <div class="site-state-item site-state-tags">
+          <a href="/tags/">
+        <span class="site-state-item-count">27</span>
+        <span class="site-state-item-name">标签</span></a>
+      </div>
+  </nav>
+</div>
+  <div class="cc-license animated" itemprop="license">
+    <a href="https://creativecommons.org/licenses/by-nc-sa/4.0/" class="cc-opacity" rel="noopener" target="_blank"><img src="https://cdnjs.cloudflare.com/ajax/libs/creativecommons-vocabulary/2020.11.3/assets/license_badges/small/by_nc_sa.svg" alt="Creative Commons"></a>
+  </div>
+
+        </div>
+      </div>
+    </div>
+
+    
+  </aside>
+
+
+    </div>
+
+    <div class="main-inner post posts-expand">
+
+
+  
+
+
+<div class="post-block">
+  
+  
+
+  <article itemscope itemtype="http://schema.org/Article" class="post-content" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="https://moyi-math.github.io/2026/07/12/LightRAG-1.1-%E4%BB%8E%E6%8F%90%E9%97%AE%E5%88%B0%E5%9B%9E%E7%AD%94-Query%E5%85%A8%E9%93%BE%E8%B7%AF%E6%8B%86%E8%A7%A3/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.webp">
+      <meta itemprop="name" content="陌忆">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="陌忆的博客">
+      <meta itemprop="description" content="欢迎来到我的世界💜">
+    </span>
+
+    <span hidden itemprop="post" itemscope itemtype="http://schema.org/CreativeWork">
+      <meta itemprop="name" content="LightRAG 源码分析 · 1.1 从提问到回答——Query 全链路拆解 | 陌忆的博客">
+      <meta itemprop="description" content="LightRAG 中用户调用 aquery(&quot;问题&quot;) 之后，代码一步一步去了哪里、每步做了什么、产生了什么数据、最终怎么变成 LLM 看到的 prompt。">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          LightRAG 源码分析 · 1.1 从提问到回答——Query 全链路拆解
+        </h1>
+
+        <div class="post-meta-container">
+          <div class="post-meta">
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-calendar"></i>
+      </span>
+      <span class="post-meta-item-text">发表于</span>
+
+      <time title="创建时间：2026-07-12 00:30:00" itemprop="dateCreated datePublished" datetime="2026-07-12T00:30:00+08:00">2026-07-12</time>
+    </span>
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-folder"></i>
+      </span>
+      <span class="post-meta-item-text">分类于</span>
+        <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+          <a href="/categories/LightRAG%E6%BA%90%E7%A0%81%E5%88%86%E6%9E%90/" itemprop="url" rel="index"><span itemprop="name">LightRAG源码分析</span></a>
+        </span>
+    </span>
+
+  
+    <span class="post-meta-break"></span>
+    <span class="post-meta-item" title="本文字数">
+      <span class="post-meta-item-icon">
+        <i class="far fa-file-word"></i>
+      </span>
+      <span class="post-meta-item-text">本文字数：</span>
+      <span>3.1k</span>
+    </span>
+    <span class="post-meta-item" title="阅读时长">
+      <span class="post-meta-item-icon">
+        <i class="far fa-clock"></i>
+      </span>
+      <span class="post-meta-item-text">阅读时长 &asymp;</span>
+      <span>11 分钟</span>
+    </span>
+</div>
+
+            <div class="post-description">LightRAG 中用户调用 aquery("问题") 之后，代码一步一步去了哪里、每步做了什么、产生了什么数据、最终怎么变成 LLM 看到的 prompt。</div>
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody"><blockquote>
+<p><strong>章节定位：</strong> 这是 LightRAG 源码分析系列的第一篇。本文聚焦 Query 路径——从 <code>aquery</code> 入口开始，完整追踪所有 5 种查询模式（local &#x2F; global &#x2F; hybrid &#x2F; mix &#x2F; naive）的数据流与调用链。不涉及 Chunk ID 生成与 source_id 指针设计。</p>
+</blockquote>
+<span id="more"></span>
+
+<h2 id="一、全景路线图"><a href="#一、全景路线图" class="headerlink" title="一、全景路线图"></a>一、全景路线图</h2><p>在深入代码之前，先看全局。<code>aquery(&quot;问题&quot;)</code> 之后，根据 <code>QueryParam.mode</code> 不同，会走三条完全不同的路径：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br></pre></td><td class="code"><pre><span class="line">用户调用 aquery(&quot;问题&quot;)</span><br><span class="line">    │</span><br><span class="line">    ▼</span><br><span class="line">aquery → aquery_llm</span><br><span class="line">    │</span><br><span class="line">    ├── mode in [local, global, hybrid, mix]  →  kg_query      （KG 路径）</span><br><span class="line">    │       │                                       │</span><br><span class="line">    │       │   1. 关键词提取 ← LLM                 │</span><br><span class="line">    │       │   2. 批嵌入 + 向量搜图                 │</span><br><span class="line">    │       │   3. 向量搜块                          │</span><br><span class="line">    │       │   4. Token 裁剪 + 图→文本汇聚          │</span><br><span class="line">    │       │   5. Context 组装 + LLM 调用            │</span><br><span class="line">    │       ▼                                       ▼</span><br><span class="line">    ├── mode = &quot;naive&quot;                             →  naive_query  （纯向量路径）</span><br><span class="line">    │       │                                           │</span><br><span class="line">    │       │   1. 向量搜块 ← query 嵌入               │</span><br><span class="line">    │       │   2. Token 裁剪                           │</span><br><span class="line">    │       │   3. Context 组装 + LLM 调用               │</span><br><span class="line">    │       ▼                                           ▼</span><br><span class="line">    └── mode = &quot;bypass&quot;                            →  直调 LLM    （无检索）</span><br></pre></td></tr></table></figure>
+
+<p>各模式核心差异：</p>
+<table>
+<thead>
+<tr>
+<th>模式</th>
+<th>向量检索</th>
+<th>图检索</th>
+<th>关键词依赖</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>local</td>
+<td>chunks（仅当 <code>only_need_context</code>）</td>
+<td>entities VDB → 图→relations</td>
+<td>ll_keywords</td>
+</tr>
+<tr>
+<td>global</td>
+<td>chunks（同上）</td>
+<td>relationships VDB → 图→entities</td>
+<td>hl_keywords</td>
+</tr>
+<tr>
+<td>hybrid</td>
+<td>chunks（同上）</td>
+<td>两者都搜，去重合并</td>
+<td>两者都要</td>
+</tr>
+<tr>
+<td>mix</td>
+<td>chunks VDB</td>
+<td>两者都搜 + 额外搜 chunks</td>
+<td>两者都要</td>
+</tr>
+<tr>
+<td>naive</td>
+<td>chunks VDB</td>
+<td>不用图</td>
+<td>不需要</td>
+</tr>
+</tbody></table>
+<hr>
+<h2 id="二、入口路由"><a href="#二、入口路由" class="headerlink" title="二、入口路由"></a>二、入口路由</h2><p><code>lightrag.py</code> 第 2077 行：</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">async</span> <span class="keyword">def</span> <span class="title function_">aquery</span>(<span class="params">self, query: <span class="built_in">str</span>, param=QueryParam(<span class="params"></span>), system_prompt=<span class="literal">None</span></span>):</span><br><span class="line">    result = <span class="keyword">await</span> <span class="variable language_">self</span>.aquery_llm(query, param, system_prompt)</span><br><span class="line">    llm_response = result.get(<span class="string">&quot;llm_response&quot;</span>, &#123;&#125;)</span><br><span class="line">    <span class="keyword">if</span> llm_response.get(<span class="string">&quot;is_streaming&quot;</span>):</span><br><span class="line">        <span class="keyword">return</span> llm_response.get(<span class="string">&quot;response_iterator&quot;</span>)</span><br><span class="line">    <span class="keyword">return</span> llm_response.get(<span class="string">&quot;content&quot;</span>, <span class="string">&quot;&quot;</span>)</span><br></pre></td></tr></table></figure>
+
+<p><code>aquery</code> 是遗留兼容封装，核心逻辑在 <code>aquery_llm</code>（第 2341 行）。</p>
+<p><code>aquery_llm</code> 做的第一件事是按 mode 分发：</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">if</span> param.mode <span class="keyword">in</span> [<span class="string">&quot;local&quot;</span>, <span class="string">&quot;global&quot;</span>, <span class="string">&quot;hybrid&quot;</span>, <span class="string">&quot;mix&quot;</span>]:</span><br><span class="line">    query_result = <span class="keyword">await</span> kg_query(...)</span><br><span class="line"><span class="keyword">elif</span> param.mode == <span class="string">&quot;naive&quot;</span>:</span><br><span class="line">    query_result = <span class="keyword">await</span> naive_query(...)</span><br><span class="line"><span class="keyword">elif</span> param.mode == <span class="string">&quot;bypass&quot;</span>:</span><br><span class="line">    <span class="comment"># 直调 LLM，无检索</span></span><br><span class="line">    response = <span class="keyword">await</span> use_llm_func(query.strip(), system_prompt=system_prompt, ...)</span><br></pre></td></tr></table></figure>
+
+<p>返回结构统一为 <code>dict</code>：</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line">&#123;</span><br><span class="line">    <span class="string">&quot;status&quot;</span>: <span class="string">&quot;success&quot;</span> | <span class="string">&quot;failure&quot;</span>,</span><br><span class="line">    <span class="string">&quot;message&quot;</span>: ...,</span><br><span class="line">    <span class="string">&quot;data&quot;</span>: &#123; <span class="string">&quot;entities&quot;</span>: [...], <span class="string">&quot;relationships&quot;</span>: [...], <span class="string">&quot;chunks&quot;</span>: [...] &#125;,</span><br><span class="line">    <span class="string">&quot;metadata&quot;</span>: &#123; <span class="string">&quot;keywords&quot;</span>: &#123;...&#125;, <span class="string">&quot;processing_info&quot;</span>: &#123;...&#125; &#125;,</span><br><span class="line">    <span class="string">&quot;llm_response&quot;</span>: &#123; <span class="string">&quot;content&quot;</span>: <span class="string">&quot;...&quot;</span>, <span class="string">&quot;response_iterator&quot;</span>: ..., <span class="string">&quot;is_streaming&quot;</span>: <span class="built_in">bool</span> &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<hr>
+<h2 id="三、关键词提取"><a href="#三、关键词提取" class="headerlink" title="三、关键词提取"></a>三、关键词提取</h2><p>所有 KG 类模式的第一步，在 <code>operate.py:3794</code> 的 <code>kg_query</code> 中：</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">hl_keywords, ll_keywords = <span class="keyword">await</span> get_keywords_from_query(</span><br><span class="line">    query, query_param, global_config, hashing_kv</span><br><span class="line">)</span><br></pre></td></tr></table></figure>
+
+<p><code>get_keywords_from_query</code>（第 4009 行）逻辑很简单：</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">if</span> query_param.hl_keywords <span class="keyword">or</span> query_param.ll_keywords:</span><br><span class="line">    <span class="keyword">return</span> query_param.hl_keywords, query_param.ll_keywords  <span class="comment"># 用户显式指定，跳过 LLM</span></span><br><span class="line"></span><br><span class="line">hl_keywords, ll_keywords = <span class="keyword">await</span> extract_keywords_only(query, ...)</span><br><span class="line"><span class="keyword">return</span> hl_keywords, ll_keywords</span><br></pre></td></tr></table></figure>
+
+<p><strong>为什么不直接用 query 嵌入去搜？</strong></p>
+<p>这是 LightRAG 区别于 naive RAG 的核心设计。KG 检索需要”概念级”的匹配——不是找跟 query 字面相似的句子，而是在知识图谱中找到与 query <strong>语义相关的实体和关系</strong>。LLM 抽出来的关键词是 query 中涉及的<strong>概念</strong>，用概念去搜实体 VDB &#x2F; 关系 VDB，召回的是”同一个事物”而非”同一段话”。</p>
+<p>抽取结果举例：</p>
+<table>
+<thead>
+<tr>
+<th>Query</th>
+<th>hl_keywords（高层）</th>
+<th>ll_keywords（低层）</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>“苹果公司今年的营收如何”</td>
+<td>“苹果, 科技公司, 财报”</td>
+<td>“苹果公司, 2024 年营收, 财务报表”</td>
+</tr>
+</tbody></table>
+<p>两个层级的后续用途完全不同：</p>
+<ul>
+<li><strong>ll_keywords</strong> → 搜 entities VDB（local 路径）</li>
+<li><strong>hl_keywords</strong> → 搜 relationships VDB（global 路径）</li>
+</ul>
+<p>抽取结果会被 LLM 响应缓存命中时跳过（key 包含 hash 后的 query + 所有参数）。</p>
+<hr>
+<h2 id="四、核心：4-阶段上下文构建"><a href="#四、核心：4-阶段上下文构建" class="headerlink" title="四、核心：4 阶段上下文构建"></a>四、核心：4 阶段上下文构建</h2><p>这是整条请求链路最复杂的部分，由 <code>_build_query_context</code>（第 5032 行）统一编排：</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># Stage 1: Pure search</span></span><br><span class="line">search_result = <span class="keyword">await</span> _perform_kg_search(...)</span><br><span class="line"></span><br><span class="line"><span class="comment"># Stage 2: Apply token truncation</span></span><br><span class="line">truncation_result = <span class="keyword">await</span> _apply_token_truncation(search_result, query_param, ...)</span><br><span class="line"></span><br><span class="line"><span class="comment"># Stage 3: Merge chunks from all sources</span></span><br><span class="line">merged_chunks = <span class="keyword">await</span> _merge_all_chunks(</span><br><span class="line">    filtered_entities=truncation_result[<span class="string">&quot;filtered_entities&quot;</span>],</span><br><span class="line">    filtered_relations=truncation_result[<span class="string">&quot;filtered_relations&quot;</span>],</span><br><span class="line">    vector_chunks=search_result[<span class="string">&quot;vector_chunks&quot;</span>],</span><br><span class="line">    ...</span><br><span class="line">)</span><br><span class="line"></span><br><span class="line"><span class="comment"># Stage 4: Build final LLM context</span></span><br><span class="line">context, raw_data = <span class="keyword">await</span> _build_context_str(</span><br><span class="line">    entities_context=truncation_result[<span class="string">&quot;entities_context&quot;</span>],</span><br><span class="line">    relations_context=truncation_result[<span class="string">&quot;relations_context&quot;</span>],</span><br><span class="line">    merged_chunks=merged_chunks,</span><br><span class="line">    ...</span><br><span class="line">)</span><br></pre></td></tr></table></figure>
+
+<h3 id="4-1-Stage-1：Search——向量搜图-向量搜块"><a href="#4-1-Stage-1：Search——向量搜图-向量搜块" class="headerlink" title="4.1 Stage 1：Search——向量搜图 + 向量搜块"></a>4.1 Stage 1：Search——向量搜图 + 向量搜块</h3><p><code>_perform_kg_search</code>（第 4323 行）是本阶段执行函数。</p>
+<p><strong>批嵌入（batch embedding）</strong></p>
+<p>进入搜索逻辑之前，有一个关键的前置步骤：<strong>批预计算嵌入</strong>。根据当前 mode 判断本次需要哪些嵌入，一次调 LLM 嵌入接口算出所有，避免 2-3 次串行 API 往返。</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br></pre></td><td class="code"><pre><span class="line">need_ll = mode <span class="keyword">in</span> (<span class="string">&quot;local&quot;</span>, <span class="string">&quot;hybrid&quot;</span>, <span class="string">&quot;mix&quot;</span>) <span class="keyword">and</span> <span class="built_in">bool</span>(ll_keywords)</span><br><span class="line">need_hl = mode <span class="keyword">in</span> (<span class="string">&quot;global&quot;</span>, <span class="string">&quot;hybrid&quot;</span>, <span class="string">&quot;mix&quot;</span>) <span class="keyword">and</span> <span class="built_in">bool</span>(hl_keywords)</span><br><span class="line"></span><br><span class="line"><span class="keyword">if</span> actual_embedding_func:</span><br><span class="line">    texts_to_embed = []</span><br><span class="line">    text_purposes = []</span><br><span class="line"></span><br><span class="line">    <span class="keyword">if</span> query <span class="keyword">and</span> (kg_chunk_pick_method == <span class="string">&quot;VECTOR&quot;</span> <span class="keyword">or</span> chunks_vdb):</span><br><span class="line">        texts_to_embed.append(query)         <span class="comment"># 给 chunks VDB 用</span></span><br><span class="line">        text_purposes.append(<span class="string">&quot;query&quot;</span>)</span><br><span class="line"></span><br><span class="line">    <span class="keyword">if</span> need_ll:</span><br><span class="line">        texts_to_embed.append(ll_keywords)   <span class="comment"># 给 entities VDB 用</span></span><br><span class="line">        text_purposes.append(<span class="string">&quot;ll&quot;</span>)</span><br><span class="line"></span><br><span class="line">    <span class="keyword">if</span> need_hl:</span><br><span class="line">        texts_to_embed.append(hl_keywords)   <span class="comment"># 给 relationships VDB 用</span></span><br><span class="line">        text_purposes.append(<span class="string">&quot;hl&quot;</span>)</span><br><span class="line"></span><br><span class="line">    all_embeddings = <span class="keyword">await</span> actual_embedding_func(texts_to_embed, ...)</span><br></pre></td></tr></table></figure>
+
+<p><strong>搜索路由</strong></p>
+<p>根据 mode 不同有三种搜索方式：</p>
+<table>
+<thead>
+<tr>
+<th>条件</th>
+<th>搜索行为</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>mode == &quot;local&quot;</code></td>
+<td>只用 ll_keywords 搜 <code>entities VDB</code> → 取回实体 → 从图取关联关系</td>
+</tr>
+<tr>
+<td><code>mode == &quot;global&quot;</code></td>
+<td>只用 hl_keywords 搜 <code>relationships VDB</code> → 取回关系 → 从图取关联实体</td>
+</tr>
+<tr>
+<td><code>mode in (&quot;hybrid&quot;, &quot;mix&quot;)</code></td>
+<td>两者都做 + round-robin 合并去重 +（mix 专属）用 query 搜 <code>chunks VDB</code></td>
+</tr>
+</tbody></table>
+<p><strong><code>_get_node_data</code>（第 5152 行）——local 路径</strong></p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># 1. 向量搜索：用 ll_keywords 的嵌入搜 entities VDB</span></span><br><span class="line">results = <span class="keyword">await</span> entities_vdb.query(query, top_k=query_param.top_k, ...)</span><br><span class="line"></span><br><span class="line"><span class="comment"># 2. 图回表查属性 + degree</span></span><br><span class="line">nodes_dict, degrees_dict = <span class="keyword">await</span> asyncio.gather(</span><br><span class="line">    knowledge_graph_inst.get_nodes_batch(node_ids),   <span class="comment"># description, source_id 等</span></span><br><span class="line">    knowledge_graph_inst.node_degrees_batch(node_ids), <span class="comment"># 关联度排序用</span></span><br><span class="line">)</span><br><span class="line"></span><br><span class="line"><span class="comment"># 3. 选关联关系</span></span><br><span class="line">use_relations = <span class="keyword">await</span> _find_most_related_edges_from_entities(node_datas, ...)</span><br><span class="line"></span><br><span class="line"><span class="keyword">return</span> node_datas, use_relations</span><br></pre></td></tr></table></figure>
+
+<p>三步走：<strong>向量搜名 → 图回表查属性 → 再查邻居关系</strong>。</p>
+<p><strong><code>_get_edge_data</code>（第 5427 行）——global 路径</strong></p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># 1. 向量搜索：用 hl_keywords 的嵌入搜 relationships VDB</span></span><br><span class="line">results = <span class="keyword">await</span> relationships_vdb.query(keywords, top_k=query_param.top_k, ...)</span><br><span class="line"></span><br><span class="line"><span class="comment"># 2. 图回表查关系属性（weight, description 等）</span></span><br><span class="line">edge_data_dict = <span class="keyword">await</span> knowledge_graph_inst.get_edges_batch(edge_pairs_dicts)</span><br><span class="line"></span><br><span class="line"><span class="comment"># 3. 从关系两边取出实体</span></span><br><span class="line">use_entities = <span class="keyword">await</span> _find_most_related_entities_from_relationships(edge_datas, ...)</span><br><span class="line"></span><br><span class="line"><span class="keyword">return</span> edge_datas, use_entities</span><br></pre></td></tr></table></figure>
+
+<p><strong><code>_get_vector_context</code>（第 4266 行）——mix 模式的第三种搜索</strong></p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">search_top_k = query_param.chunk_top_k <span class="keyword">or</span> query_param.top_k</span><br><span class="line">results = <span class="keyword">await</span> chunks_vdb.query(query, top_k=search_top_k, ...)</span><br></pre></td></tr></table></figure>
+
+<p>用 query 本身嵌入直接搜 chunks VDB，返回文本块。</p>
+<p><strong>Round-robin 合并</strong></p>
+<p>local 和 global 搜到的实体&#x2F;关系在 <code>_perform_kg_search</code> 第 4464-4518 行做 round-robin 去重合并：</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br></pre></td><td class="code"><pre><span class="line">final_entities = []</span><br><span class="line">seen_entities = <span class="built_in">set</span>()</span><br><span class="line">max_len = <span class="built_in">max</span>(<span class="built_in">len</span>(local_entities), <span class="built_in">len</span>(global_entities))</span><br><span class="line"><span class="keyword">for</span> i <span class="keyword">in</span> <span class="built_in">range</span>(max_len):</span><br><span class="line">    <span class="keyword">if</span> i &lt; <span class="built_in">len</span>(local_entities):     <span class="comment"># 先 local</span></span><br><span class="line">        entity = local_entities[i]</span><br><span class="line">        <span class="keyword">if</span> entity_name <span class="keyword">and</span> entity_name <span class="keyword">not</span> <span class="keyword">in</span> seen_entities:</span><br><span class="line">            ...</span><br><span class="line">    <span class="keyword">if</span> i &lt; <span class="built_in">len</span>(global_entities):    <span class="comment"># 再 global</span></span><br><span class="line">        entity = global_entities[i]</span><br><span class="line">        ...</span><br></pre></td></tr></table></figure>
+
+<p>关系同理。这样 hybrid &#x2F; mix 模式得到的实体和关系在两个方向的搜索结果间交错排序，优先覆盖双方的高分结果。</p>
+<p>搜索阶段最终返回：</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">return</span> &#123;</span><br><span class="line">    <span class="string">&quot;final_entities&quot;</span>: final_entities,</span><br><span class="line">    <span class="string">&quot;final_relations&quot;</span>: final_relations,</span><br><span class="line">    <span class="string">&quot;vector_chunks&quot;</span>: vector_chunks,</span><br><span class="line">    <span class="string">&quot;chunk_tracking&quot;</span>: chunk_tracking,</span><br><span class="line">    <span class="string">&quot;query_embedding&quot;</span>: query_embedding,</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<h3 id="4-2-Stage-2：Truncation——Token-预算裁剪"><a href="#4-2-Stage-2：Truncation——Token-预算裁剪" class="headerlink" title="4.2 Stage 2：Truncation——Token 预算裁剪"></a>4.2 Stage 2：Truncation——Token 预算裁剪</h3><p>搜回来的实体和关系数量可能远超出 LLM 窗口能容纳的范围，第二阶段做 token 预算裁剪。</p>
+<p><code>_apply_token_truncation</code>（第 4533 行）接受两个预算参数：</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">max_entity_tokens = <span class="built_in">getattr</span>(query_param, <span class="string">&quot;max_entity_tokens&quot;</span>, DEFAULT_MAX_ENTITY_TOKENS)</span><br><span class="line">max_relation_tokens = <span class="built_in">getattr</span>(query_param, <span class="string">&quot;max_relation_tokens&quot;</span>, DEFAULT_MAX_RELATION_TOKENS)</span><br></pre></td></tr></table></figure>
+
+<p>默认值分别是 6000 和 8000（可配置）。</p>
+<p><strong>裁剪策略：</strong> 按嵌入距离（搜索结果顺序）保留靠前的实体&#x2F;关系，截断到预算内，<strong>保留原有顺序</strong>。裁剪后，从 entities_context 的 <code>entity</code> 字段反向查找原始实体数据，建立 <code>filtered_entities</code> 和 <code>filtered_relations</code> 供下一阶段用。</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line">entities_context = truncate_list_by_token_size(</span><br><span class="line">    entities_context_for_truncation,       <span class="comment"># 去掉 file_path/created_at 后的精简结构</span></span><br><span class="line">    key=<span class="keyword">lambda</span> x: <span class="string">&quot;\n&quot;</span>.join(json.dumps(item, ensure_ascii=<span class="literal">False</span>) <span class="keyword">for</span> item <span class="keyword">in</span> [x]),</span><br><span class="line">    max_token_size=max_entity_tokens,</span><br><span class="line">)</span><br><span class="line"><span class="comment"># 裁剪后只保留落在预算内的实体</span></span><br><span class="line">final_entity_names = &#123;e[<span class="string">&quot;entity&quot;</span>] <span class="keyword">for</span> e <span class="keyword">in</span> entities_context&#125;</span><br><span class="line">filtered_entities = [e <span class="keyword">for</span> e <span class="keyword">in</span> final_entities <span class="keyword">if</span> e[<span class="string">&quot;entity_name&quot;</span>] <span class="keyword">in</span> final_entity_names]</span><br></pre></td></tr></table></figure>
+
+<p>为什么保留顺序？因为排序本身是 embedding 相似度的体现——最相关的排在前面，被截掉的是相对不重要的。</p>
+<h3 id="4-3-Stage-3：Chunk-汇聚——从图到文本"><a href="#4-3-Stage-3：Chunk-汇聚——从图到文本" class="headerlink" title="4.3 Stage 3：Chunk 汇聚——从图到文本"></a>4.3 Stage 3：Chunk 汇聚——从图到文本</h3><p>实体和关系本身只有”概念名 + 描述 + 属性”，真正的文本内容在 chunks VDB 里。第三阶段做的核心操作是 <strong>reverse lookup：source_id → text_chunks</strong>。</p>
+<p><code>_merge_all_chunks</code>（第 4739 行）接受三个来源：</p>
+<table>
+<thead>
+<tr>
+<th>来源</th>
+<th>数据</th>
+<th>函数</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>vector_chunks</td>
+<td>query 向量搜 chunks VDB</td>
+<td>直接在搜索阶段已返回</td>
+</tr>
+<tr>
+<td>entity_chunks</td>
+<td>实体的 source_id 对应块</td>
+<td><code>_find_related_text_unit_from_entities</code></td>
+</tr>
+<tr>
+<td>relation_chunks</td>
+<td>关系的 source_id 对应块</td>
+<td><code>_find_related_text_unit_from_relations</code></td>
+</tr>
+</tbody></table>
+<p><strong>合并策略：round-robin 三路去重</strong></p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br></pre></td><td class="code"><pre><span class="line">max_len = <span class="built_in">max</span>(<span class="built_in">len</span>(vector_chunks), <span class="built_in">len</span>(entity_chunks), <span class="built_in">len</span>(relation_chunks))</span><br><span class="line"><span class="keyword">for</span> i <span class="keyword">in</span> <span class="built_in">range</span>(max_len):</span><br><span class="line">    <span class="keyword">if</span> i &lt; <span class="built_in">len</span>(vector_chunks):     <span class="comment"># 第一轮：向量</span></span><br><span class="line">        ...</span><br><span class="line">    <span class="keyword">if</span> i &lt; <span class="built_in">len</span>(entity_chunks):     <span class="comment"># 第二轮：实体</span></span><br><span class="line">        ...</span><br><span class="line">    <span class="keyword">if</span> i &lt; <span class="built_in">len</span>(relation_chunks):   <span class="comment"># 第三轮：关系</span></span><br><span class="line">        ...</span><br><span class="line"></span><br><span class="line"><span class="comment"># 三轮都按 chunk_id 去重</span></span><br><span class="line"><span class="keyword">if</span> chunk_id <span class="keyword">and</span> chunk_id <span class="keyword">not</span> <span class="keyword">in</span> seen_chunk_ids:</span><br><span class="line">    seen_chunk_ids.add(chunk_id)</span><br><span class="line">    merged_chunks.append(...)</span><br></pre></td></tr></table></figure>
+
+<p><strong>去重逻辑：</strong> 同一个文本块可能被多个实体引用、也被关系引用、还被向量搜到。合并时第一次遇到加入，后面的跳过。三路交替取，保证每种来源的高分块都有机会进入最终集合。</p>
+<p>如果启用了 <code>enable_content_headings</code>，合并后还会从 <code>text_chunks_db</code> 回填 heading path（文档中的章节路径），让 LLM 看到每段内容的上下文位置。</p>
+<h3 id="4-4-Stage-4：Context-组装——拼-prompt"><a href="#4-4-Stage-4：Context-组装——拼-prompt" class="headerlink" title="4.4 Stage 4：Context 组装——拼 prompt"></a>4.4 Stage 4：Context 组装——拼 prompt</h3><p>到了这一步，已经有了三样东西：</p>
+<ul>
+<li>裁剪后的实体列表</li>
+<li>裁剪后的关系列表</li>
+<li>汇聚去重后的文本块</li>
+</ul>
+<p><code>_build_context_str</code>（第 4847 行）用这些东西填充预定义模板。</p>
+<p><strong>模板结构（<code>prompt.py:442</code>）：</strong></p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">Knowledge Graph Data (Entity):</span><br><span class="line">```json</span><br><span class="line">[&#123;entities_str&#125;]</span><br></pre></td></tr></table></figure>
+
+<p>Knowledge Graph Data (Relationship):</p>
+<figure class="highlight json"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line"><span class="punctuation">[</span><span class="punctuation">&#123;</span>relations_str<span class="punctuation">&#125;</span><span class="punctuation">]</span></span><br></pre></td></tr></table></figure>
+
+<p>Document Chunks:</p>
+<figure class="highlight json"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line"><span class="punctuation">[</span><span class="punctuation">&#123;</span>text_chunks_str<span class="punctuation">&#125;</span><span class="punctuation">]</span></span><br></pre></td></tr></table></figure>
+
+<p>Reference Document List:</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">[&#123;reference_list_str&#125;]</span><br></pre></td></tr></table></figure>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br></pre></td><td class="code"><pre><span class="line"></span><br><span class="line">**Token 预算二次裁剪**</span><br><span class="line"></span><br><span class="line">拼接前要做一次精细的 token 预算计算：</span><br><span class="line"></span><br><span class="line">```python</span><br><span class="line">pre_kg_context = kg_context_template.format(entities_str=..., relations_str=..., ...)</span><br><span class="line">kg_context_tokens = len(tokenizer.encode(pre_kg_context))   # KG 部分的 token 数</span><br><span class="line"></span><br><span class="line">pre_sys_prompt = sys_prompt_template.format(context_data=&quot;&quot;, ...)</span><br><span class="line">sys_prompt_tokens = len(tokenizer.encode(pre_sys_prompt))    # system prompt 的 token 数</span><br><span class="line"></span><br><span class="line">query_tokens = len(tokenizer.encode(query))                  # 用户问题的 token 数</span><br><span class="line">buffer_tokens = 200                                          # 安全缓冲</span><br><span class="line"></span><br><span class="line">available_chunk_tokens = max_total_tokens - (</span><br><span class="line">    sys_prompt_tokens + kg_context_tokens + query_tokens + buffer_tokens</span><br><span class="line">)</span><br></pre></td></tr></table></figure>
+
+<p><strong>剩下可用空间全部给 chunks</strong>，再通过 <code>process_chunks_unified</code> 做一次 token 级别裁剪（其中可能包含 reranker 重排序 + 引用编号）。</p>
+<p><strong>reranker 重排序</strong>（如果启用）：</p>
+<p>如果配置了 reranker，会在 token 裁剪之前对 chunks 做一次重排，让最相关的块排在前面，保证裁剪保留的是”质量最高”而非”嵌入距离最近”的块。</p>
+<p><strong>引用编号生成：</strong></p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">reference_list, truncated_chunks = generate_reference_list_from_chunks(truncated_chunks)</span><br></pre></td></tr></table></figure>
+
+<p>给每个 chunk 分配 <code>reference_id</code>（如 1, 2, 3…），同时生成引用列表（reference_id → 文件名）。最终 <code>text_chunks_str</code> 中的每个 chunk 都带 <code>reference_id</code>，<code>reference_list_str</code> 则是：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">[1] 2024-financial-report.pdf</span><br><span class="line">[2] apple-company-intro.docx</span><br><span class="line">[3] stock-market-analysis.txt</span><br></pre></td></tr></table></figure>
+
+<hr>
+<h2 id="五、LLM-调用与缓存"><a href="#五、LLM-调用与缓存" class="headerlink" title="五、LLM 调用与缓存"></a>五、LLM 调用与缓存</h2><p>context 全部组装好后，回到 <code>kg_query</code>（第 3941 行）准备最终调用 LLM。</p>
+<p><strong>第一步：cache 检查</strong></p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br></pre></td><td class="code"><pre><span class="line">args_hash = compute_args_hash(mode, query, response_type, top_k, ...)</span><br><span class="line">cached_result = <span class="keyword">await</span> handle_cache(hashing_kv, args_hash, user_query, mode, cache_type=<span class="string">&quot;query&quot;</span>)</span><br><span class="line"></span><br><span class="line"><span class="keyword">if</span> cached_result <span class="keyword">is</span> <span class="keyword">not</span> <span class="literal">None</span>:</span><br><span class="line">    <span class="comment"># cache 命中，直接用</span></span><br><span class="line">    cached_response, _ = cached_result</span><br><span class="line">    response = cached_response</span><br><span class="line"><span class="keyword">else</span>:</span><br><span class="line">    <span class="comment"># 调用 LLM</span></span><br><span class="line">    response = <span class="keyword">await</span> use_model_func(</span><br><span class="line">        user_query,</span><br><span class="line">        system_prompt=sys_prompt,</span><br><span class="line">        history_messages=query_param.conversation_history,</span><br><span class="line">        enable_cot=<span class="literal">True</span>,</span><br><span class="line">        stream=query_param.stream,</span><br><span class="line">    )</span><br><span class="line">    <span class="comment"># 写入 cache</span></span><br><span class="line">    <span class="keyword">await</span> save_to_cache(hashing_kv, CacheData(args_hash=args_hash, content=response, ...))</span><br></pre></td></tr></table></figure>
+
+<p><strong>Cache key 包含什么？</strong> 不只是 query 本身，而是 <code>(mode, query, response_type, top_k, chunk_top_k, max_entity_tokens, max_relation_tokens, max_total_tokens, hl_keywords, ll_keywords, user_prompt, enable_rerank, enable_content_headings, llm_identity)</code> 的全维度 hash。只要这些参数中任何一个变化，cache 就不命中。</p>
+<p><strong>第二步：响应清洗</strong></p>
+<p>LLM 返回后，对非 streaming 响应做清洗：</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">if</span> <span class="built_in">isinstance</span>(response, <span class="built_in">str</span>):</span><br><span class="line">    response = (</span><br><span class="line">        response.replace(sys_prompt, <span class="string">&quot;&quot;</span>)</span><br><span class="line">        .replace(<span class="string">&quot;user&quot;</span>, <span class="string">&quot;&quot;</span>)</span><br><span class="line">        .replace(<span class="string">&quot;model&quot;</span>, <span class="string">&quot;&quot;</span>)</span><br><span class="line">        .replace(query, <span class="string">&quot;&quot;</span>)</span><br><span class="line">        .replace(<span class="string">&quot;&lt;system&gt;&quot;</span>, <span class="string">&quot;&quot;</span>)</span><br><span class="line">        .replace(<span class="string">&quot;&lt;/system&gt;&quot;</span>, <span class="string">&quot;&quot;</span>)</span><br><span class="line">        .strip()</span><br><span class="line">    )</span><br></pre></td></tr></table></figure>
+
+<p>有些 LLM 在返回中会携带输入 prompt 的回显，这里逐一剥离。<strong>streaming 模式不做此清洗</strong>（流式逐 token 吐，无法整体替换）。</p>
+<p>返回的 <code>QueryResult</code> 包含 <code>content</code>（非流式响应）或 <code>response_iterator</code>（流式迭代器），以及组装好的完整 <code>raw_data</code>（供后续二次处理和数据分析）。</p>
+<hr>
+<h2 id="六、Naive-模式的单独路径"><a href="#六、Naive-模式的单独路径" class="headerlink" title="六、Naive 模式的单独路径"></a>六、Naive 模式的单独路径</h2><p><code>naive_query</code>（第 5748 行）比 KG 路径简单得多，<strong>不走图、不抽关键词</strong>：</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># 1. 向量搜块</span></span><br><span class="line">chunks = <span class="keyword">await</span> _get_vector_context(query, chunks_vdb, query_param, <span class="literal">None</span>)</span><br><span class="line"></span><br><span class="line"><span class="comment"># 2. Token 预算计算（与 KG 路径类似但不含 KG 部分）</span></span><br><span class="line">available_chunk_tokens = max_total_tokens - (sys_prompt_tokens + query_tokens + buffer_tokens)</span><br><span class="line"></span><br><span class="line"><span class="comment"># 3. 统一块处理 + 引用编号</span></span><br><span class="line">processed_chunks = <span class="keyword">await</span> process_chunks_unified(query, chunks, ...)</span><br><span class="line">reference_list, processed_chunks = generate_reference_list_from_chunks(processed_chunks)</span><br><span class="line"></span><br><span class="line"><span class="comment"># 4. 用 naive_query_context 模板组装</span></span><br><span class="line">naive_context_template = PROMPTS[<span class="string">&quot;naive_query_context&quot;</span>]</span><br><span class="line">context_content = naive_context_template.<span class="built_in">format</span>(text_chunks_str=..., reference_list_str=...)</span><br><span class="line"></span><br><span class="line"><span class="comment"># 5. 拼 system prompt → 调 LLM → cache（与 kg_query 相同）</span></span><br><span class="line">sys_prompt = sys_prompt_template.<span class="built_in">format</span>(content_data=context_content, ...)</span><br><span class="line">response = <span class="keyword">await</span> use_model_func(user_query, system_prompt=sys_prompt, ...)</span><br></pre></td></tr></table></figure>
+
+<p>Naive 模式使用 <code>PROMPTS[&quot;naive_rag_response&quot;]</code> 作为 system prompt，不包含任何图相关指令。</p>
+<hr>
+<h2 id="七、各模式的完整路径串讲"><a href="#七、各模式的完整路径串讲" class="headerlink" title="七、各模式的完整路径串讲"></a>七、各模式的完整路径串讲</h2><h3 id="Local-模式（”搜特定实体”）"><a href="#Local-模式（”搜特定实体”）" class="headerlink" title="Local 模式（”搜特定实体”）"></a>Local 模式（”搜特定实体”）</h3><figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br></pre></td><td class="code"><pre><span class="line">aquery → aquery_llm → kg_query</span><br><span class="line">    → get_keywords_from_query → 抽 ll_keywords（低层关键词）</span><br><span class="line">    → _build_query_context</span><br><span class="line">        → _perform_kg_search</span><br><span class="line">            → ll_keywords embeddings → entities_vdb.query()</span><br><span class="line">            → get_nodes_batch() → node_degrees_batch()</span><br><span class="line">            → _find_most_related_edges_from_entities()</span><br><span class="line">        → _apply_token_truncation (entities max_entity_tokens, relations max_relation_tokens)</span><br><span class="line">        → _merge_all_chunks (entity_chunks + vector_chunks)</span><br><span class="line">        → _build_context_str → 模板组装 → LLM</span><br></pre></td></tr></table></figure>
+
+<p><strong>典型场景：</strong> “苹果公司的 CEO 是谁？”——需要精确实体识别。</p>
+<h3 id="Global-模式（”搜全局主题”）"><a href="#Global-模式（”搜全局主题”）" class="headerlink" title="Global 模式（”搜全局主题”）"></a>Global 模式（”搜全局主题”）</h3><figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br></pre></td><td class="code"><pre><span class="line">aquery → aquery_llm → kg_query</span><br><span class="line">    → get_keywords_from_query → 抽 hl_keywords（高层关键词）</span><br><span class="line">    → _build_query_context</span><br><span class="line">        → _perform_kg_search</span><br><span class="line">            → hl_keywords embeddings → relationships_vdb.query()</span><br><span class="line">            → get_edges_batch() → weight 排序</span><br><span class="line">            → _find_most_related_entities_from_relationships()</span><br><span class="line">        → _apply_token_truncation</span><br><span class="line">        → _merge_all_chunks (relation_chunks + vector_chunks)</span><br><span class="line">        → _build_context_str → 模板组装 → LLM</span><br></pre></td></tr></table></figure>
+
+<p><strong>典型场景：</strong> “2024 年科技行业的整体趋势如何？”——需要全局视角，不针对特定实体。</p>
+<h3 id="Hybrid-模式（local-global-合并）"><a href="#Hybrid-模式（local-global-合并）" class="headerlink" title="Hybrid 模式（local + global 合并）"></a>Hybrid 模式（local + global 合并）</h3><figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br></pre></td><td class="code"><pre><span class="line">aquery → aquery_llm → kg_query</span><br><span class="line">    → get_keywords_from_query → 抽 hl_keywords + ll_keywords</span><br><span class="line">    → _build_query_context</span><br><span class="line">        → _perform_kg_search</span><br><span class="line">            → ll_keywords → entities_vdb + hl_keywords → relationships_vdb</span><br><span class="line">            → round-robin 去重合并实体和关系</span><br><span class="line">        → _apply_token_truncation</span><br><span class="line">        → _merge_all_chunks (entity + relation + vector 三路)</span><br><span class="line">        → _build_context_str → 模板组装 → LLM</span><br></pre></td></tr></table></figure>
+
+<p><strong>典型场景：</strong> “苹果公司近期的营收受哪些宏观经济因素影响？”——既有具体实体又有全局背景。</p>
+<h3 id="Mix-模式（hybrid-chunks-VDB）"><a href="#Mix-模式（hybrid-chunks-VDB）" class="headerlink" title="Mix 模式（hybrid + chunks VDB）"></a>Mix 模式（hybrid + chunks VDB）</h3><figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br></pre></td><td class="code"><pre><span class="line">aquery → aquery_llm → kg_query</span><br><span class="line">    → get_keywords_from_query → 抽 hl_keywords + ll_keywords</span><br><span class="line">    → _build_query_context</span><br><span class="line">        → _perform_kg_search</span><br><span class="line">            → 同上 hybrid 全部 + query→chunks_vdb.query()</span><br><span class="line">            → round-robin 去重合并</span><br><span class="line">        → _apply_token_truncation</span><br><span class="line">        → _merge_all_chunks (entity + relation + vector 三路)</span><br><span class="line">        → _build_context_str → 模板组装 → LLM</span><br></pre></td></tr></table></figure>
+
+<p>Mix 与 Hybrid 的唯一区别：多了一步用 query 嵌入搜 chunks VDB，给下游提供额外”纯文本”视角。官方推荐搭配 reranker 使用。</p>
+<h3 id="Naive-模式（纯向量，不走图）"><a href="#Naive-模式（纯向量，不走图）" class="headerlink" title="Naive 模式（纯向量，不走图）"></a>Naive 模式（纯向量，不走图）</h3><figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line">aquery → aquery_llm → naive_query</span><br><span class="line">    → _get_vector_context (query→chunks_vdb)</span><br><span class="line">    → token 预算 → process_chunks_unified</span><br><span class="line">    → naive_query_context 模板组装 → LLM</span><br></pre></td></tr></table></figure>
+
+<p><strong>典型场景：</strong> 文档量小、不需要知识图谱的场景，或作为 ablative baseline。</p>
+<hr>
+<h2 id="附：函数索引表"><a href="#附：函数索引表" class="headerlink" title="附：函数索引表"></a>附：函数索引表</h2><table>
+<thead>
+<tr>
+<th>函数</th>
+<th>文件</th>
+<th>行号</th>
+<th>职责</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>LightRAG.aquery</code></td>
+<td>lightrag.py</td>
+<td>2077</td>
+<td>查询入口（兼容封装）</td>
+</tr>
+<tr>
+<td><code>LightRAG.aquery_llm</code></td>
+<td>lightrag.py</td>
+<td>2341</td>
+<td>完整查询 API（路由分发 + 数据 + LLM）</td>
+</tr>
+<tr>
+<td><code>kg_query</code></td>
+<td>operate.py</td>
+<td>3794</td>
+<td>KG 模式查询（local&#x2F;global&#x2F;hybrid&#x2F;mix）</td>
+</tr>
+<tr>
+<td><code>naive_query</code></td>
+<td>operate.py</td>
+<td>5748</td>
+<td>Naive 模式查询</td>
+</tr>
+<tr>
+<td><code>get_keywords_from_query</code></td>
+<td>operate.py</td>
+<td>4009</td>
+<td>关键词提取（缓存&#x2F;LLM）</td>
+</tr>
+<tr>
+<td><code>_build_query_context</code></td>
+<td>operate.py</td>
+<td>5032</td>
+<td>4 阶段上下文构建编排</td>
+</tr>
+<tr>
+<td><code>_perform_kg_search</code></td>
+<td>operate.py</td>
+<td>4323</td>
+<td>Stage 1：纯搜索（向量 + 图）</td>
+</tr>
+<tr>
+<td><code>_get_node_data</code></td>
+<td>operate.py</td>
+<td>5152</td>
+<td>搜 entities VDB + 图回表（local 路径）</td>
+</tr>
+<tr>
+<td><code>_get_edge_data</code></td>
+<td>operate.py</td>
+<td>5427</td>
+<td>搜 relationships VDB + 图回表（global 路径）</td>
+</tr>
+<tr>
+<td><code>_get_vector_context</code></td>
+<td>operate.py</td>
+<td>4266</td>
+<td>搜 chunks VDB</td>
+</tr>
+<tr>
+<td><code>_apply_token_truncation</code></td>
+<td>operate.py</td>
+<td>4533</td>
+<td>Stage 2：Token 裁剪</td>
+</tr>
+<tr>
+<td><code>_merge_all_chunks</code></td>
+<td>operate.py</td>
+<td>4739</td>
+<td>Stage 3：三路去重合并</td>
+</tr>
+<tr>
+<td><code>_build_context_str</code></td>
+<td>operate.py</td>
+<td>4847</td>
+<td>Stage 4：Context 拼装 + 二次裁剪</td>
+</tr>
+<tr>
+<td><code>process_chunks_unified</code></td>
+<td>operate.py</td>
+<td>—</td>
+<td>统一块处理（rerank + token 裁剪）</td>
+</tr>
+<tr>
+<td><code>generate_reference_list_from_chunks</code></td>
+<td>operate.py</td>
+<td>—</td>
+<td>引用编号 + 引用列表生成</td>
+</tr>
+<tr>
+<td><code>compute_args_hash</code></td>
+<td>operate.py</td>
+<td>—</td>
+<td>Cache key 计算</td>
+</tr>
+<tr>
+<td><code>handle_cache</code> &#x2F; <code>save_to_cache</code></td>
+<td>operate.py</td>
+<td>—</td>
+<td>LLM 响应缓存读写</td>
+</tr>
+</tbody></table>
+
+    </div>
+
+    
+    
+    
+
+    <footer class="post-footer">
+          
+
+<div class="post-copyright">
+<ul>
+  <li class="post-copyright-author">
+      <strong>本文作者： </strong>陌忆
+  </li>
+  <li class="post-copyright-link">
+      <strong>本文链接：</strong>
+      <a href="https://moyi-math.github.io/2026/07/12/LightRAG-1.1-%E4%BB%8E%E6%8F%90%E9%97%AE%E5%88%B0%E5%9B%9E%E7%AD%94-Query%E5%85%A8%E9%93%BE%E8%B7%AF%E6%8B%86%E8%A7%A3/" title="LightRAG 源码分析 · 1.1 从提问到回答——Query 全链路拆解">https://moyi-math.github.io/2026/07/12/LightRAG-1.1-从提问到回答-Query全链路拆解/</a>
+  </li>
+  <li class="post-copyright-license">
+      <strong>版权声明： </strong>本博客所有文章除特别声明外，均采用 <a href="https://creativecommons.org/licenses/by-nc-sa/4.0/" rel="noopener" target="_blank"><i class="fab fa-fw fa-creative-commons"></i>BY-NC-SA</a> 许可协议。转载请注明出处！
+  </li>
+</ul>
+</div>
+
+          <div class="post-tags">
+              <a href="/tags/RAG/" rel="tag"># RAG</a>
+              <a href="/tags/LightRAG/" rel="tag"># LightRAG</a>
+              <a href="/tags/GraphRAG/" rel="tag"># GraphRAG</a>
+              <a href="/tags/%E6%BA%90%E7%A0%81%E5%88%86%E6%9E%90/" rel="tag"># 源码分析</a>
+              <a href="/tags/Query/" rel="tag"># Query</a>
+              <a href="/tags/%E6%A3%80%E7%B4%A2%E5%A2%9E%E5%BC%BA%E7%94%9F%E6%88%90/" rel="tag"># 检索增强生成</a>
+              <a href="/tags/%E7%9F%A5%E8%AF%86%E5%9B%BE%E8%B0%B1/" rel="tag"># 知识图谱</a>
+          </div>
+
+        
+
+          <div class="post-nav">
+            <div class="post-nav-item">
+                <a href="/2026/07/11/RAG-1.2-%E5%8F%82%E6%95%B0%E8%AE%B0%E5%BF%86vs%E9%9D%9E%E5%8F%82%E6%95%B0%E8%AE%B0%E5%BF%86/" rel="prev" title="RAG 学习笔记 · 1.2 参数记忆 vs 非参数记忆——RAG 的核心解法">
+                  <i class="fa fa-angle-left"></i> RAG 学习笔记 · 1.2 参数记忆 vs 非参数记忆——RAG 的核心解法
+                </a>
+            </div>
+            <div class="post-nav-item">
+                <a href="/2026/07/12/RAG-1.3-RAG%E5%9F%BA%E7%A1%80%E6%A6%82%E5%BF%B5%E4%B8%8E%E5%B7%A5%E4%BD%9C%E5%8E%9F%E7%90%86/" rel="next" title="RAG 学习笔记 · 1.3 RAG 基础概念与工作原理">
+                  RAG 学习笔记 · 1.3 RAG 基础概念与工作原理 <i class="fa fa-angle-right"></i>
+                </a>
+            </div>
+          </div>
+    </footer>
+  </article>
+</div>
+
+
+
+
+
+
+</div>
+  </main>
+
+  <footer class="footer">
+    <div class="footer-inner">
+
+  <div class="copyright">
+    &copy; 
+    <span itemprop="copyrightYear">2026</span>
+    <span class="with-love">
+      <i class="fa fa-heart"></i>
+    </span>
+    <span class="author" itemprop="copyrightHolder">陌忆</span>
+  </div>
+<div class="wordcount">
+  <span class="post-meta-item">
+    <span class="post-meta-item-icon">
+      <i class="fa fa-chart-line"></i>
+    </span>
+    <span title="站点总字数">18k</span>
+  </span>
+  <span class="post-meta-item">
+    <span class="post-meta-item-icon">
+      <i class="fa fa-coffee"></i>
+    </span>
+    <span title="站点阅读时长">1:05</span>
+  </span>
+</div>
+
+    </div>
+  </footer>
+
+  
+  <div class="toggle sidebar-toggle" role="button">
+    <span class="toggle-line"></span>
+    <span class="toggle-line"></span>
+    <span class="toggle-line"></span>
+  </div>
+  <div class="sidebar-dimmer"></div>
+  <div class="back-to-top" role="button" aria-label="返回顶部">
+    <i class="fa fa-arrow-up fa-lg"></i>
+    <span>0%</span>
+  </div>
+
+<noscript>
+  <div class="noscript-warning">Theme NexT works best with JavaScript enabled</div>
+</noscript>
+<!-- canvas-nest particle background -->
+<script defer>
+(function() {
+  var s = document.createElement("script");
+  s.src = "//cdn.bootcss.com/canvas-nest.js/1.0.0/canvas-nest.min.js";
+  s.setAttribute("count", "150");
+  s.setAttribute("opacity", "1");
+  document.body.appendChild(s);
+})();
+</script>
+
+<!-- Live2D widget -->
+<script defer src="/live2dw/lib/L2Dwidget.min.js"></script>
+<script defer>
+L2Dwidget.init({
+  "pluginRootPath": "live2dw/",
+  "pluginJsPath": "lib/",
+  "pluginModelPath": "assets/",
+  "tagMode": false,
+  "debug": false,
+  "model": {"jsonPath": "/live2dw/assets/assets/shizuku.model.json"},
+  "display": {"position": "right", "width": 150, "height": 300},
+  "mobile": {"show": true},
+  "log": false
+});
+</script>
+
+<!-- Page click heart effect -->
+<script defer src="/js/clicklove.js"></script>
+
+<!-- Site running time -->
+<span id="timeDate"></span>
+<script>
+var now = new Date();
+function createtime() {
+  var grt = new Date("11/17/2022 8:00:00");
+  now.setTime(now.getTime() + 250);
+  var days = (now - grt) / 1000 / 60 / 60 / 24;
+  var dnum = Math.floor(days);
+  var hours = (now - grt) / 1000 / 60 / 60 - (24 * dnum);
+  var hnum = Math.floor(hours);
+  if (String(hnum).length == 1) hnum = "0" + hnum;
+  var minutes = (now - grt) / 1000 / 60 - (24 * 60 * dnum) - (60 * hnum);
+  var mnum = Math.floor(minutes);
+  if (String(mnum).length == 1) mnum = "0" + mnum;
+  var seconds = (now - grt) / 1000 - (24 * 60 * 60 * dnum) - (60 * 60 * hnum) - (60 * mnum);
+  var snum = Math.round(seconds);
+  if (String(snum).length == 1) snum = "0" + snum;
+  document.getElementById("timeDate").innerHTML = "本站已安全运行 " + dnum + " 天 " + hnum + " 小时 " + mnum + " 分 " + snum + " 秒";
+}
+setInterval(createtime, 1000);
+</script>
+
+</body>
+</html>
