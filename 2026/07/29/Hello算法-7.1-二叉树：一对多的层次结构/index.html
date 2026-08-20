@@ -1,0 +1,619 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width">
+<meta name="theme-color" content="#222" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#222" media="(prefers-color-scheme: dark)"><meta name="generator" content="Hexo 7.3.0">
+<link rel="preconnect" href="https://cdnjs.cloudflare.com" crossorigin>
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon-next.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32-next.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next.png">
+  <link rel="mask-icon" href="/images/logo.svg" color="#222">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/7.0.0/css/all.min.css" integrity="sha256-VHqXKFhhMxcpubYf9xiWdCiojEbY9NexQ4jh8AxbvcM=" crossorigin="anonymous">
+
+<script class="next-config" data-name="main" type="application/json">{"hostname":"moyi-math.github.io","root":"/","images":"/images","scheme":"Gemini","darkmode":true,"version":"8.28.0","exturl":false,"sidebar":{"position":"left","width_expanded":320,"width_dual_column":240,"display":"post","padding":18,"offset":12},"hljswrap":true,"codeblock":{"theme":{"light":"default","dark":"stackoverflow-dark"},"prism":{"light":"prism","dark":"prism-dark"},"copy_button":{"enable":true,"style":null},"fold":{"enable":false,"height":500},"language":false},"bookmark":{"enable":false,"color":"#222","save":"auto"},"mediumzoom":false,"lazyload":true,"pangu":false,"comments":{"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},"stickytabs":false,"motion":{"enable":false,"async":false,"duration":200,"transition":{"menu_item":"fadeInDown","post_block":"fadeIn","post_header":"fadeInDown","post_body":"fadeInDown","coll_header":"fadeInLeft","sidebar":"fadeInUp"}},"prism":false,"i18n":{"placeholder":"搜索...","empty":"没有找到任何搜索结果：${query}","hits_time":"找到 ${hits} 个搜索结果（用时 ${time} 毫秒）","hits":"找到 ${hits} 个搜索结果"},"path":"/search.json","localsearch":{"enable":true,"top_n_per_article":1,"unescape":false,"preload":false}}</script><script src="/js/config.js" defer></script>
+
+    <meta name="description" content="树是第一种非线性数据结构——一对多的层次关系。二叉树每个节点最多两个分支，是树结构的基础。本文从节点定义到四种遍历方式（BFS层序、DFS前&#x2F;中&#x2F;后序）逐层拆解，理解遍历的本质就是&quot;待办清单&quot;。">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Hello算法 学习笔记 · 7.1 二叉树：一对多的层次结构">
+<meta property="og:url" content="https://moyi-math.github.io/2026/07/29/Hello%E7%AE%97%E6%B3%95-7.1-%E4%BA%8C%E5%8F%89%E6%A0%91%EF%BC%9A%E4%B8%80%E5%AF%B9%E5%A4%9A%E7%9A%84%E5%B1%82%E6%AC%A1%E7%BB%93%E6%9E%84/index.html">
+<meta property="og:site_name" content="陌忆的博客">
+<meta property="og:description" content="树是第一种非线性数据结构——一对多的层次关系。二叉树每个节点最多两个分支，是树结构的基础。本文从节点定义到四种遍历方式（BFS层序、DFS前&#x2F;中&#x2F;后序）逐层拆解，理解遍历的本质就是&quot;待办清单&quot;。">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:image" content="https://moyi-math.github.io/images/background.webp">
+<meta property="article:published_time" content="2026-07-29T16:00:00.000Z">
+<meta property="article:modified_time" content="2026-07-29T16:00:00.000Z">
+<meta property="article:author" content="陌忆">
+<meta property="article:tag" content="算法">
+<meta property="article:tag" content="数据结构">
+<meta property="article:tag" content="Python">
+<meta property="article:tag" content="树">
+<meta property="article:tag" content="二叉树">
+<meta property="article:tag" content="Binary Tree">
+<meta property="article:tag" content="BFS">
+<meta property="article:tag" content="DFS">
+<meta property="article:tag" content="前序遍历">
+<meta property="article:tag" content="中序遍历">
+<meta property="article:tag" content="后序遍历">
+<meta property="article:tag" content="层序遍历">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:image" content="https://moyi-math.github.io/images/background.webp">
+
+
+<link rel="canonical" href="https://moyi-math.github.io/2026/07/29/Hello%E7%AE%97%E6%B3%95-7.1-%E4%BA%8C%E5%8F%89%E6%A0%91%EF%BC%9A%E4%B8%80%E5%AF%B9%E5%A4%9A%E7%9A%84%E5%B1%82%E6%AC%A1%E7%BB%93%E6%9E%84/">
+
+
+<script class="next-config" data-name="page" type="application/json">{"sidebar":"","isHome":false,"isPost":true,"lang":"zh-CN","comments":true,"permalink":"https://moyi-math.github.io/2026/07/29/Hello%E7%AE%97%E6%B3%95-7.1-%E4%BA%8C%E5%8F%89%E6%A0%91%EF%BC%9A%E4%B8%80%E5%AF%B9%E5%A4%9A%E7%9A%84%E5%B1%82%E6%AC%A1%E7%BB%93%E6%9E%84/","path":"2026/07/29/Hello算法-7.1-二叉树：一对多的层次结构/","title":"Hello算法 学习笔记 · 7.1 二叉树：一对多的层次结构"}</script>
+
+<script class="next-config" data-name="calendar" type="application/json">""</script>
+<title>Hello算法 学习笔记 · 7.1 二叉树：一对多的层次结构 | 陌忆的博客</title>
+  
+
+
+
+
+
+
+
+
+  
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/animejs/3.2.1/anime.min.js" integrity="sha256-XL2inqUJaslATFnHdJOi9GfQ60on8Wx1C2H8DYiN1xY=" crossorigin="anonymous" defer></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/lozad.js/1.16.0/lozad.min.js" integrity="sha256-mOFREFhqmHeQbXpK2lp4nA3qooVgACfh88fpJftLBbc=" crossorigin="anonymous" defer></script>
+<script src="/js/utils.js" defer></script><script src="/js/sidebar.js" defer></script><script src="/js/next-boot.js" defer></script>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/hexo-generator-searchdb/1.5.0/search.js" integrity="sha256-xFC6PJ82SL9b3WkGjFavNiA9gm5z6UBxWPiu4CYjptg=" crossorigin="anonymous" defer></script>
+<script src="/js/third-party/search/local-search.js" defer></script>
+
+
+
+
+
+
+
+  
+
+
+
+
+  
+
+  <script class="next-config" data-name="enableMath" type="application/json">false</script><link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/katex.min.css" integrity="sha256-UF1fgpAiu3tPJN/uCqEUHNe7pnr+QR0SQDNfgglgtcM=" crossorigin="anonymous">
+
+
+<link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
+
+
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"WebSite","name":"陌忆的博客","url":"https://moyi-math.github.io","description":"记录 RAG、Agent、MCP、算法与软件工程实践，按专栏整理可复用的技术笔记。","inLanguage":"zh-CN","author":{"@type":"Person","name":"陌忆"}}</script>
+
+
+
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"Article","headline":"Hello算法 学习笔记 · 7.1 二叉树：一对多的层次结构","description":"树是第一种非线性数据结构——一对多的层次关系。二叉树每个节点最多两个分支，是树结构的基础。本文从节点定义到四种遍历方式（BFS层序、DFS前/中/后序）逐层拆解，理解遍历的本质就是\"待办清单\"。","datePublished":"2026-07-29T16:00:00.000Z","dateModified":"2026-07-29T16:00:00.000Z","inLanguage":"zh-CN","mainEntityOfPage":{"@type":"WebPage","@id":"https://moyi-math.github.io/2026/07/29/Hello%E7%AE%97%E6%B3%95-7.1-%E4%BA%8C%E5%8F%89%E6%A0%91%EF%BC%9A%E4%B8%80%E5%AF%B9%E5%A4%9A%E7%9A%84%E5%B1%82%E6%AC%A1%E7%BB%93%E6%9E%84/index.html"},"author":{"@type":"Person","name":"陌忆"}}</script>
+<meta name="author" content="陌忆">
+
+
+  <noscript>
+    <link rel="stylesheet" href="/css/noscript.css">
+  </noscript>
+<!-- hexo injector head_end start --><link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/katex.min.css" integrity="sha512-fHwaWebuwA7NSF5Qg/af4UeDx9XqUpYpOGgubo3yWu+b2IQR4UeQwbb42Ti7gVAjNtVoI/I9TEoYeu9omwcC6g==" crossorigin="anonymous" referrerpolicy="no-referrer" /><!-- hexo injector head_end end --><link rel="alternate" href="/atom.xml" title="陌忆的博客" type="application/atom+xml">
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage">
+  <div class="headband"></div>
+
+  <main class="main">
+    <div class="column">
+      <header class="header" itemscope itemtype="http://schema.org/WPHeader"><div class="site-brand-container">
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="切换导航栏" role="button">
+        <span class="toggle-line"></span>
+        <span class="toggle-line"></span>
+        <span class="toggle-line"></span>
+    </div>
+  </div>
+
+  <div class="site-meta">
+
+    <a href="/" class="brand" rel="start">
+      <i class="logo-line"></i>
+      <p class="site-title">陌忆的博客</p>
+      <i class="logo-line"></i>
+    </a>
+      <p class="site-subtitle" itemprop="description">数据库无法得出结论</p>
+  </div>
+
+  <div class="site-nav-right">
+    <div class="toggle popup-trigger" aria-label="搜索" role="button">
+        <i class="fa fa-search fa-fw fa-lg"></i>
+    </div>
+  </div>
+</div>
+
+
+
+<nav class="site-nav">
+  <ul class="main-menu menu"><li class="menu-item menu-item-home"><a href="/" rel="section"><i class="fa fa-home fa-fw"></i>首页</a></li><li class="menu-item menu-item-about"><a href="/about/" rel="section"><i class="fa fa-user fa-fw"></i>关于</a></li><li class="menu-item menu-item-tags"><a href="/tags/" rel="section"><i class="fa fa-tags fa-fw"></i>标签</a></li><li class="menu-item menu-item-categories"><a href="/categories/" rel="section"><i class="fa fa-th fa-fw"></i>分类</a></li><li class="menu-item menu-item-archives"><a href="/archives/" rel="section"><i class="fa fa-archive fa-fw"></i>归档</a></li>
+      <li class="menu-item menu-item-search">
+        <a role="button" class="popup-trigger"><i class="fa fa-search fa-fw"></i>搜索
+        </a>
+      </li>
+  </ul>
+</nav>
+
+
+
+  <div class="search-pop-overlay">
+    <div class="popup search-popup">
+      <div class="search-header">
+        <span class="search-icon">
+          <i class="fa fa-search"></i>
+        </span>
+        <div class="search-input-container">
+          <input autocomplete="off" autocapitalize="off" maxlength="80"
+                placeholder="搜索..." spellcheck="false"
+                type="search" class="search-input">
+        </div>
+        <span class="popup-btn-close" role="button">
+          <i class="fa fa-times-circle"></i>
+        </span>
+      </div>
+      <div class="search-result-container">
+        <div class="search-result-icon">
+          <i class="fa fa-spinner fa-pulse fa-5x"></i>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</header>
+        
+  
+  <aside class="sidebar">
+
+    <div class="sidebar-inner sidebar-nav-active sidebar-toc-active">
+      <ul class="sidebar-nav">
+        <li class="sidebar-nav-toc">
+          文章目录
+        </li>
+        <li class="sidebar-nav-overview">
+          站点概览
+        </li>
+      </ul>
+
+      <div class="sidebar-panel-container">
+        <!--noindex-->
+        <div class="post-toc-wrap sidebar-panel">
+            <div class="post-toc animated"><ol class="nav"><li class="nav-item nav-level-2"><a class="nav-link" href="#%E6%91%98%E8%A6%81-Abstract"><span class="nav-text">摘要(Abstract)</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E4%B8%80%E3%80%81%E4%B8%BA%E4%BB%80%E4%B9%88%E9%9C%80%E8%A6%81%E6%A0%91%EF%BC%9F"><span class="nav-text">一、为什么需要树？</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E4%BA%8C%E3%80%81%E4%BA%8C%E5%8F%89%E6%A0%91%E7%9A%84%E5%AE%9A%E4%B9%89"><span class="nav-text">二、二叉树的定义</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E4%B8%89%E3%80%81%E6%A0%91%E7%9A%84%E6%9C%AF%E8%AF%AD"><span class="nav-text">三、树的术语</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%9B%9B%E3%80%81%E4%BA%8C%E5%8F%89%E6%A0%91%E7%9A%84%E7%89%B9%E6%AE%8A%E5%BD%A2%E6%80%81"><span class="nav-text">四、二叉树的特殊形态</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E4%BA%94%E3%80%81%E5%B1%82%E5%BA%8F%E9%81%8D%E5%8E%86%EF%BC%88BFS%EF%BC%89%E2%80%94%E2%80%94%E9%80%90%E5%B1%82%E4%BB%8E%E4%B8%8A%E5%88%B0%E4%B8%8B"><span class="nav-text">五、层序遍历（BFS）——逐层从上到下</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#%E4%B8%BA%E4%BB%80%E4%B9%88-BFS-%E8%A6%81%E7%94%A8%E9%98%9F%E5%88%97%EF%BC%9F"><span class="nav-text">为什么 BFS 要用队列？</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%85%AD%E3%80%81DFS-%E4%B8%89%E7%A7%8D%E9%81%8D%E5%8E%86%E2%80%94%E2%80%94%E9%80%92%E5%BD%92%E6%B7%B1%E5%85%A5"><span class="nav-text">六、DFS 三种遍历——递归深入</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#%E5%89%8D%E5%BA%8F%E9%81%8D%E5%8E%86%EF%BC%9A%E6%A0%B9-%E2%86%92-%E5%B7%A6-%E2%86%92-%E5%8F%B3"><span class="nav-text">前序遍历：根 → 左 → 右</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E4%B8%AD%E5%BA%8F%E9%81%8D%E5%8E%86%EF%BC%9A%E5%B7%A6-%E2%86%92-%E6%A0%B9-%E2%86%92-%E5%8F%B3"><span class="nav-text">中序遍历：左 → 根 → 右</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E5%90%8E%E5%BA%8F%E9%81%8D%E5%8E%86%EF%BC%9A%E5%B7%A6-%E2%86%92-%E5%8F%B3-%E2%86%92-%E6%A0%B9"><span class="nav-text">后序遍历：左 → 右 → 根</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E8%BF%BD%E8%B8%AA%E4%B8%80%E6%AC%A1%E5%89%8D%E5%BA%8F%E9%81%8D%E5%8E%86"><span class="nav-text">追踪一次前序遍历</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E4%B8%89%E7%A7%8D%E9%81%8D%E5%8E%86%E7%9A%84%E5%AE%8C%E6%95%B4%E7%BB%93%E6%9E%9C"><span class="nav-text">三种遍历的完整结果</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E9%81%8D%E5%8E%86%E6%96%B9%E6%B3%95%E5%AF%B9%E6%AF%94"><span class="nav-text">遍历方法对比</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E4%B8%83%E3%80%81%E9%9D%A2%E8%AF%95%E9%AB%98%E9%A2%91%E9%A2%98"><span class="nav-text">七、面试高频题</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#Q1-%E4%BA%8C%E5%8F%89%E6%A0%91%E5%92%8C%E9%93%BE%E8%A1%A8%E7%9A%84%E5%8C%BA%E5%88%AB%E6%98%AF%E4%BB%80%E4%B9%88%EF%BC%9F"><span class="nav-text">Q1: 二叉树和链表的区别是什么？</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#Q2-BFS-%E4%B8%BA%E4%BB%80%E4%B9%88%E8%A6%81%E7%94%A8%E9%98%9F%E5%88%97%E5%AE%9E%E7%8E%B0%EF%BC%9F%E7%94%A8%E6%A0%88%E8%A1%8C%E4%B8%8D%E8%A1%8C%EF%BC%9F"><span class="nav-text">Q2: BFS 为什么要用队列实现？用栈行不行？</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#Q3-%E5%89%8D%E5%BA%8F%E3%80%81%E4%B8%AD%E5%BA%8F%E3%80%81%E5%90%8E%E5%BA%8F%E9%81%8D%E5%8E%86%E5%90%84%E6%9C%89%E4%BB%80%E4%B9%88%E5%AE%9E%E9%99%85%E7%94%A8%E9%80%94%EF%BC%9F"><span class="nav-text">Q3: 前序、中序、后序遍历各有什么实际用途？</span></a></li></ol></li></ol></div>
+        </div>
+        <!--/noindex-->
+
+        <div class="site-overview-wrap sidebar-panel">
+          <div class="site-author animated" itemprop="author" itemscope itemtype="http://schema.org/Person">
+    <img class="site-author-image" itemprop="image" alt="陌忆"
+      src="/images/avatar.webp">
+  <p class="site-author-name" itemprop="name">陌忆</p>
+  <div class="site-description" itemprop="description">记录 RAG、Agent、MCP、算法与软件工程实践，按专栏整理可复用的技术笔记。</div>
+</div>
+<div class="site-state-wrap animated">
+  <nav class="site-state">
+      <div class="site-state-item site-state-posts">
+        <a href="/archives/">
+          <span class="site-state-item-count">50</span>
+          <span class="site-state-item-name">日志</span>
+        </a>
+      </div>
+      <div class="site-state-item site-state-categories">
+          <a href="/categories/">
+        <span class="site-state-item-count">10</span>
+        <span class="site-state-item-name">分类</span></a>
+      </div>
+      <div class="site-state-item site-state-tags">
+          <a href="/tags/">
+        <span class="site-state-item-count">172</span>
+        <span class="site-state-item-name">标签</span></a>
+      </div>
+  </nav>
+</div>
+  <div class="links-of-author animated">
+      <span class="links-of-author-item">
+        <a href="https://github.com/moyi-math" title="GitHub → https:&#x2F;&#x2F;github.com&#x2F;moyi-math" rel="noopener me" target="_blank"><i class="fab fa-github fa-fw"></i>GitHub</a>
+      </span>
+  </div>
+  <div class="cc-license animated" itemprop="license">
+    <a href="https://creativecommons.org/licenses/by-nc-sa/4.0/" class="cc-opacity" rel="noopener" target="_blank"><img src="https://cdnjs.cloudflare.com/ajax/libs/creativecommons-vocabulary/2020.11.3/assets/license_badges/small/by_nc_sa.svg" alt="Creative Commons"></a>
+  </div>
+
+        </div>
+      </div>
+    </div>
+
+    
+  </aside>
+
+
+    </div>
+
+    <div class="main-inner post posts-expand">
+
+
+  
+
+
+<div class="post-block">
+  
+  
+
+  <article itemscope itemtype="http://schema.org/Article" class="post-content" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="https://moyi-math.github.io/2026/07/29/Hello%E7%AE%97%E6%B3%95-7.1-%E4%BA%8C%E5%8F%89%E6%A0%91%EF%BC%9A%E4%B8%80%E5%AF%B9%E5%A4%9A%E7%9A%84%E5%B1%82%E6%AC%A1%E7%BB%93%E6%9E%84/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.webp">
+      <meta itemprop="name" content="陌忆">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="陌忆的博客">
+      <meta itemprop="description" content="记录 RAG、Agent、MCP、算法与软件工程实践，按专栏整理可复用的技术笔记。">
+    </span>
+
+    <span hidden itemprop="post" itemscope itemtype="http://schema.org/CreativeWork">
+      <meta itemprop="name" content="Hello算法 学习笔记 · 7.1 二叉树：一对多的层次结构 | 陌忆的博客">
+      <meta itemprop="description" content="树是第一种非线性数据结构——一对多的层次关系。二叉树每个节点最多两个分支，是树结构的基础。本文从节点定义到四种遍历方式（BFS层序、DFS前&#x2F;中&#x2F;后序）逐层拆解，理解遍历的本质就是&quot;待办清单&quot;。">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          Hello算法 学习笔记 · 7.1 二叉树：一对多的层次结构
+        </h1>
+
+        <div class="post-meta-container">
+          <div class="post-meta">
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-calendar"></i>
+      </span>
+      <span class="post-meta-item-text">发表于</span>
+
+      <time title="创建时间：2026-07-30 00:00:00" itemprop="dateCreated datePublished" datetime="2026-07-30T00:00:00+08:00">2026-07-30</time>
+    </span>
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-folder"></i>
+      </span>
+      <span class="post-meta-item-text">分类于</span>
+        <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+          <a href="/categories/Hello%E7%AE%97%E6%B3%95%E5%AD%A6%E4%B9%A0%E7%AC%94%E8%AE%B0/" itemprop="url" rel="index"><span itemprop="name">Hello算法学习笔记</span></a>
+        </span>
+    </span>
+
+  
+    <span class="post-meta-break"></span>
+    <span class="post-meta-item" title="本文字数">
+      <span class="post-meta-item-icon">
+        <i class="far fa-file-word"></i>
+      </span>
+      <span class="post-meta-item-text">本文字数：</span>
+      <span>2k</span>
+    </span>
+    <span class="post-meta-item" title="阅读时长">
+      <span class="post-meta-item-icon">
+        <i class="far fa-clock"></i>
+      </span>
+      <span class="post-meta-item-text">阅读时长 &asymp;</span>
+      <span>7 分钟</span>
+    </span>
+</div>
+
+            <div class="post-description">树是第一种非线性数据结构——一对多的层次关系。二叉树每个节点最多两个分支，是树结构的基础。本文从节点定义到四种遍历方式（BFS层序、DFS前/中/后序）逐层拆解，理解遍历的本质就是"待办清单"。</div>
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody"><blockquote>
+<p><strong>章节定位:</strong> 前几章学的都是线性结构（数组、链表、栈、队列、哈希表）——数据一对一排列。本章进入<strong>非线性结构</strong>的第一站：<strong>树（Tree）</strong>。树是一对多的层次关系，而<strong>二叉树（Binary Tree）</strong> 是最基础的树形结构。文件系统、编译器语法树、数据库索引，底层都是树。</p>
+</blockquote>
+<span id="more"></span>
+
+<h2 id="摘要-Abstract"><a href="#摘要-Abstract" class="headerlink" title="摘要(Abstract)"></a>摘要(Abstract)</h2><p><strong>TL;DR:</strong> 二叉树是每个节点<strong>最多有两个子节点</strong>的树形结构。节点散落在内存中，通过 <code>left</code> 和 <code>right</code> 指针连接。和链表相比，链表只有 <code>next</code>（一个方向），二叉树有 <code>left</code> 和 <code>right</code>（两个方向）。二叉树的遍历有四种方式：层序遍历（BFS，用队列）和前序&#x2F;中序&#x2F;后序遍历（DFS，用递归）。理解遍历的关键是理解”队列&#x2F;栈是用来记住待办事项的”。</p>
+<p>本文覆盖:</p>
+<ul>
+<li><strong>为什么需要树</strong>: 从线性结构到一对多的层次关系</li>
+<li><strong>二叉树的定义</strong>: <code>TreeNode(val, left, right)</code>——每个节点最多两个子节点</li>
+<li><strong>树的术语</strong>: 根节点、叶子节点、子树、高度、深度</li>
+<li><strong>特殊形态</strong>: 满二叉树、完全二叉树</li>
+<li><strong>层序遍历 BFS</strong>: 用队列逐层从上到下遍历</li>
+<li><strong>前序&#x2F;中序&#x2F;后序遍历 DFS</strong>: 递归深入，根节点的访问位置决定名称</li>
+<li><strong>遍历的本质</strong>: 队列和栈都是”待办清单”，只是顺序不同</li>
+<li><strong>面试高频题</strong>: 3 道覆盖二叉树核心知识的面试题</li>
+</ul>
+<p>适合读者: 第一次接触树形结构的初学者；对 BFS&#x2F;DFS 遍历为什么要用队列&#x2F;递归感到困惑的学习者。</p>
+<hr>
+<h2 id="一、为什么需要树？"><a href="#一、为什么需要树？" class="headerlink" title="一、为什么需要树？"></a>一、为什么需要树？</h2><p>前面学的数据结构都是一对一的线性关系：</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># 线性结构：一个挨一个</span></span><br><span class="line">array = [<span class="number">1</span>, <span class="number">3</span>, <span class="number">2</span>, <span class="number">5</span>, <span class="number">4</span>]</span><br><span class="line">linked_list = <span class="number">1</span> → <span class="number">3</span> → <span class="number">2</span> → <span class="number">5</span> → <span class="number">4</span></span><br><span class="line">stack = push/pop 都在一端</span><br><span class="line">queue = 先进先出排队</span><br></pre></td></tr></table></figure>
+
+<p>但现实中的很多关系是<strong>一对多</strong>的：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line">文件系统：                    网页 DOM 树：</span><br><span class="line">  root                        html</span><br><span class="line">  ├── home                    ├── head</span><br><span class="line">  │   ├── user1               │   ├── title</span><br><span class="line">  │   └── user2               │   └── meta</span><br><span class="line">  └── etc                     └── body</span><br><span class="line">      ├── config                  ├── div</span><br><span class="line">      └── data                    └── script</span><br></pre></td></tr></table></figure>
+
+<p><strong>树就是用来表示这种一对多层次关系的数据结构。</strong></p>
+<hr>
+<h2 id="二、二叉树的定义"><a href="#二、二叉树的定义" class="headerlink" title="二、二叉树的定义"></a>二、二叉树的定义</h2><p>二叉树是<strong>每个节点最多有两个分支</strong>的树。</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">class</span> <span class="title class_">TreeNode</span>:</span><br><span class="line">    <span class="keyword">def</span> <span class="title function_">__init__</span>(<span class="params">self, val: <span class="built_in">int</span></span>):</span><br><span class="line">        <span class="variable language_">self</span>.val: <span class="built_in">int</span> = val                 <span class="comment"># 节点的值</span></span><br><span class="line">        <span class="variable language_">self</span>.left: TreeNode | <span class="literal">None</span> = <span class="literal">None</span>   <span class="comment"># 左子节点指针</span></span><br><span class="line">        <span class="variable language_">self</span>.right: TreeNode | <span class="literal">None</span> = <span class="literal">None</span>  <span class="comment"># 右子节点指针</span></span><br></pre></td></tr></table></figure>
+
+<p>每个节点就三个东西：<strong>自己的值</strong>、<strong>左孩子的指针</strong>、<strong>右孩子的指针</strong>。</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line">    1</span><br><span class="line">   / \</span><br><span class="line">  2   3</span><br><span class="line"> / \</span><br><span class="line">4   5</span><br></pre></td></tr></table></figure>
+
+<p>构建这棵树：</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br></pre></td><td class="code"><pre><span class="line">n1 = TreeNode(<span class="number">1</span>)</span><br><span class="line">n2 = TreeNode(<span class="number">2</span>)</span><br><span class="line">n3 = TreeNode(<span class="number">3</span>)</span><br><span class="line">n4 = TreeNode(<span class="number">4</span>)</span><br><span class="line">n5 = TreeNode(<span class="number">5</span>)</span><br><span class="line"></span><br><span class="line">n1.left = n2      <span class="comment"># 1 的左子是 2</span></span><br><span class="line">n1.right = n3     <span class="comment"># 1 的右子是 3</span></span><br><span class="line">n2.left = n4      <span class="comment"># 2 的左子是 4</span></span><br><span class="line">n2.right = n5     <span class="comment"># 2 的右子是 5</span></span><br></pre></td></tr></table></figure>
+
+<p><strong>和链表的关系：</strong> 链表节点只有 <code>next</code>，二叉树节点有 <code>left</code> 和 <code>right</code>。链表是”单行道”，二叉树是”双岔路”。</p>
+<hr>
+<h2 id="三、树的术语"><a href="#三、树的术语" class="headerlink" title="三、树的术语"></a>三、树的术语</h2><figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line">     1         ← 根节点（root）</span><br><span class="line">   /   \</span><br><span class="line">  2     3      ← 2 是 1 的左子节点，3 是右子节点</span><br><span class="line"> / \   / \</span><br><span class="line">4   5 6   7    ← 叶子节点（leaf）：没有孩子的节点</span><br></pre></td></tr></table></figure>
+
+<table>
+<thead>
+<tr>
+<th>术语</th>
+<th>含义</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>根节点</strong></td>
+<td>树的最顶层节点，没有父节点</td>
+</tr>
+<tr>
+<td><strong>父节点 &#x2F; 子节点</strong></td>
+<td>相连的两个节点，上层是父，下层是子</td>
+</tr>
+<tr>
+<td><strong>叶子节点</strong></td>
+<td>没有子节点的节点</td>
+</tr>
+<tr>
+<td><strong>子树</strong></td>
+<td>任何一个节点及其所有后代构成一棵子树</td>
+</tr>
+<tr>
+<td><strong>高度</strong></td>
+<td>从根到最远叶子节点的边数</td>
+</tr>
+<tr>
+<td><strong>深度</strong></td>
+<td>从根到该节点的边数</td>
+</tr>
+</tbody></table>
+<hr>
+<h2 id="四、二叉树的特殊形态"><a href="#四、二叉树的特殊形态" class="headerlink" title="四、二叉树的特殊形态"></a>四、二叉树的特殊形态</h2><figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br></pre></td><td class="code"><pre><span class="line">空树：         只有根：</span><br><span class="line"> None             1</span><br><span class="line">              /     \</span><br><span class="line">            None   None</span><br><span class="line"></span><br><span class="line">满二叉树：                 完全二叉树：</span><br><span class="line">       1                       1</span><br><span class="line">     /   \                   /   \</span><br><span class="line">    2     3                 2     3</span><br><span class="line">   / \   / \               / \   /</span><br><span class="line">  4   5 6   7             4   5 6</span><br></pre></td></tr></table></figure>
+
+<ul>
+<li><strong>满二叉树</strong>：所有层的节点数都达到最大值（每层 <code>2^level</code> 个）</li>
+<li><strong>完全二叉树</strong>：除了最后一层，其他层都满；最后一层的节点靠左排列</li>
+</ul>
+<p>完全二叉树后面会用到——<strong>堆（Heap）就是用数组存完全二叉树</strong>。</p>
+<hr>
+<h2 id="五、层序遍历（BFS）——逐层从上到下"><a href="#五、层序遍历（BFS）——逐层从上到下" class="headerlink" title="五、层序遍历（BFS）——逐层从上到下"></a>五、层序遍历（BFS）——逐层从上到下</h2><p>层序遍历的目标：<strong>按层从上到下，每层从左到右</strong>遍历所有节点。</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line">          1</span><br><span class="line">        /   \</span><br><span class="line">       2     3</span><br><span class="line">      / \   / \</span><br><span class="line">     4   5 6   7</span><br><span class="line"></span><br><span class="line">层序遍历结果：[1, 2, 3, 4, 5, 6, 7]</span><br></pre></td></tr></table></figure>
+
+<p>实现用<strong>队列</strong>：</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">def</span> <span class="title function_">level_order</span>(<span class="params">root: TreeNode | <span class="literal">None</span></span>) -&gt; <span class="built_in">list</span>[<span class="built_in">int</span>]:</span><br><span class="line">    queue = deque()</span><br><span class="line">    queue.append(root)</span><br><span class="line">    res = []</span><br><span class="line">    <span class="keyword">while</span> queue:</span><br><span class="line">        node = queue.popleft()       <span class="comment"># 从队列取出一个</span></span><br><span class="line">        res.append(node.val)         <span class="comment"># 访问它</span></span><br><span class="line">        <span class="keyword">if</span> node.left:</span><br><span class="line">            queue.append(node.left)  <span class="comment"># 左子入队——以后访问</span></span><br><span class="line">        <span class="keyword">if</span> node.right:</span><br><span class="line">            queue.append(node.right) <span class="comment"># 右子入队——以后访问</span></span><br><span class="line">    <span class="keyword">return</span> res</span><br></pre></td></tr></table></figure>
+
+<h3 id="为什么-BFS-要用队列？"><a href="#为什么-BFS-要用队列？" class="headerlink" title="为什么 BFS 要用队列？"></a>为什么 BFS 要用队列？</h3><p>完整手工追踪一次：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br></pre></td><td class="code"><pre><span class="line">初始：queue = [1],       res = []</span><br><span class="line"></span><br><span class="line">取 1: 访问 1, 左子 2 入队, 右子 3 入队</span><br><span class="line">     queue = [2, 3],    res = [1]</span><br><span class="line"></span><br><span class="line">取 2: 访问 2, 左子 4 入队, 右子 5 入队</span><br><span class="line">     queue = [3, 4, 5], res = [1, 2]</span><br><span class="line"></span><br><span class="line">取 3: 访问 3, 左子 6 入队, 右子 7 入队</span><br><span class="line">     queue = [4, 5, 6, 7], res = [1, 2, 3]</span><br><span class="line"></span><br><span class="line">取 4 → 取 5 → 取 6 → 取 7</span><br><span class="line">     queue = [],        res = [1, 2, 3, 4, 5, 6, 7]</span><br></pre></td></tr></table></figure>
+
+<div class="note primary"><p><strong>队列 &#x3D; “待办清单”。</strong></p>
+<ul>
+<li><strong>入队</strong> &#x3D; 把”以后要访问的节点”记在清单上</li>
+<li><strong>出队</strong> &#x3D; 从清单上取一个来访问</li>
+</ul>
+<p>队列的先进先出特性保证了：<strong>先发现的节点先被访问</strong>，同一层从左到右，一层完了再下一层。</p>
+</div>
+
+<hr>
+<h2 id="六、DFS-三种遍历——递归深入"><a href="#六、DFS-三种遍历——递归深入" class="headerlink" title="六、DFS 三种遍历——递归深入"></a>六、DFS 三种遍历——递归深入</h2><p>DFS 用递归（或显式栈）实现。”一条路走到底，回头再走另一条”。</p>
+<h3 id="前序遍历：根-→-左-→-右"><a href="#前序遍历：根-→-左-→-右" class="headerlink" title="前序遍历：根 → 左 → 右"></a>前序遍历：根 → 左 → 右</h3><figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">def</span> <span class="title function_">pre_order</span>(<span class="params">root</span>):</span><br><span class="line">    <span class="keyword">if</span> root <span class="keyword">is</span> <span class="literal">None</span>:</span><br><span class="line">        <span class="keyword">return</span></span><br><span class="line">    res.append(root.val)      <span class="comment"># 根</span></span><br><span class="line">    pre_order(root.left)       <span class="comment"># 左子树</span></span><br><span class="line">    pre_order(root.right)      <span class="comment"># 右子树</span></span><br></pre></td></tr></table></figure>
+
+<h3 id="中序遍历：左-→-根-→-右"><a href="#中序遍历：左-→-根-→-右" class="headerlink" title="中序遍历：左 → 根 → 右"></a>中序遍历：左 → 根 → 右</h3><figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">def</span> <span class="title function_">in_order</span>(<span class="params">root</span>):</span><br><span class="line">    <span class="keyword">if</span> root <span class="keyword">is</span> <span class="literal">None</span>:</span><br><span class="line">        <span class="keyword">return</span></span><br><span class="line">    in_order(root.left)        <span class="comment"># 左子树</span></span><br><span class="line">    res.append(root.val)       <span class="comment"># 根</span></span><br><span class="line">    in_order(root.right)       <span class="comment"># 右子树</span></span><br></pre></td></tr></table></figure>
+
+<h3 id="后序遍历：左-→-右-→-根"><a href="#后序遍历：左-→-右-→-根" class="headerlink" title="后序遍历：左 → 右 → 根"></a>后序遍历：左 → 右 → 根</h3><figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">def</span> <span class="title function_">post_order</span>(<span class="params">root</span>):</span><br><span class="line">    <span class="keyword">if</span> root <span class="keyword">is</span> <span class="literal">None</span>:</span><br><span class="line">        <span class="keyword">return</span></span><br><span class="line">    post_order(root.left)      <span class="comment"># 左子树</span></span><br><span class="line">    post_order(root.right)     <span class="comment"># 右子树</span></span><br><span class="line">    res.append(root.val)       <span class="comment"># 根</span></span><br></pre></td></tr></table></figure>
+
+<h3 id="追踪一次前序遍历"><a href="#追踪一次前序遍历" class="headerlink" title="追踪一次前序遍历"></a>追踪一次前序遍历</h3><figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br></pre></td><td class="code"><pre><span class="line">          1</span><br><span class="line">        /   \</span><br><span class="line">       2     3</span><br><span class="line">      / \   / \</span><br><span class="line">     4   5 6   7</span><br><span class="line"></span><br><span class="line">pre_order(1):</span><br><span class="line">  → res=[1]          # 访问 1</span><br><span class="line">  → pre_order(2):    # 进入左子树</span><br><span class="line">    → res=[1,2]      # 访问 2</span><br><span class="line">    → pre_order(4):  # 进入左子树</span><br><span class="line">      → res=[1,2,4]  # 访问 4 → 返回</span><br><span class="line">    → pre_order(5):  # 进入右子树</span><br><span class="line">      → res=[1,2,4,5] # 访问 5 → 返回</span><br><span class="line">  → pre_order(3):    # 进入右子树</span><br><span class="line">    → ... 最终 [1,2,4,5,3,6,7]</span><br></pre></td></tr></table></figure>
+
+<h3 id="三种遍历的完整结果"><a href="#三种遍历的完整结果" class="headerlink" title="三种遍历的完整结果"></a>三种遍历的完整结果</h3><figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br></pre></td><td class="code"><pre><span class="line">          1</span><br><span class="line">        /   \</span><br><span class="line">       2     3</span><br><span class="line">      / \   / \</span><br><span class="line">     4   5 6   7</span><br><span class="line"></span><br><span class="line">前序：[1, 2, 4, 5, 3, 6, 7]  根 → 左 → 右</span><br><span class="line">中序：[4, 2, 5, 1, 6, 3, 7]  左 → 根 → 右</span><br><span class="line">后序：[4, 5, 2, 6, 7, 3, 1]  左 → 右 → 根</span><br></pre></td></tr></table></figure>
+
+<p><strong>按根的位置记忆：前序根在前，中序根在中，后序根在后。</strong></p>
+<h3 id="遍历方法对比"><a href="#遍历方法对比" class="headerlink" title="遍历方法对比"></a>遍历方法对比</h3><table>
+<thead>
+<tr>
+<th>遍历方式</th>
+<th>数据结构</th>
+<th>顺序</th>
+<th>用途</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>层序 BFS</td>
+<td><strong>队列</strong></td>
+<td>逐层从上到下</td>
+<td>最短路径、层级分析</td>
+</tr>
+<tr>
+<td>前序 DFS</td>
+<td>递归&#x2F;栈</td>
+<td>根→左→右</td>
+<td>复制树</td>
+</tr>
+<tr>
+<td>中序 DFS</td>
+<td>递归&#x2F;栈</td>
+<td>左→根→右</td>
+<td>BST 升序输出</td>
+</tr>
+<tr>
+<td>后序 DFS</td>
+<td>递归&#x2F;栈</td>
+<td>左→右→根</td>
+<td>删除树</td>
+</tr>
+</tbody></table>
+<div class="note warning"><p><strong>BFS 用队列，DFS 用递归&#x2F;栈，区别在哪里？</strong></p>
+<p>两者的本质都是**记住”还有哪些节点没访问”**：</p>
+<ul>
+<li>BFS 用队列：先进先出 → 同一层先被发现的先访问 → 逐层展开</li>
+<li>DFS 用递归&#x2F;栈：后进先出 → 最后发现的先访问 → 一条路走到底</li>
+</ul>
+<p>队列和栈只是”待办清单”的不同组织形式——顺序决定了遍历的顺序。</p>
+</div>
+
+<hr>
+<h2 id="七、面试高频题"><a href="#七、面试高频题" class="headerlink" title="七、面试高频题"></a>七、面试高频题</h2><h3 id="Q1-二叉树和链表的区别是什么？"><a href="#Q1-二叉树和链表的区别是什么？" class="headerlink" title="Q1: 二叉树和链表的区别是什么？"></a>Q1: 二叉树和链表的区别是什么？</h3><p>链表是线性结构（一对一），二叉树是树形结构（一对多）。链表节点只有一个 <code>next</code> 指针，二叉树节点有 <code>left</code> 和 <code>right</code> 两个指针。从代码上看，<code>ListNode</code> 和 <code>TreeNode</code> 只差一个指针字段，但表达能力完全不同——树可以表达层次、从属、包含关系。</p>
+<h3 id="Q2-BFS-为什么要用队列实现？用栈行不行？"><a href="#Q2-BFS-为什么要用队列实现？用栈行不行？" class="headerlink" title="Q2: BFS 为什么要用队列实现？用栈行不行？"></a>Q2: BFS 为什么要用队列实现？用栈行不行？</h3><p>BFS 要求<strong>先发现的节点先访问</strong>（先进先出），队列正好满足这个需求。如果用栈（后进先出），就会变成”后发现的先访问”，那不是 BFS，而是另一种 DFS。</p>
+<h3 id="Q3-前序、中序、后序遍历各有什么实际用途？"><a href="#Q3-前序、中序、后序遍历各有什么实际用途？" class="headerlink" title="Q3: 前序、中序、后序遍历各有什么实际用途？"></a>Q3: 前序、中序、后序遍历各有什么实际用途？</h3><ul>
+<li><strong>前序</strong>：复制一棵二叉树——先创建根节点，再递归创建左右子树</li>
+<li><strong>中序</strong>：二叉搜索树的中序遍历结果是有序的（升序排列）</li>
+<li><strong>后序</strong>：删除一棵二叉树——必须先删除子节点，再删除根节点</li>
+</ul>
+<hr>
+<blockquote>
+<p><strong>下一节预告:</strong> 普通二叉树的查找需要遍历整棵树——O(n)。<strong>二叉搜索树（BST）</strong> 加了一条规则（左 &lt; 根 &lt; 右），就让查找变成了 O(log n)。它是二分查找的树形实现。</p>
+</blockquote>
+
+    </div>
+
+    
+    
+    
+
+    <footer class="post-footer">
+          
+
+<div class="post-copyright">
+<ul>
+  <li class="post-copyright-author">
+      <strong>本文作者： </strong>陌忆
+  </li>
+  <li class="post-copyright-link">
+      <strong>本文链接：</strong>
+      <a href="https://moyi-math.github.io/2026/07/29/Hello%E7%AE%97%E6%B3%95-7.1-%E4%BA%8C%E5%8F%89%E6%A0%91%EF%BC%9A%E4%B8%80%E5%AF%B9%E5%A4%9A%E7%9A%84%E5%B1%82%E6%AC%A1%E7%BB%93%E6%9E%84/" title="Hello算法 学习笔记 · 7.1 二叉树：一对多的层次结构">https://moyi-math.github.io/2026/07/29/Hello算法-7.1-二叉树：一对多的层次结构/</a>
+  </li>
+  <li class="post-copyright-license">
+      <strong>版权声明： </strong>本博客所有文章除特别声明外，均采用 <a href="https://creativecommons.org/licenses/by-nc-sa/4.0/" rel="noopener" target="_blank"><i class="fab fa-fw fa-creative-commons"></i>BY-NC-SA</a> 许可协议。转载请注明出处！
+  </li>
+</ul>
+</div>
+
+          <div class="post-tags">
+              <a href="/tags/%E7%AE%97%E6%B3%95/" rel="tag"># 算法</a>
+              <a href="/tags/%E6%95%B0%E6%8D%AE%E7%BB%93%E6%9E%84/" rel="tag"># 数据结构</a>
+              <a href="/tags/Python/" rel="tag"># Python</a>
+              <a href="/tags/%E6%A0%91/" rel="tag"># 树</a>
+              <a href="/tags/%E4%BA%8C%E5%8F%89%E6%A0%91/" rel="tag"># 二叉树</a>
+              <a href="/tags/Binary-Tree/" rel="tag"># Binary Tree</a>
+              <a href="/tags/BFS/" rel="tag"># BFS</a>
+              <a href="/tags/DFS/" rel="tag"># DFS</a>
+              <a href="/tags/%E5%89%8D%E5%BA%8F%E9%81%8D%E5%8E%86/" rel="tag"># 前序遍历</a>
+              <a href="/tags/%E4%B8%AD%E5%BA%8F%E9%81%8D%E5%8E%86/" rel="tag"># 中序遍历</a>
+              <a href="/tags/%E5%90%8E%E5%BA%8F%E9%81%8D%E5%8E%86/" rel="tag"># 后序遍历</a>
+              <a href="/tags/%E5%B1%82%E5%BA%8F%E9%81%8D%E5%8E%86/" rel="tag"># 层序遍历</a>
+          </div>
+
+        
+
+          <div class="post-nav">
+            <div class="post-nav-item">
+                <a href="/2026/07/29/Hello%E7%AE%97%E6%B3%95-7.2-%E4%BA%8C%E5%8F%89%E6%90%9C%E7%B4%A2%E6%A0%91%EF%BC%9A%E4%BA%8C%E5%88%86%E6%9F%A5%E6%89%BE%E7%9A%84%E6%A0%91%E5%BD%A2%E5%AE%9E%E7%8E%B0/" rel="prev" title="Hello算法 学习笔记 · 7.2 二叉搜索树：二分查找的树形实现">
+                  <i class="fa fa-angle-left"></i> Hello算法 学习笔记 · 7.2 二叉搜索树：二分查找的树形实现
+                </a>
+            </div>
+            <div class="post-nav-item">
+                <a href="/2026/07/30/%E4%BB%8E%E9%9B%B6%E5%AE%9E%E8%B7%B5-Function-Call-1-%E5%85%A5%E9%97%A8/" rel="next" title="从零实践 Function Call（一）：从 LLM 到 Agent——Function Call 入门">
+                  从零实践 Function Call（一）：从 LLM 到 Agent——Function Call 入门 <i class="fa fa-angle-right"></i>
+                </a>
+            </div>
+          </div>
+    </footer>
+  </article>
+</div>
+
+
+
+
+
+
+</div>
+  </main>
+
+  <footer class="footer">
+    <div class="footer-inner">
+
+  <div class="copyright">
+    &copy; 
+    <span itemprop="copyrightYear">2026</span>
+    <span class="with-love">
+      <i class="fab fa-osi"></i>
+    </span>
+    <span class="author" itemprop="copyrightHolder">陌忆</span>
+  </div>
+<div class="wordcount">
+  <span class="post-meta-item">
+    <span class="post-meta-item-icon">
+      <i class="fa fa-chart-line"></i>
+    </span>
+    <span title="站点总字数">106k</span>
+  </span>
+  <span class="post-meta-item">
+    <span class="post-meta-item-icon">
+      <i class="fa fa-coffee"></i>
+    </span>
+    <span title="站点阅读时长">6:24</span>
+  </span>
+</div>
+  <div class="powered-by">由 <a href="https://hexo.io/" rel="noopener" target="_blank">Hexo</a> & <a href="https://theme-next.js.org/" rel="noopener" target="_blank">NexT.Gemini</a> 强力驱动
+  </div>
+
+    </div>
+  </footer>
+
+  
+  <div class="toggle sidebar-toggle" role="button">
+    <span class="toggle-line"></span>
+    <span class="toggle-line"></span>
+    <span class="toggle-line"></span>
+  </div>
+  <div class="sidebar-dimmer"></div>
+  <div class="back-to-top" role="button" aria-label="返回顶部">
+    <i class="fa fa-arrow-up fa-lg"></i>
+    <span>0%</span>
+  </div>
+
+<noscript>
+  <div class="noscript-warning">Theme NexT works best with JavaScript enabled</div>
+</noscript>
+<!-- Site running time -->
+<span id="timeDate" aria-live="off"></span>
+<script>
+(function() {
+  var start = new Date("2022-11-17T08:00:00+08:00");
+  function pad(n) { return n < 10 ? "0" + n : "" + n; }
+  function tick() {
+    var diff = Date.now() - start.getTime();
+    if (diff < 0) return;
+    var d = Math.floor(diff / 86400000);
+    var h = Math.floor((diff % 86400000) / 3600000);
+    var m = Math.floor((diff % 3600000) / 60000);
+    var timeDate = document.getElementById("timeDate");
+    if (!timeDate) return;
+    timeDate.textContent =
+      "\u672C\u7AD9\u5DF2\u5B89\u5168\u8FD0\u884C " + d + " \u5929 " + pad(h) + " \u5C0F\u65F6 " + pad(m) + " \u5206";
+  }
+  tick();
+  setInterval(tick, 60000);
+})();
+</script>
+
+</body>
+</html>

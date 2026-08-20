@@ -1,0 +1,585 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width">
+<meta name="theme-color" content="#222" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#222" media="(prefers-color-scheme: dark)"><meta name="generator" content="Hexo 7.3.0">
+<link rel="preconnect" href="https://cdnjs.cloudflare.com" crossorigin>
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon-next.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32-next.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next.png">
+  <link rel="mask-icon" href="/images/logo.svg" color="#222">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/7.0.0/css/all.min.css" integrity="sha256-VHqXKFhhMxcpubYf9xiWdCiojEbY9NexQ4jh8AxbvcM=" crossorigin="anonymous">
+
+<script class="next-config" data-name="main" type="application/json">{"hostname":"moyi-math.github.io","root":"/","images":"/images","scheme":"Gemini","darkmode":true,"version":"8.28.0","exturl":false,"sidebar":{"position":"left","width_expanded":320,"width_dual_column":240,"display":"post","padding":18,"offset":12},"hljswrap":true,"codeblock":{"theme":{"light":"default","dark":"stackoverflow-dark"},"prism":{"light":"prism","dark":"prism-dark"},"copy_button":{"enable":true,"style":null},"fold":{"enable":false,"height":500},"language":false},"bookmark":{"enable":false,"color":"#222","save":"auto"},"mediumzoom":false,"lazyload":true,"pangu":false,"comments":{"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},"stickytabs":false,"motion":{"enable":false,"async":false,"duration":200,"transition":{"menu_item":"fadeInDown","post_block":"fadeIn","post_header":"fadeInDown","post_body":"fadeInDown","coll_header":"fadeInLeft","sidebar":"fadeInUp"}},"prism":false,"i18n":{"placeholder":"搜索...","empty":"没有找到任何搜索结果：${query}","hits_time":"找到 ${hits} 个搜索结果（用时 ${time} 毫秒）","hits":"找到 ${hits} 个搜索结果"},"path":"/search.json","localsearch":{"enable":true,"top_n_per_article":1,"unescape":false,"preload":false}}</script><script src="/js/config.js" defer></script>
+
+    <meta name="description" content="从跑通第一个 MCP Server 开始，逐步拆解 MCP 测试的三种手段：单元测试的内存会话机制、MCP Inspector 的客户端本质、以及 HTTP 手动测试的请求格式。">
+<meta property="og:type" content="article">
+<meta property="og:title" content="MCP 入门（四）：调试与测试——三层机制拆解">
+<meta property="og:url" content="https://moyi-math.github.io/2026/07/31/MCP%E5%85%A5%E9%97%A8-%E5%9B%9B-%E8%B0%83%E8%AF%95%E4%B8%8E%E6%B5%8B%E8%AF%95/index.html">
+<meta property="og:site_name" content="陌忆的博客">
+<meta property="og:description" content="从跑通第一个 MCP Server 开始，逐步拆解 MCP 测试的三种手段：单元测试的内存会话机制、MCP Inspector 的客户端本质、以及 HTTP 手动测试的请求格式。">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:image" content="https://moyi-math.github.io/images/background.webp">
+<meta property="article:published_time" content="2026-07-31T13:30:00.000Z">
+<meta property="article:modified_time" content="2026-07-31T13:30:00.000Z">
+<meta property="article:author" content="陌忆">
+<meta property="article:tag" content="MCP">
+<meta property="article:tag" content="Model Context Protocol">
+<meta property="article:tag" content="JSON-RPC">
+<meta property="article:tag" content="Testing">
+<meta property="article:tag" content="测试">
+<meta property="article:tag" content="调试">
+<meta property="article:tag" content="MCP Inspector">
+<meta property="article:tag" content="pytest">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:image" content="https://moyi-math.github.io/images/background.webp">
+
+
+<link rel="canonical" href="https://moyi-math.github.io/2026/07/31/MCP%E5%85%A5%E9%97%A8-%E5%9B%9B-%E8%B0%83%E8%AF%95%E4%B8%8E%E6%B5%8B%E8%AF%95/">
+
+
+<script class="next-config" data-name="page" type="application/json">{"sidebar":"","isHome":false,"isPost":true,"lang":"zh-CN","comments":true,"permalink":"https://moyi-math.github.io/2026/07/31/MCP%E5%85%A5%E9%97%A8-%E5%9B%9B-%E8%B0%83%E8%AF%95%E4%B8%8E%E6%B5%8B%E8%AF%95/","path":"2026/07/31/MCP入门-四-调试与测试/","title":"MCP 入门（四）：调试与测试——三层机制拆解"}</script>
+
+<script class="next-config" data-name="calendar" type="application/json">""</script>
+<title>MCP 入门（四）：调试与测试——三层机制拆解 | 陌忆的博客</title>
+  
+
+
+
+
+
+
+
+
+  
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/animejs/3.2.1/anime.min.js" integrity="sha256-XL2inqUJaslATFnHdJOi9GfQ60on8Wx1C2H8DYiN1xY=" crossorigin="anonymous" defer></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/lozad.js/1.16.0/lozad.min.js" integrity="sha256-mOFREFhqmHeQbXpK2lp4nA3qooVgACfh88fpJftLBbc=" crossorigin="anonymous" defer></script>
+<script src="/js/utils.js" defer></script><script src="/js/sidebar.js" defer></script><script src="/js/next-boot.js" defer></script>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/hexo-generator-searchdb/1.5.0/search.js" integrity="sha256-xFC6PJ82SL9b3WkGjFavNiA9gm5z6UBxWPiu4CYjptg=" crossorigin="anonymous" defer></script>
+<script src="/js/third-party/search/local-search.js" defer></script>
+
+
+
+
+
+
+
+  
+
+
+
+
+  
+
+  <script class="next-config" data-name="enableMath" type="application/json">false</script><link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/katex.min.css" integrity="sha256-UF1fgpAiu3tPJN/uCqEUHNe7pnr+QR0SQDNfgglgtcM=" crossorigin="anonymous">
+
+
+<link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
+
+
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"WebSite","name":"陌忆的博客","url":"https://moyi-math.github.io","description":"记录 RAG、Agent、MCP、算法与软件工程实践，按专栏整理可复用的技术笔记。","inLanguage":"zh-CN","author":{"@type":"Person","name":"陌忆"}}</script>
+
+
+
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"Article","headline":"MCP 入门（四）：调试与测试——三层机制拆解","description":"从跑通第一个 MCP Server 开始，逐步拆解 MCP 测试的三种手段：单元测试的内存会话机制、MCP Inspector 的客户端本质、以及 HTTP 手动测试的请求格式。","datePublished":"2026-07-31T13:30:00.000Z","dateModified":"2026-07-31T13:30:00.000Z","inLanguage":"zh-CN","mainEntityOfPage":{"@type":"WebPage","@id":"https://moyi-math.github.io/2026/07/31/MCP%E5%85%A5%E9%97%A8-%E5%9B%9B-%E8%B0%83%E8%AF%95%E4%B8%8E%E6%B5%8B%E8%AF%95/index.html"},"author":{"@type":"Person","name":"陌忆"}}</script>
+<meta name="author" content="陌忆">
+
+
+  <noscript>
+    <link rel="stylesheet" href="/css/noscript.css">
+  </noscript>
+<!-- hexo injector head_end start --><link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/katex.min.css" integrity="sha512-fHwaWebuwA7NSF5Qg/af4UeDx9XqUpYpOGgubo3yWu+b2IQR4UeQwbb42Ti7gVAjNtVoI/I9TEoYeu9omwcC6g==" crossorigin="anonymous" referrerpolicy="no-referrer" /><!-- hexo injector head_end end --><link rel="alternate" href="/atom.xml" title="陌忆的博客" type="application/atom+xml">
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage">
+  <div class="headband"></div>
+
+  <main class="main">
+    <div class="column">
+      <header class="header" itemscope itemtype="http://schema.org/WPHeader"><div class="site-brand-container">
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="切换导航栏" role="button">
+        <span class="toggle-line"></span>
+        <span class="toggle-line"></span>
+        <span class="toggle-line"></span>
+    </div>
+  </div>
+
+  <div class="site-meta">
+
+    <a href="/" class="brand" rel="start">
+      <i class="logo-line"></i>
+      <p class="site-title">陌忆的博客</p>
+      <i class="logo-line"></i>
+    </a>
+      <p class="site-subtitle" itemprop="description">数据库无法得出结论</p>
+  </div>
+
+  <div class="site-nav-right">
+    <div class="toggle popup-trigger" aria-label="搜索" role="button">
+        <i class="fa fa-search fa-fw fa-lg"></i>
+    </div>
+  </div>
+</div>
+
+
+
+<nav class="site-nav">
+  <ul class="main-menu menu"><li class="menu-item menu-item-home"><a href="/" rel="section"><i class="fa fa-home fa-fw"></i>首页</a></li><li class="menu-item menu-item-about"><a href="/about/" rel="section"><i class="fa fa-user fa-fw"></i>关于</a></li><li class="menu-item menu-item-tags"><a href="/tags/" rel="section"><i class="fa fa-tags fa-fw"></i>标签</a></li><li class="menu-item menu-item-categories"><a href="/categories/" rel="section"><i class="fa fa-th fa-fw"></i>分类</a></li><li class="menu-item menu-item-archives"><a href="/archives/" rel="section"><i class="fa fa-archive fa-fw"></i>归档</a></li>
+      <li class="menu-item menu-item-search">
+        <a role="button" class="popup-trigger"><i class="fa fa-search fa-fw"></i>搜索
+        </a>
+      </li>
+  </ul>
+</nav>
+
+
+
+  <div class="search-pop-overlay">
+    <div class="popup search-popup">
+      <div class="search-header">
+        <span class="search-icon">
+          <i class="fa fa-search"></i>
+        </span>
+        <div class="search-input-container">
+          <input autocomplete="off" autocapitalize="off" maxlength="80"
+                placeholder="搜索..." spellcheck="false"
+                type="search" class="search-input">
+        </div>
+        <span class="popup-btn-close" role="button">
+          <i class="fa fa-times-circle"></i>
+        </span>
+      </div>
+      <div class="search-result-container">
+        <div class="search-result-icon">
+          <i class="fa fa-spinner fa-pulse fa-5x"></i>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</header>
+        
+  
+  <aside class="sidebar">
+
+    <div class="sidebar-inner sidebar-nav-active sidebar-toc-active">
+      <ul class="sidebar-nav">
+        <li class="sidebar-nav-toc">
+          文章目录
+        </li>
+        <li class="sidebar-nav-overview">
+          站点概览
+        </li>
+      </ul>
+
+      <div class="sidebar-panel-container">
+        <!--noindex-->
+        <div class="post-toc-wrap sidebar-panel">
+            <div class="post-toc animated"><ol class="nav"><li class="nav-item nav-level-2"><a class="nav-link" href="#%E4%B8%80%E3%80%81%E5%85%88%E5%8A%A8%E6%89%8B%EF%BC%9A%E8%B7%91%E9%80%9A%E4%BD%A0%E7%9A%84%E7%AC%AC%E4%B8%80%E4%B8%AA-MCP-Server"><span class="nav-text">一、先动手：跑通你的第一个 MCP Server</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E4%BA%8C%E3%80%81%E4%B8%BA%E4%BB%80%E4%B9%88%E8%A6%81%E5%88%86%E5%B1%82%E6%B5%8B%E8%AF%95"><span class="nav-text">二、为什么要分层测试</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E4%B8%89%E3%80%81%E7%AC%AC%E4%B8%80%E5%B1%82%EF%BC%9A%E5%8D%95%E5%85%83%E6%B5%8B%E8%AF%95%E2%80%94%E2%80%94%E5%86%85%E5%AD%98%E4%BC%9A%E8%AF%9D%E6%9C%BA%E5%88%B6"><span class="nav-text">三、第一层：单元测试——内存会话机制</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#%E6%A0%B8%E5%BF%83%E9%97%AE%E9%A2%98%EF%BC%9A%E6%80%8E%E4%B9%88%E5%81%9A%E5%88%B0%E2%80%9D%E4%B8%8D%E5%90%AF%E5%8A%A8%E8%BF%9B%E7%A8%8B%E4%B9%9F%E8%83%BD%E9%80%9A%E4%BF%A1%E2%80%9D%EF%BC%9F"><span class="nav-text">核心问题：怎么做到”不启动进程也能通信”？</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E4%B8%BA%E4%BB%80%E4%B9%88%E8%BF%99%E6%A0%B7%E5%8F%AF%E8%A1%8C%EF%BC%9F"><span class="nav-text">为什么这样可行？</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E5%AF%B9%E5%BA%94%E7%9A%84%E7%86%9F%E6%82%89%E6%A8%A1%E5%BC%8F"><span class="nav-text">对应的熟悉模式</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%9B%9B%E3%80%81%E7%AC%AC%E4%BA%8C%E5%B1%82%EF%BC%9AMCP-Inspector%E2%80%94%E2%80%94%E5%AE%83%E5%B0%B1%E6%98%AF%E7%8E%B0%E6%88%90%E7%9A%84-MCP-Client"><span class="nav-text">四、第二层：MCP Inspector——它就是现成的 MCP Client</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#%E5%86%85%E9%83%A8%E6%9C%BA%E5%88%B6"><span class="nav-text">内部机制</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E4%BA%94%E3%80%81%E7%AC%AC%E4%B8%89%E5%B1%82%EF%BC%9AHTTP-%E6%89%8B%E5%8A%A8%E6%B5%8B%E8%AF%95"><span class="nav-text">五、第三层：HTTP 手动测试</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%85%AD%E3%80%81%E4%B8%89%E5%B1%82%E6%B5%8B%E8%AF%95%E7%9A%84%E6%9C%AC%E8%B4%A8"><span class="nav-text">六、三层测试的本质</span></a></li></ol></div>
+        </div>
+        <!--/noindex-->
+
+        <div class="site-overview-wrap sidebar-panel">
+          <div class="site-author animated" itemprop="author" itemscope itemtype="http://schema.org/Person">
+    <img class="site-author-image" itemprop="image" alt="陌忆"
+      src="/images/avatar.webp">
+  <p class="site-author-name" itemprop="name">陌忆</p>
+  <div class="site-description" itemprop="description">记录 RAG、Agent、MCP、算法与软件工程实践，按专栏整理可复用的技术笔记。</div>
+</div>
+<div class="site-state-wrap animated">
+  <nav class="site-state">
+      <div class="site-state-item site-state-posts">
+        <a href="/archives/">
+          <span class="site-state-item-count">50</span>
+          <span class="site-state-item-name">日志</span>
+        </a>
+      </div>
+      <div class="site-state-item site-state-categories">
+          <a href="/categories/">
+        <span class="site-state-item-count">10</span>
+        <span class="site-state-item-name">分类</span></a>
+      </div>
+      <div class="site-state-item site-state-tags">
+          <a href="/tags/">
+        <span class="site-state-item-count">172</span>
+        <span class="site-state-item-name">标签</span></a>
+      </div>
+  </nav>
+</div>
+  <div class="links-of-author animated">
+      <span class="links-of-author-item">
+        <a href="https://github.com/moyi-math" title="GitHub → https:&#x2F;&#x2F;github.com&#x2F;moyi-math" rel="noopener me" target="_blank"><i class="fab fa-github fa-fw"></i>GitHub</a>
+      </span>
+  </div>
+  <div class="cc-license animated" itemprop="license">
+    <a href="https://creativecommons.org/licenses/by-nc-sa/4.0/" class="cc-opacity" rel="noopener" target="_blank"><img src="https://cdnjs.cloudflare.com/ajax/libs/creativecommons-vocabulary/2020.11.3/assets/license_badges/small/by_nc_sa.svg" alt="Creative Commons"></a>
+  </div>
+
+        </div>
+      </div>
+    </div>
+
+    
+  </aside>
+
+
+    </div>
+
+    <div class="main-inner post posts-expand">
+
+
+  
+
+
+<div class="post-block">
+  
+  
+
+  <article itemscope itemtype="http://schema.org/Article" class="post-content" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="https://moyi-math.github.io/2026/07/31/MCP%E5%85%A5%E9%97%A8-%E5%9B%9B-%E8%B0%83%E8%AF%95%E4%B8%8E%E6%B5%8B%E8%AF%95/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.webp">
+      <meta itemprop="name" content="陌忆">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="陌忆的博客">
+      <meta itemprop="description" content="记录 RAG、Agent、MCP、算法与软件工程实践，按专栏整理可复用的技术笔记。">
+    </span>
+
+    <span hidden itemprop="post" itemscope itemtype="http://schema.org/CreativeWork">
+      <meta itemprop="name" content="MCP 入门（四）：调试与测试——三层机制拆解 | 陌忆的博客">
+      <meta itemprop="description" content="从跑通第一个 MCP Server 开始，逐步拆解 MCP 测试的三种手段：单元测试的内存会话机制、MCP Inspector 的客户端本质、以及 HTTP 手动测试的请求格式。">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          MCP 入门（四）：调试与测试——三层机制拆解
+        </h1>
+
+        <div class="post-meta-container">
+          <div class="post-meta">
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-calendar"></i>
+      </span>
+      <span class="post-meta-item-text">发表于</span>
+
+      <time title="创建时间：2026-07-31 21:30:00" itemprop="dateCreated datePublished" datetime="2026-07-31T21:30:00+08:00">2026-07-31</time>
+    </span>
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-folder"></i>
+      </span>
+      <span class="post-meta-item-text">分类于</span>
+        <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+          <a href="/categories/MCP-%E5%AD%A6%E4%B9%A0%E7%AC%94%E8%AE%B0/" itemprop="url" rel="index"><span itemprop="name">MCP 学习笔记</span></a>
+        </span>
+    </span>
+
+  
+    <span class="post-meta-break"></span>
+    <span class="post-meta-item" title="本文字数">
+      <span class="post-meta-item-icon">
+        <i class="far fa-file-word"></i>
+      </span>
+      <span class="post-meta-item-text">本文字数：</span>
+      <span>1.6k</span>
+    </span>
+    <span class="post-meta-item" title="阅读时长">
+      <span class="post-meta-item-icon">
+        <i class="far fa-clock"></i>
+      </span>
+      <span class="post-meta-item-text">阅读时长 &asymp;</span>
+      <span>6 分钟</span>
+    </span>
+</div>
+
+            <div class="post-description">从跑通第一个 MCP Server 开始，逐步拆解 MCP 测试的三种手段：单元测试的内存会话机制、MCP Inspector 的客户端本质、以及 HTTP 手动测试的请求格式。</div>
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody"><h2 id="一、先动手：跑通你的第一个-MCP-Server"><a href="#一、先动手：跑通你的第一个-MCP-Server" class="headerlink" title="一、先动手：跑通你的第一个 MCP Server"></a>一、先动手：跑通你的第一个 MCP Server</h2><p>前面三篇我们一直在聊概念。这一篇从实际操作开始——把你的第一个 MCP Server 跑起来，再深入理解调试与测试的三层机制。</p>
+<p>一个最简单的 MCP Server 只需要几行 Python：</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">from</span> mcp.server.mcpserver <span class="keyword">import</span> MCPServer</span><br><span class="line"></span><br><span class="line">mcp = MCPServer(<span class="string">&quot;Demo&quot;</span>)</span><br><span class="line"></span><br><span class="line"><span class="meta">@mcp.tool()</span></span><br><span class="line"><span class="keyword">def</span> <span class="title function_">add</span>(<span class="params">a: <span class="built_in">int</span>, b: <span class="built_in">int</span></span>) -&gt; <span class="built_in">int</span>:</span><br><span class="line">    <span class="string">&quot;&quot;&quot;Add two numbers&quot;&quot;&quot;</span></span><br><span class="line">    <span class="keyword">return</span> a + b</span><br><span class="line"></span><br><span class="line"><span class="meta">@mcp.resource(<span class="params"><span class="string">&quot;greeting://&#123;name&#125;&quot;</span></span>)</span></span><br><span class="line"><span class="keyword">def</span> <span class="title function_">get_greeting</span>(<span class="params">name: <span class="built_in">str</span></span>) -&gt; <span class="built_in">str</span>:</span><br><span class="line">    <span class="string">&quot;&quot;&quot;Get a personalized greeting&quot;&quot;&quot;</span></span><br><span class="line">    <span class="keyword">return</span> <span class="string">f&quot;Hello, <span class="subst">&#123;name&#125;</span>!&quot;</span></span><br></pre></td></tr></table></figure>
+
+<p>安装依赖并启动：</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">pip install <span class="string">&quot;mcp[cli]&quot;</span></span><br><span class="line">python server.py</span><br></pre></td></tr></table></figure>
+
+<p>然后写一个客户端连上去，自动发现工具并调用：</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">from</span> mcp <span class="keyword">import</span> ClientSession, StdioServerParameters</span><br><span class="line"><span class="keyword">from</span> mcp.client.stdio <span class="keyword">import</span> stdio_client</span><br><span class="line"></span><br><span class="line">server_params = StdioServerParameters(</span><br><span class="line">    command=sys.executable,</span><br><span class="line">    args=[<span class="string">&quot;server.py&quot;</span>],</span><br><span class="line">)</span><br><span class="line"></span><br><span class="line"><span class="keyword">async</span> <span class="keyword">with</span> stdio_client(server_params) <span class="keyword">as</span> (read, write):</span><br><span class="line">    <span class="keyword">async</span> <span class="keyword">with</span> ClientSession(read, write) <span class="keyword">as</span> session:</span><br><span class="line">        <span class="keyword">await</span> session.initialize()</span><br><span class="line"></span><br><span class="line">        tools = <span class="keyword">await</span> session.list_tools()      <span class="comment"># 发现工具</span></span><br><span class="line">        result = <span class="keyword">await</span> session.call_tool(<span class="string">&quot;add&quot;</span>, arguments=&#123;<span class="string">&quot;a&quot;</span>: <span class="number">1</span>, <span class="string">&quot;b&quot;</span>: <span class="number">7</span>&#125;)</span><br><span class="line">        content = <span class="keyword">await</span> session.read_resource(<span class="string">&quot;greeting://Codex&quot;</span>)</span><br></pre></td></tr></table></figure>
+
+<p>运行结果：</p>
+<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br></pre></td><td class="code"><pre><span class="line">=== 工具列表 ===</span><br><span class="line">  [add] Add two numbers</span><br><span class="line">  [subtract] Subtract two numbers</span><br><span class="line"></span><br><span class="line">=== 调用工具: add(1, 7) ===</span><br><span class="line">  结果: 8</span><br><span class="line"></span><br><span class="line">=== 读取资源: greeting://Codex ===</span><br><span class="line">  结果: Hello, Codex!</span><br></pre></td></tr></table></figure>
+
+<p>到这里，你已经完成了一个真实的 MCP 调用链路：<strong>Client 发现工具 → Client 调用工具 → Server 执行 → 返回结果</strong>。</p>
+<h2 id="二、为什么要分层测试"><a href="#二、为什么要分层测试" class="headerlink" title="二、为什么要分层测试"></a>二、为什么要分层测试</h2><p>Server 跑起来只是开始。当你写了 20 个工具函数，每次测试都要启动进程、连客户端、调工具，开发效率会很低。MCP 提供了三种测试手段，本质是三个层级：</p>
+<table>
+<thead>
+<tr>
+<th>层级</th>
+<th>传输方式</th>
+<th>适合场景</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>第一层：单元测试</td>
+<td>内存流（不启动进程）</td>
+<td>CI 自动化，快速回归</td>
+</tr>
+<tr>
+<td>第二层：MCP Inspector</td>
+<td>STDIO（启动本地进程）</td>
+<td>开发时人工调试</td>
+</tr>
+<tr>
+<td>第三层：HTTP 手动测试</td>
+<td>HTTP（远程服务）</td>
+<td>部署后冒烟测试</td>
+</tr>
+</tbody></table>
+<p>三层的本质是<strong>同一套 MCP 逻辑，换不同的传输方式</strong>。</p>
+<h2 id="三、第一层：单元测试——内存会话机制"><a href="#三、第一层：单元测试——内存会话机制" class="headerlink" title="三、第一层：单元测试——内存会话机制"></a>三、第一层：单元测试——内存会话机制</h2><h3 id="核心问题：怎么做到”不启动进程也能通信”？"><a href="#核心问题：怎么做到”不启动进程也能通信”？" class="headerlink" title="核心问题：怎么做到”不启动进程也能通信”？"></a>核心问题：怎么做到”不启动进程也能通信”？</h3><p>回顾 MCP 的分层架构：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line">┌─────────────────────────────┐</span><br><span class="line">│  数据层（JSON-RPC 2.0）      │  ← 消息格式</span><br><span class="line">├─────────────────────────────┤</span><br><span class="line">│  传输层（STDIO / HTTP）      │  ← 消息怎么传</span><br><span class="line">└─────────────────────────────┘</span><br></pre></td></tr></table></figure>
+
+<p>正常运行时，Client 和 Server 通过 STDIO 通信——本质是操作系统的管道，数据从一个进程流到另一个进程。</p>
+<p>单元测试的巧妙之处在于：<strong>传输层是可替换的。</strong></p>
+<p>MCP SDK 内置了一个”内存传输层”，它不经过操作系统管道，而是在同一个进程里造一对互相连接的虚拟管道，让 Client 和 Server 直接通过内存对象收发消息：</p>
+<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br></pre></td><td class="code"><pre><span class="line">正常模式：</span><br><span class="line">┌─────────┐   STDIO 管道   ┌─────────┐</span><br><span class="line">│ Client  │ ←————————————→ │ Server  │</span><br><span class="line">└─────────┘   进程边界      └─────────┘</span><br><span class="line"></span><br><span class="line">单元测试模式：</span><br><span class="line">┌───────────────── 同一个进程 ─────────────────┐</span><br><span class="line">│  ┌─────────┐   内存流    ┌─────────┐        │</span><br><span class="line">│  │ Client  │ ←—————————→ │ Server  │        │</span><br><span class="line">│  └─────────┘  (对象直接传) └─────────┘        │</span><br><span class="line">└────────────────────────────────────────────┘</span><br></pre></td></tr></table></figure>
+
+<h3 id="为什么这样可行？"><a href="#为什么这样可行？" class="headerlink" title="为什么这样可行？"></a>为什么这样可行？</h3><p>因为 MCP 协议本身就是 <strong>JSON-RPC 消息</strong>——Client 发的是结构化请求，Server 收到后解析、路由、返回。传输层只是负责把这串数据从 A 挪到 B：</p>
+<ul>
+<li>用 STDIO：数据通过管道挪</li>
+<li>用 HTTP：数据通过网络挪</li>
+<li>用内存流：数据通过 Python 协程&#x2F;对象直接挪</li>
+</ul>
+<p>挪的方式不同，但 Server 收到的请求一模一样。所以测试结果和真实运行是一致的。</p>
+<p>SDK 的 <code>create_connected_server_and_client_session</code> 辅助函数替你完成四件事：</p>
+<ol>
+<li>创建 Server 实例（不启动进程）</li>
+<li>创建一对互连的内存流（扮演管道）</li>
+<li>创建 Client 会话，接到内存流的一端</li>
+<li>初始化握手（等价于真实连接时的 <code>initialize</code>）</li>
+</ol>
+<p>之后就可以像普通测试一样断言：</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">async</span> <span class="keyword">with</span> create_session(server._mcp_server) <span class="keyword">as</span> client_session:</span><br><span class="line">    result = <span class="keyword">await</span> client_session.list_tools()</span><br><span class="line">    <span class="keyword">assert</span> <span class="built_in">len</span>(result.tools) == <span class="number">2</span></span><br><span class="line"></span><br><span class="line">    result = <span class="keyword">await</span> client_session.call_tool(<span class="string">&quot;add&quot;</span>, arguments=&#123;<span class="string">&quot;a&quot;</span>: <span class="number">2</span>, <span class="string">&quot;b&quot;</span>: <span class="number">3</span>&#125;)</span><br><span class="line">    <span class="keyword">assert</span> result.content[<span class="number">0</span>].text == <span class="string">&quot;5&quot;</span></span><br></pre></td></tr></table></figure>
+
+<h3 id="对应的熟悉模式"><a href="#对应的熟悉模式" class="headerlink" title="对应的熟悉模式"></a>对应的熟悉模式</h3><p>这个设计你其实早就见过——**FastAPI 的 <code>TestClient</code>**：</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># FastAPI TestClient</span></span><br><span class="line">app = FastAPI()</span><br><span class="line">client = TestClient(app)</span><br><span class="line">response = client.get(<span class="string">&quot;/users&quot;</span>)</span><br><span class="line"><span class="keyword">assert</span> response.status_code == <span class="number">200</span></span><br><span class="line"></span><br><span class="line"><span class="comment"># MCP in-memory session</span></span><br><span class="line">server = MCPServer(<span class="string">&quot;test&quot;</span>)</span><br><span class="line">session = create_session(server)</span><br><span class="line">result = <span class="keyword">await</span> session.list_tools()</span><br><span class="line"><span class="keyword">assert</span> <span class="built_in">len</span>(result.tools) == <span class="number">2</span></span><br></pre></td></tr></table></figure>
+
+<p>两者本质相同：<strong>不启动真实服务器，直接在进程内把请求灌给应用层处理，然后断言结果。</strong></p>
+<h2 id="四、第二层：MCP-Inspector——它就是现成的-MCP-Client"><a href="#四、第二层：MCP-Inspector——它就是现成的-MCP-Client" class="headerlink" title="四、第二层：MCP Inspector——它就是现成的 MCP Client"></a>四、第二层：MCP Inspector——它就是现成的 MCP Client</h2><p>MCP Inspector 是官方提供的可视化调试工具，本质是一个<strong>现成的 MCP Client + 网页界面</strong>。</p>
+<h3 id="内部机制"><a href="#内部机制" class="headerlink" title="内部机制"></a>内部机制</h3><figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line">浏览器页面（你看到的界面）</span><br><span class="line">     ↑ 网页 UI</span><br><span class="line">Inspector 进程（Node.js 写的 MCP Client）</span><br><span class="line">     ↑ STDIO 管道</span><br><span class="line">你的 MCP Server（server.py 进程）</span><br></pre></td></tr></table></figure>
+
+<p>你运行 <code>mcp dev server.py</code> 时，Inspector 会像你自己写的客户端一样：</p>
+<ol>
+<li><strong>连接</strong>：把你的 Server 作为子进程启动，通过 STDIO 连上去</li>
+<li><strong>发现能力</strong>：自动调用 <code>tools/list</code>、<code>resources/list</code>、<code>prompts/list</code>，把结果显示在网页上</li>
+<li><strong>测试工具</strong>：你在网页上填参数、点调用，Inspector 包装成 <code>tools/call</code> 请求发给 Server，拿到结果后渲染在页面上</li>
+</ol>
+<p>Inspector 没有魔法。它做的事情和你手写的 client 一模一样——连上 Server、发 JSON-RPC 请求、收结果。区别只是界面：</p>
+<table>
+<thead>
+<tr>
+<th></th>
+<th>手写 client</th>
+<th>MCP Inspector</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>界面</td>
+<td>终端打印</td>
+<td>网页可视化</td>
+</tr>
+<tr>
+<td>谁写的</td>
+<td>自己</td>
+<td>官方预制</td>
+</tr>
+<tr>
+<td>自动化</td>
+<td>可以脚本化</td>
+<td>人工交互为主</td>
+</tr>
+</tbody></table>
+<p>一句话：<strong>Inspector 就是别人写好的 MCP Client，加了一个 UI。</strong></p>
+<h2 id="五、第三层：HTTP-手动测试"><a href="#五、第三层：HTTP-手动测试" class="headerlink" title="五、第三层：HTTP 手动测试"></a>五、第三层：HTTP 手动测试</h2><p>当 MCP Server 部署到远程（使用 Streamable HTTP 传输），它就是一个普通 HTTP 服务。这时可以直接用 curl 测试：</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># 列出工具</span></span><br><span class="line">curl -X POST http://your-server.com/mcp \</span><br><span class="line">  -H <span class="string">&quot;Content-Type: application/json&quot;</span> \</span><br><span class="line">  -d <span class="string">&#x27;&#123;&quot;jsonrpc&quot;:&quot;2.0&quot;,&quot;id&quot;:1,&quot;method&quot;:&quot;tools/list&quot;&#125;&#x27;</span></span><br><span class="line"></span><br><span class="line"><span class="comment"># 调用工具</span></span><br><span class="line">curl -X POST http://your-server.com/mcp \</span><br><span class="line">  -H <span class="string">&quot;Content-Type: application/json&quot;</span> \</span><br><span class="line">  -d <span class="string">&#x27;&#123;&quot;jsonrpc&quot;:&quot;2.0&quot;,&quot;id&quot;:2,&quot;method&quot;:&quot;tools/call&quot;,</span></span><br><span class="line"><span class="string">       &quot;params&quot;:&#123;&quot;name&quot;:&quot;add&quot;,&quot;arguments&quot;:&#123;&quot;a&quot;:2,&quot;b&quot;:3&#125;&#125;&#125;&#x27;</span></span><br></pre></td></tr></table></figure>
+
+<p>注意看——这个请求体，就是 MCP 协议里的 <strong>JSON-RPC 2.0 消息</strong>：</p>
+<figure class="highlight json"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line"><span class="punctuation">&#123;</span><span class="attr">&quot;jsonrpc&quot;</span><span class="punctuation">:</span> <span class="string">&quot;2.0&quot;</span><span class="punctuation">,</span> <span class="attr">&quot;id&quot;</span><span class="punctuation">:</span> <span class="number">1</span><span class="punctuation">,</span> <span class="attr">&quot;method&quot;</span><span class="punctuation">:</span> <span class="string">&quot;tools/list&quot;</span><span class="punctuation">&#125;</span></span><br></pre></td></tr></table></figure>
+
+<p>这和你之前学到的协议格式完全一致，只是传输层从 STDIO 换成了 HTTP。</p>
+<h2 id="六、三层测试的本质"><a href="#六、三层测试的本质" class="headerlink" title="六、三层测试的本质"></a>六、三层测试的本质</h2><p>三种测试手段，对应 MCP 协议的一个核心设计：<strong>数据层与传输层分离</strong>。</p>
+<table>
+<thead>
+<tr>
+<th>层级</th>
+<th>传输方式</th>
+<th>适合场景</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>单元测试</td>
+<td>内存流（不启动进程）</td>
+<td>CI 自动化，快速回归</td>
+</tr>
+<tr>
+<td>MCP Inspector</td>
+<td>STDIO（启动本地进程）</td>
+<td>开发时人工调试</td>
+</tr>
+<tr>
+<td>HTTP 手动测试</td>
+<td>HTTP（远程服务）</td>
+<td>部署后冒烟测试</td>
+</tr>
+</tbody></table>
+<p>选择逻辑很简单：<strong>开发时用 Inspector 看效果，CI 用单元测试守回归，上线后用 HTTP 冒烟。</strong></p>
+<blockquote>
+<p>补充说明：课程原示例使用旧版 <code>FastMCP</code> API，本文代码已适配 MCP Python SDK 2.0.0 的 <code>MCPServer</code> API。</p>
+</blockquote>
+
+    </div>
+
+    
+    
+    
+
+    <footer class="post-footer">
+          
+
+<div class="post-copyright">
+<ul>
+  <li class="post-copyright-author">
+      <strong>本文作者： </strong>陌忆
+  </li>
+  <li class="post-copyright-link">
+      <strong>本文链接：</strong>
+      <a href="https://moyi-math.github.io/2026/07/31/MCP%E5%85%A5%E9%97%A8-%E5%9B%9B-%E8%B0%83%E8%AF%95%E4%B8%8E%E6%B5%8B%E8%AF%95/" title="MCP 入门（四）：调试与测试——三层机制拆解">https://moyi-math.github.io/2026/07/31/MCP入门-四-调试与测试/</a>
+  </li>
+  <li class="post-copyright-license">
+      <strong>版权声明： </strong>本博客所有文章除特别声明外，均采用 <a href="https://creativecommons.org/licenses/by-nc-sa/4.0/" rel="noopener" target="_blank"><i class="fab fa-fw fa-creative-commons"></i>BY-NC-SA</a> 许可协议。转载请注明出处！
+  </li>
+</ul>
+</div>
+
+          <div class="post-tags">
+              <a href="/tags/MCP/" rel="tag"># MCP</a>
+              <a href="/tags/Model-Context-Protocol/" rel="tag"># Model Context Protocol</a>
+              <a href="/tags/JSON-RPC/" rel="tag"># JSON-RPC</a>
+              <a href="/tags/Testing/" rel="tag"># Testing</a>
+              <a href="/tags/%E6%B5%8B%E8%AF%95/" rel="tag"># 测试</a>
+              <a href="/tags/%E8%B0%83%E8%AF%95/" rel="tag"># 调试</a>
+              <a href="/tags/MCP-Inspector/" rel="tag"># MCP Inspector</a>
+              <a href="/tags/pytest/" rel="tag"># pytest</a>
+          </div>
+
+        
+
+          <div class="post-nav">
+            <div class="post-nav-item">
+                <a href="/2026/07/31/MCP%E5%85%A5%E9%97%A8-%E4%B8%89-%E5%AE%89%E5%85%A8%E6%A8%A1%E5%9E%8B/" rel="prev" title="MCP 入门（三）：安全模型——当 AI 可以被&quot;骗&quot;时">
+                  <i class="fa fa-angle-left"></i> MCP 入门（三）：安全模型——当 AI 可以被"骗"时
+                </a>
+            </div>
+            <div class="post-nav-item">
+                <a href="/2026/08/05/PostGIS-%E7%B2%BE%E5%BA%A6%E5%BD%92%E7%BA%A6%E9%81%BF%E5%9D%91%EF%BC%9AST-ReducePrecision-%E4%B8%BA%E4%BB%80%E4%B9%88%E4%BC%9A%E5%88%B6%E9%80%A0%E6%8E%A5%E8%BE%B9%E7%BC%9D%E9%9A%99/" rel="next" title="PostGIS 精度归约避坑：ST_ReducePrecision 为什么会制造接边缝隙">
+                  PostGIS 精度归约避坑：ST_ReducePrecision 为什么会制造接边缝隙 <i class="fa fa-angle-right"></i>
+                </a>
+            </div>
+          </div>
+    </footer>
+  </article>
+</div>
+
+
+
+
+
+
+</div>
+  </main>
+
+  <footer class="footer">
+    <div class="footer-inner">
+
+  <div class="copyright">
+    &copy; 
+    <span itemprop="copyrightYear">2026</span>
+    <span class="with-love">
+      <i class="fab fa-osi"></i>
+    </span>
+    <span class="author" itemprop="copyrightHolder">陌忆</span>
+  </div>
+<div class="wordcount">
+  <span class="post-meta-item">
+    <span class="post-meta-item-icon">
+      <i class="fa fa-chart-line"></i>
+    </span>
+    <span title="站点总字数">106k</span>
+  </span>
+  <span class="post-meta-item">
+    <span class="post-meta-item-icon">
+      <i class="fa fa-coffee"></i>
+    </span>
+    <span title="站点阅读时长">6:24</span>
+  </span>
+</div>
+  <div class="powered-by">由 <a href="https://hexo.io/" rel="noopener" target="_blank">Hexo</a> & <a href="https://theme-next.js.org/" rel="noopener" target="_blank">NexT.Gemini</a> 强力驱动
+  </div>
+
+    </div>
+  </footer>
+
+  
+  <div class="toggle sidebar-toggle" role="button">
+    <span class="toggle-line"></span>
+    <span class="toggle-line"></span>
+    <span class="toggle-line"></span>
+  </div>
+  <div class="sidebar-dimmer"></div>
+  <div class="back-to-top" role="button" aria-label="返回顶部">
+    <i class="fa fa-arrow-up fa-lg"></i>
+    <span>0%</span>
+  </div>
+
+<noscript>
+  <div class="noscript-warning">Theme NexT works best with JavaScript enabled</div>
+</noscript>
+<!-- Site running time -->
+<span id="timeDate" aria-live="off"></span>
+<script>
+(function() {
+  var start = new Date("2022-11-17T08:00:00+08:00");
+  function pad(n) { return n < 10 ? "0" + n : "" + n; }
+  function tick() {
+    var diff = Date.now() - start.getTime();
+    if (diff < 0) return;
+    var d = Math.floor(diff / 86400000);
+    var h = Math.floor((diff % 86400000) / 3600000);
+    var m = Math.floor((diff % 3600000) / 60000);
+    var timeDate = document.getElementById("timeDate");
+    if (!timeDate) return;
+    timeDate.textContent =
+      "\u672C\u7AD9\u5DF2\u5B89\u5168\u8FD0\u884C " + d + " \u5929 " + pad(h) + " \u5C0F\u65F6 " + pad(m) + " \u5206";
+  }
+  tick();
+  setInterval(tick, 60000);
+})();
+</script>
+
+</body>
+</html>

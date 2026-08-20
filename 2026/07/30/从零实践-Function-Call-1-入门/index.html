@@ -1,0 +1,516 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width">
+<meta name="theme-color" content="#222" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#222" media="(prefers-color-scheme: dark)"><meta name="generator" content="Hexo 7.3.0">
+<link rel="preconnect" href="https://cdnjs.cloudflare.com" crossorigin>
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon-next.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32-next.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next.png">
+  <link rel="mask-icon" href="/images/logo.svg" color="#222">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/7.0.0/css/all.min.css" integrity="sha256-VHqXKFhhMxcpubYf9xiWdCiojEbY9NexQ4jh8AxbvcM=" crossorigin="anonymous">
+
+<script class="next-config" data-name="main" type="application/json">{"hostname":"moyi-math.github.io","root":"/","images":"/images","scheme":"Gemini","darkmode":true,"version":"8.28.0","exturl":false,"sidebar":{"position":"left","width_expanded":320,"width_dual_column":240,"display":"post","padding":18,"offset":12},"hljswrap":true,"codeblock":{"theme":{"light":"default","dark":"stackoverflow-dark"},"prism":{"light":"prism","dark":"prism-dark"},"copy_button":{"enable":true,"style":null},"fold":{"enable":false,"height":500},"language":false},"bookmark":{"enable":false,"color":"#222","save":"auto"},"mediumzoom":false,"lazyload":true,"pangu":false,"comments":{"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},"stickytabs":false,"motion":{"enable":false,"async":false,"duration":200,"transition":{"menu_item":"fadeInDown","post_block":"fadeIn","post_header":"fadeInDown","post_body":"fadeInDown","coll_header":"fadeInLeft","sidebar":"fadeInUp"}},"prism":false,"i18n":{"placeholder":"搜索...","empty":"没有找到任何搜索结果：${query}","hits_time":"找到 ${hits} 个搜索结果（用时 ${time} 毫秒）","hits":"找到 ${hits} 个搜索结果"},"path":"/search.json","localsearch":{"enable":true,"top_n_per_article":1,"unescape":false,"preload":false}}</script><script src="/js/config.js" defer></script>
+
+    <meta name="description" content="从一个最小工具调用示例出发，理解 LLM 如何选择工具、生成参数，并逐步进入 Agent 循环。">
+<meta property="og:type" content="article">
+<meta property="og:title" content="从零实践 Function Call（一）：从 LLM 到 Agent——Function Call 入门">
+<meta property="og:url" content="https://moyi-math.github.io/2026/07/30/%E4%BB%8E%E9%9B%B6%E5%AE%9E%E8%B7%B5-Function-Call-1-%E5%85%A5%E9%97%A8/index.html">
+<meta property="og:site_name" content="陌忆的博客">
+<meta property="og:description" content="从一个最小工具调用示例出发，理解 LLM 如何选择工具、生成参数，并逐步进入 Agent 循环。">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:image" content="https://moyi-math.github.io/images/background.webp">
+<meta property="article:published_time" content="2026-07-30T06:50:00.000Z">
+<meta property="article:modified_time" content="2026-08-20T14:47:37.221Z">
+<meta property="article:author" content="陌忆">
+<meta property="article:tag" content="Agent">
+<meta property="article:tag" content="LLM">
+<meta property="article:tag" content="Tool Use">
+<meta property="article:tag" content="Function Call">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:image" content="https://moyi-math.github.io/images/background.webp">
+
+
+<link rel="canonical" href="https://moyi-math.github.io/2026/07/30/%E4%BB%8E%E9%9B%B6%E5%AE%9E%E8%B7%B5-Function-Call-1-%E5%85%A5%E9%97%A8/">
+
+
+<script class="next-config" data-name="page" type="application/json">{"sidebar":"","isHome":false,"isPost":true,"lang":"zh-CN","comments":true,"permalink":"https://moyi-math.github.io/2026/07/30/%E4%BB%8E%E9%9B%B6%E5%AE%9E%E8%B7%B5-Function-Call-1-%E5%85%A5%E9%97%A8/","path":"2026/07/30/从零实践-Function-Call-1-入门/","title":"从零实践 Function Call（一）：从 LLM 到 Agent——Function Call 入门"}</script>
+
+<script class="next-config" data-name="calendar" type="application/json">""</script>
+<title>从零实践 Function Call（一）：从 LLM 到 Agent——Function Call 入门 | 陌忆的博客</title>
+  
+
+
+
+
+
+
+
+
+  
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/animejs/3.2.1/anime.min.js" integrity="sha256-XL2inqUJaslATFnHdJOi9GfQ60on8Wx1C2H8DYiN1xY=" crossorigin="anonymous" defer></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/lozad.js/1.16.0/lozad.min.js" integrity="sha256-mOFREFhqmHeQbXpK2lp4nA3qooVgACfh88fpJftLBbc=" crossorigin="anonymous" defer></script>
+<script src="/js/utils.js" defer></script><script src="/js/sidebar.js" defer></script><script src="/js/next-boot.js" defer></script>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/hexo-generator-searchdb/1.5.0/search.js" integrity="sha256-xFC6PJ82SL9b3WkGjFavNiA9gm5z6UBxWPiu4CYjptg=" crossorigin="anonymous" defer></script>
+<script src="/js/third-party/search/local-search.js" defer></script>
+
+
+
+
+
+
+
+  
+
+
+
+
+  
+
+  <script class="next-config" data-name="enableMath" type="application/json">false</script><link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/katex.min.css" integrity="sha256-UF1fgpAiu3tPJN/uCqEUHNe7pnr+QR0SQDNfgglgtcM=" crossorigin="anonymous">
+
+
+<link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
+
+
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"WebSite","name":"陌忆的博客","url":"https://moyi-math.github.io","description":"记录 RAG、Agent、MCP、算法与软件工程实践，按专栏整理可复用的技术笔记。","inLanguage":"zh-CN","author":{"@type":"Person","name":"陌忆"}}</script>
+
+
+
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"Article","headline":"从零实践 Function Call（一）：从 LLM 到 Agent——Function Call 入门","description":"从一个最小工具调用示例出发，理解 LLM 如何选择工具、生成参数，并逐步进入 Agent 循环。","datePublished":"2026-07-30T06:50:00.000Z","dateModified":"2026-08-20T14:47:37.221Z","inLanguage":"zh-CN","mainEntityOfPage":{"@type":"WebPage","@id":"https://moyi-math.github.io/2026/07/30/%E4%BB%8E%E9%9B%B6%E5%AE%9E%E8%B7%B5-Function-Call-1-%E5%85%A5%E9%97%A8/index.html"},"author":{"@type":"Person","name":"陌忆"}}</script>
+<meta name="author" content="陌忆">
+
+
+  <noscript>
+    <link rel="stylesheet" href="/css/noscript.css">
+  </noscript>
+<!-- hexo injector head_end start --><link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/katex.min.css" integrity="sha512-fHwaWebuwA7NSF5Qg/af4UeDx9XqUpYpOGgubo3yWu+b2IQR4UeQwbb42Ti7gVAjNtVoI/I9TEoYeu9omwcC6g==" crossorigin="anonymous" referrerpolicy="no-referrer" /><!-- hexo injector head_end end --><link rel="alternate" href="/atom.xml" title="陌忆的博客" type="application/atom+xml">
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage">
+  <div class="headband"></div>
+
+  <main class="main">
+    <div class="column">
+      <header class="header" itemscope itemtype="http://schema.org/WPHeader"><div class="site-brand-container">
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="切换导航栏" role="button">
+        <span class="toggle-line"></span>
+        <span class="toggle-line"></span>
+        <span class="toggle-line"></span>
+    </div>
+  </div>
+
+  <div class="site-meta">
+
+    <a href="/" class="brand" rel="start">
+      <i class="logo-line"></i>
+      <p class="site-title">陌忆的博客</p>
+      <i class="logo-line"></i>
+    </a>
+      <p class="site-subtitle" itemprop="description">数据库无法得出结论</p>
+  </div>
+
+  <div class="site-nav-right">
+    <div class="toggle popup-trigger" aria-label="搜索" role="button">
+        <i class="fa fa-search fa-fw fa-lg"></i>
+    </div>
+  </div>
+</div>
+
+
+
+<nav class="site-nav">
+  <ul class="main-menu menu"><li class="menu-item menu-item-home"><a href="/" rel="section"><i class="fa fa-home fa-fw"></i>首页</a></li><li class="menu-item menu-item-about"><a href="/about/" rel="section"><i class="fa fa-user fa-fw"></i>关于</a></li><li class="menu-item menu-item-tags"><a href="/tags/" rel="section"><i class="fa fa-tags fa-fw"></i>标签</a></li><li class="menu-item menu-item-categories"><a href="/categories/" rel="section"><i class="fa fa-th fa-fw"></i>分类</a></li><li class="menu-item menu-item-archives"><a href="/archives/" rel="section"><i class="fa fa-archive fa-fw"></i>归档</a></li>
+      <li class="menu-item menu-item-search">
+        <a role="button" class="popup-trigger"><i class="fa fa-search fa-fw"></i>搜索
+        </a>
+      </li>
+  </ul>
+</nav>
+
+
+
+  <div class="search-pop-overlay">
+    <div class="popup search-popup">
+      <div class="search-header">
+        <span class="search-icon">
+          <i class="fa fa-search"></i>
+        </span>
+        <div class="search-input-container">
+          <input autocomplete="off" autocapitalize="off" maxlength="80"
+                placeholder="搜索..." spellcheck="false"
+                type="search" class="search-input">
+        </div>
+        <span class="popup-btn-close" role="button">
+          <i class="fa fa-times-circle"></i>
+        </span>
+      </div>
+      <div class="search-result-container">
+        <div class="search-result-icon">
+          <i class="fa fa-spinner fa-pulse fa-5x"></i>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</header>
+        
+  
+  <aside class="sidebar">
+
+    <div class="sidebar-inner sidebar-nav-active sidebar-toc-active">
+      <ul class="sidebar-nav">
+        <li class="sidebar-nav-toc">
+          文章目录
+        </li>
+        <li class="sidebar-nav-overview">
+          站点概览
+        </li>
+      </ul>
+
+      <div class="sidebar-panel-container">
+        <!--noindex-->
+        <div class="post-toc-wrap sidebar-panel">
+            <div class="post-toc animated"><ol class="nav"><li class="nav-item nav-level-2"><a class="nav-link" href="#%E4%B8%80%E3%80%81%E5%BC%95%E8%A8%80"><span class="nav-text">一、引言</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E4%BA%8C%E3%80%81%E6%9C%80%E5%9F%BA%E7%A1%80%E7%9A%84%E4%BE%8B%E5%AD%90%EF%BC%9A60-%E8%A1%8C%E4%BB%A3%E7%A0%81%E7%9A%84-Agent"><span class="nav-text">二、最基础的例子：60 行代码的 Agent</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E4%B8%89%E3%80%81%E4%B8%80%E8%A1%8C%E4%BB%A3%E7%A0%81%E8%83%8C%E5%90%8E%E7%9A%84%E5%9B%9B%E6%AD%A5%E6%9C%BA%E5%88%B6"><span class="nav-text">三、一行代码背后的四步机制</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#%E6%AD%A5%E9%AA%A4-1%EF%BC%9A%E5%B7%A5%E5%85%B7%E5%AE%9A%E4%B9%89%E6%B3%A8%E5%85%A5-System-Prompt"><span class="nav-text">步骤 1：工具定义注入 System Prompt</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E6%AD%A5%E9%AA%A4-2%EF%BC%9ALLM-%E8%87%AA%E4%B8%BB%E5%86%B3%E7%AD%96%E8%A6%81%E4%B8%8D%E8%A6%81%E8%B0%83%E7%94%A8%E5%B7%A5%E5%85%B7"><span class="nav-text">步骤 2：LLM 自主决策要不要调用工具</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E6%AD%A5%E9%AA%A4-3%EF%BC%9A%E5%BA%93%E6%8B%A6%E6%88%AA%E6%89%A7%E8%A1%8C-%E7%BB%93%E6%9E%9C%E6%B3%A8%E5%85%A5"><span class="nav-text">步骤 3：库拦截执行 + 结果注入</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E6%AD%A5%E9%AA%A4-4%EF%BC%9ALLM-%E5%A4%84%E7%90%86%E7%BB%93%E6%9E%9C%E5%B9%B6%E8%BE%93%E5%87%BA%E6%9C%80%E7%BB%88%E7%AD%94%E6%A1%88"><span class="nav-text">步骤 4：LLM 处理结果并输出最终答案</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%9B%9B%E3%80%81%E6%A0%B8%E5%BF%83%E5%9B%BE%E8%A7%A3%EF%BC%9A%E5%85%A8%E6%B5%81%E7%A8%8B%E4%B8%80%E8%A7%88"><span class="nav-text">四、核心图解：全流程一览</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E4%BA%94%E3%80%81%E5%B7%A5%E5%85%B7%E5%AE%9A%E4%B9%89%E7%9A%84%E4%B8%89%E8%A6%81%E7%B4%A0"><span class="nav-text">五、工具定义的三要素</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%85%AD%E3%80%81%E6%A0%B8%E5%BF%83%E6%B4%9E%E8%A7%81"><span class="nav-text">六、核心洞见</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E4%B8%83%E3%80%81%E4%B8%8B%E4%B8%80%E7%AF%87%E9%A2%84%E5%91%8A"><span class="nav-text">七、下一篇预告</span></a></li></ol></div>
+        </div>
+        <!--/noindex-->
+
+        <div class="site-overview-wrap sidebar-panel">
+          <div class="site-author animated" itemprop="author" itemscope itemtype="http://schema.org/Person">
+    <img class="site-author-image" itemprop="image" alt="陌忆"
+      src="/images/avatar.webp">
+  <p class="site-author-name" itemprop="name">陌忆</p>
+  <div class="site-description" itemprop="description">记录 RAG、Agent、MCP、算法与软件工程实践，按专栏整理可复用的技术笔记。</div>
+</div>
+<div class="site-state-wrap animated">
+  <nav class="site-state">
+      <div class="site-state-item site-state-posts">
+        <a href="/archives/">
+          <span class="site-state-item-count">50</span>
+          <span class="site-state-item-name">日志</span>
+        </a>
+      </div>
+      <div class="site-state-item site-state-categories">
+          <a href="/categories/">
+        <span class="site-state-item-count">10</span>
+        <span class="site-state-item-name">分类</span></a>
+      </div>
+      <div class="site-state-item site-state-tags">
+          <a href="/tags/">
+        <span class="site-state-item-count">172</span>
+        <span class="site-state-item-name">标签</span></a>
+      </div>
+  </nav>
+</div>
+  <div class="links-of-author animated">
+      <span class="links-of-author-item">
+        <a href="https://github.com/moyi-math" title="GitHub → https:&#x2F;&#x2F;github.com&#x2F;moyi-math" rel="noopener me" target="_blank"><i class="fab fa-github fa-fw"></i>GitHub</a>
+      </span>
+  </div>
+  <div class="cc-license animated" itemprop="license">
+    <a href="https://creativecommons.org/licenses/by-nc-sa/4.0/" class="cc-opacity" rel="noopener" target="_blank"><img src="https://cdnjs.cloudflare.com/ajax/libs/creativecommons-vocabulary/2020.11.3/assets/license_badges/small/by_nc_sa.svg" alt="Creative Commons"></a>
+  </div>
+
+        </div>
+      </div>
+    </div>
+
+    
+  </aside>
+
+
+    </div>
+
+    <div class="main-inner post posts-expand">
+
+
+  
+
+
+<div class="post-block">
+  
+  
+
+  <article itemscope itemtype="http://schema.org/Article" class="post-content" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="https://moyi-math.github.io/2026/07/30/%E4%BB%8E%E9%9B%B6%E5%AE%9E%E8%B7%B5-Function-Call-1-%E5%85%A5%E9%97%A8/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.webp">
+      <meta itemprop="name" content="陌忆">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="陌忆的博客">
+      <meta itemprop="description" content="记录 RAG、Agent、MCP、算法与软件工程实践，按专栏整理可复用的技术笔记。">
+    </span>
+
+    <span hidden itemprop="post" itemscope itemtype="http://schema.org/CreativeWork">
+      <meta itemprop="name" content="从零实践 Function Call（一）：从 LLM 到 Agent——Function Call 入门 | 陌忆的博客">
+      <meta itemprop="description" content="从一个最小工具调用示例出发，理解 LLM 如何选择工具、生成参数，并逐步进入 Agent 循环。">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          从零实践 Function Call（一）：从 LLM 到 Agent——Function Call 入门
+        </h1>
+
+        <div class="post-meta-container">
+          <div class="post-meta">
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-calendar"></i>
+      </span>
+      <span class="post-meta-item-text">发表于</span>
+
+      <time title="创建时间：2026-07-30 14:50:00" itemprop="dateCreated datePublished" datetime="2026-07-30T14:50:00+08:00">2026-07-30</time>
+    </span>
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-calendar-check"></i>
+      </span>
+      <span class="post-meta-item-text">更新于</span>
+      <time title="修改时间：2026-08-20 22:47:37" itemprop="dateModified" datetime="2026-08-20T22:47:37+08:00">2026-08-20</time>
+    </span>
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-folder"></i>
+      </span>
+      <span class="post-meta-item-text">分类于</span>
+        <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+          <a href="/categories/%E4%BB%8E%E9%9B%B6%E5%AE%9E%E8%B7%B5-Function-Call/" itemprop="url" rel="index"><span itemprop="name">从零实践 Function Call</span></a>
+        </span>
+    </span>
+
+  
+    <span class="post-meta-break"></span>
+    <span class="post-meta-item" title="本文字数">
+      <span class="post-meta-item-icon">
+        <i class="far fa-file-word"></i>
+      </span>
+      <span class="post-meta-item-text">本文字数：</span>
+      <span>1.2k</span>
+    </span>
+    <span class="post-meta-item" title="阅读时长">
+      <span class="post-meta-item-icon">
+        <i class="far fa-clock"></i>
+      </span>
+      <span class="post-meta-item-text">阅读时长 &asymp;</span>
+      <span>4 分钟</span>
+    </span>
+</div>
+
+            <div class="post-description">从一个最小工具调用示例出发，理解 LLM 如何选择工具、生成参数，并逐步进入 Agent 循环。</div>
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody"><span id="more"></span>
+
+<blockquote>
+<p>本文示例使用 <strong>node-llama-cpp</strong> 在本地运行 Qwen3-1.7B 模型，不需要任何 API Key 就能跑通全部代码。</p>
+</blockquote>
+<h2 id="一、引言"><a href="#一、引言" class="headerlink" title="一、引言"></a>一、引言</h2><p>如果你和 ChatGPT 聊过天，你用的是<strong>语言模型</strong>。如果你让它”查一下明天的天气”然后它真的去查了，你用的是 <strong>Agent</strong>。</p>
+<p>区别在哪？一句话：</p>
+<blockquote>
+<p><strong>LLM 只能”说”，Agent 能”做”。</strong></p>
+</blockquote>
+<p>LLM 再强大，它也只能基于训练数据”猜”出一个答案。它不知道现在几点，查不了数据库，算不了复杂数学，更没法操作你的文件系统。但一旦给 LLM 配上<strong>工具（Tools）</strong>，这一切就变了。</p>
+<p>这就是 <strong>Function Calling（函数调用）</strong>——让 LLM 不只是生成文本，而是能调用外部函数、获取真实数据、执行真实操作的能力。</p>
+<p>这篇文章带你从最基础的例子开始，理解 Function Call 的全过程。</p>
+<h2 id="二、最基础的例子：60-行代码的-Agent"><a href="#二、最基础的例子：60-行代码的-Agent" class="headerlink" title="二、最基础的例子：60 行代码的 Agent"></a>二、最基础的例子：60 行代码的 Agent</h2><p>我们先看一个最简的 Function Call 实现，它只做一件事——获取当前时间：</p>
+<figure class="highlight javascript"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">const</span> getCurrentTime = <span class="title function_">defineChatSessionFunction</span>(&#123;</span><br><span class="line">    <span class="attr">description</span>: <span class="string">&quot;Get the current time&quot;</span>,</span><br><span class="line">    <span class="attr">params</span>: &#123; <span class="attr">type</span>: <span class="string">&quot;object&quot;</span>, <span class="attr">properties</span>: &#123;&#125; &#125;,</span><br><span class="line">    <span class="keyword">async</span> <span class="title function_">handler</span>(<span class="params"></span>) &#123;</span><br><span class="line">        <span class="keyword">return</span> <span class="keyword">new</span> <span class="title class_">Date</span>().<span class="title function_">toLocaleTimeString</span>();</span><br><span class="line">    &#125;</span><br><span class="line">&#125;);</span><br><span class="line"></span><br><span class="line"><span class="keyword">const</span> functions = &#123; getCurrentTime &#125;;</span><br><span class="line"><span class="keyword">const</span> a1 = <span class="keyword">await</span> session.<span class="title function_">prompt</span>(<span class="string">&quot;What time is it right now?&quot;</span>, &#123; functions &#125;);</span><br><span class="line"><span class="variable language_">console</span>.<span class="title function_">log</span>(<span class="string">&quot;AI: &quot;</span> + a1);</span><br></pre></td></tr></table></figure>
+
+<p>输出：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">AI: 20:24</span><br></pre></td></tr></table></figure>
+
+<p>这个输出看起来平淡无奇，但背后发生了 4 个关键步骤。</p>
+<h2 id="三、一行代码背后的四步机制"><a href="#三、一行代码背后的四步机制" class="headerlink" title="三、一行代码背后的四步机制"></a>三、一行代码背后的四步机制</h2><p>关键的只有 <code>session.prompt(prompt, &#123;functions&#125;)</code> 这一行。但你传入 <code>&#123;functions&#125;</code> 后，<code>node-llama-cpp</code> 在底层替你完成了一套完整的<strong>工具调用协议</strong>。</p>
+<h3 id="步骤-1：工具定义注入-System-Prompt"><a href="#步骤-1：工具定义注入-System-Prompt" class="headerlink" title="步骤 1：工具定义注入 System Prompt"></a>步骤 1：工具定义注入 System Prompt</h3><p>当你传入 <code>&#123;functions&#125;</code>，库自动将工具定义序列化为 LLM 能理解的格式，追加到 System Prompt 末尾。调试日志揭示了这个过程：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br></pre></td><td class="code"><pre><span class="line">&lt;|im_start|&gt;system</span><br><span class="line">You are a professional chronologist...</span><br><span class="line"></span><br><span class="line"># Tools</span><br><span class="line">You may call one or more functions to assist with the user query.</span><br><span class="line"></span><br><span class="line">&lt;tools&gt;</span><br><span class="line">&#123;&quot;type&quot;: &quot;function&quot;, &quot;function&quot;: &#123;</span><br><span class="line">  &quot;name&quot;: &quot;getCurrentTime&quot;,</span><br><span class="line">  &quot;description&quot;: &quot;Get the current time&quot;,</span><br><span class="line">  &quot;parameters&quot;: &#123;&quot;type&quot;: &quot;object&quot;, &quot;properties&quot;: &#123;&#125;&#125;</span><br><span class="line">&#125;&#125;</span><br><span class="line">&lt;/tools&gt;</span><br><span class="line"></span><br><span class="line">For each function call, return a json object with function name</span><br><span class="line">and arguments within &lt;tool_call&gt;&lt;/tool_call&gt; XML tags:</span><br><span class="line">&lt;tool_call&gt;</span><br><span class="line">&#123;&quot;name&quot;: &lt;function-name&gt;, &quot;arguments&quot;: &lt;args-json-object&gt;&#125;</span><br><span class="line">&lt;/tool_call&gt;</span><br><span class="line">&lt;|im_end|&gt;</span><br></pre></td></tr></table></figure>
+
+<p>关键细节：</p>
+<ul>
+<li>工具以 XML 的 <code>&lt;tools&gt;</code> 标签包裹</li>
+<li>LLM 被明确告知输出格式：<code>&lt;tool_call&gt;</code> 里放 JSON</li>
+<li>这一切<strong>自动生成</strong>，开发者零配置</li>
+</ul>
+<h3 id="步骤-2：LLM-自主决策要不要调用工具"><a href="#步骤-2：LLM-自主决策要不要调用工具" class="headerlink" title="步骤 2：LLM 自主决策要不要调用工具"></a>步骤 2：LLM 自主决策要不要调用工具</h3><p>LLM 读取了工具列表，看到 <code>getCurrentTime</code> 的描述是 “Get the current time”，再对比用户问题 “What time is it right now?”——匹配上了。</p>
+<p>于是 LLM 输出：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br></pre></td><td class="code"><pre><span class="line">&lt;|im_start|&gt;assistant</span><br><span class="line">&lt;think&gt;</span><br><span class="line">The user is asking for the current time.</span><br><span class="line">The tools include getCurrentTime, which doesn&#x27;t require any parameters.</span><br><span class="line">I should call this function.</span><br><span class="line">&lt;/think&gt;</span><br><span class="line"></span><br><span class="line">&lt;tool_call&gt;</span><br><span class="line">&#123;&quot;name&quot;: &quot;getCurrentTime&quot;, &quot;arguments&quot;: &#123;&#125;&#125;</span><br><span class="line">&lt;/tool_call&gt;</span><br></pre></td></tr></table></figure>
+
+<p>注意几个要点：</p>
+<ul>
+<li>LLM 先<strong>思考</strong>（<code>&lt;think&gt;</code>），再<strong>决策</strong></li>
+<li>输出的是一个结构化的 <code>&lt;tool_call&gt;</code> XML 块</li>
+<li>库拦截到 <code>&lt;tool_call&gt;</code>，解析出函数名和参数</li>
+</ul>
+<h3 id="步骤-3：库拦截执行-结果注入"><a href="#步骤-3：库拦截执行-结果注入" class="headerlink" title="步骤 3：库拦截执行 + 结果注入"></a>步骤 3：库拦截执行 + 结果注入</h3><p><code>node-llama-cpp</code> 拦截 <code>&lt;tool_call&gt;</code>，执行你注册的 <code>handler()</code>：</p>
+<figure class="highlight javascript"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">async</span> <span class="title function_">handler</span>(<span class="params"></span>) &#123;</span><br><span class="line">    <span class="keyword">return</span> <span class="keyword">new</span> <span class="title class_">Date</span>().<span class="title function_">toLocaleTimeString</span>();  <span class="comment">// 返回 &quot;20:24:44&quot;</span></span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>然后把返回值包装成 <code>&lt;tool_response&gt;</code> 注入回对话历史：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line">&lt;|im_start|&gt;user</span><br><span class="line">&lt;tool_response&gt;</span><br><span class="line">&quot;20:24:44&quot;</span><br><span class="line">&lt;/tool_response&gt;</span><br></pre></td></tr></table></figure>
+
+<p>LLM 就像”看到”了一个用户消息一样读到这个结果。</p>
+<h3 id="步骤-4：LLM-处理结果并输出最终答案"><a href="#步骤-4：LLM-处理结果并输出最终答案" class="headerlink" title="步骤 4：LLM 处理结果并输出最终答案"></a>步骤 4：LLM 处理结果并输出最终答案</h3><p>LLM 拿到工具的返回结果，再结合 System Prompt 的指令（”convert to 24-hour format without seconds”），生成最终回复：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line">&lt;|im_start|&gt;assistant</span><br><span class="line">&lt;think&gt;</span><br><span class="line">The response was &quot;20:24:44&quot;.</span><br><span class="line">Already in 24h format, so just remove the seconds.</span><br><span class="line">&lt;/think&gt;</span><br><span class="line"></span><br><span class="line">The current time is 20:24.</span><br></pre></td></tr></table></figure>
+
+<h2 id="四、核心图解：全流程一览"><a href="#四、核心图解：全流程一览" class="headerlink" title="四、核心图解：全流程一览"></a>四、核心图解：全流程一览</h2><figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br></pre></td><td class="code"><pre><span class="line">session.prompt(&quot;What time is it?&quot;, &#123;functions&#125;)</span><br><span class="line">                    |</span><br><span class="line">  ------------------+------------------</span><br><span class="line">  |  1. 库自动注入工具定义到 system prompt |</span><br><span class="line">  ------------------+------------------</span><br><span class="line">                    |</span><br><span class="line">  ------------------+------------------</span><br><span class="line">  |  2. LLM 读工具列表 -&gt; 判断 -&gt;        |</span><br><span class="line">  |     输出 &lt;tool_call&gt;               |</span><br><span class="line">  ------------------+------------------</span><br><span class="line">                    |</span><br><span class="line">  ------------------+------------------</span><br><span class="line">  |  3. 库拦截 -&gt; 执行 handler()        |</span><br><span class="line">  |     -&gt; 注入 &lt;tool_response&gt;         |</span><br><span class="line">  ------------------+------------------</span><br><span class="line">                    |</span><br><span class="line">  ------------------+------------------</span><br><span class="line">  |  4. LLM 处理结果 -&gt; &quot;20:24&quot;         |</span><br><span class="line">  ------------------+------------------</span><br><span class="line">                    v</span><br><span class="line">          输出: &quot;The current time is 20:24.&quot;</span><br></pre></td></tr></table></figure>
+
+<h2 id="五、工具定义的三要素"><a href="#五、工具定义的三要素" class="headerlink" title="五、工具定义的三要素"></a>五、工具定义的三要素</h2><figure class="highlight javascript"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br></pre></td><td class="code"><pre><span class="line"><span class="title function_">defineChatSessionFunction</span>(&#123;</span><br><span class="line">    <span class="attr">description</span>: <span class="string">&quot;Get the current time&quot;</span>,        <span class="comment">// 1. 描述：LLM 靠这个判断是否该用</span></span><br><span class="line">    <span class="attr">params</span>: &#123;                                     <span class="comment">// 2. 参数 Schema：JSON Schema 格式</span></span><br><span class="line">        <span class="attr">type</span>: <span class="string">&quot;object&quot;</span>,</span><br><span class="line">        <span class="attr">properties</span>: &#123;&#125;</span><br><span class="line">    &#125;,</span><br><span class="line">    <span class="keyword">async</span> <span class="title function_">handler</span>(<span class="params"></span>) &#123;                             <span class="comment">// 3. 处理函数：真实执行的代码</span></span><br><span class="line">        <span class="keyword">return</span> <span class="keyword">new</span> <span class="title class_">Date</span>().<span class="title function_">toLocaleTimeString</span>();</span><br><span class="line">    &#125;</span><br><span class="line">&#125;);</span><br></pre></td></tr></table></figure>
+
+<p>三个要素缺一不可：</p>
+<ul>
+<li><strong>description</strong>：告诉 LLM 这个工具做什么（LLM 决策时读）</li>
+<li><strong>params</strong>：定义工具需要的参数（JSON Schema，LLM 生成参数时参考）</li>
+<li><strong>handler</strong>：真正执行的逻辑（库在执行阶段调用）</li>
+</ul>
+<h2 id="六、核心洞见"><a href="#六、核心洞见" class="headerlink" title="六、核心洞见"></a>六、核心洞见</h2><p>对比这段代码和纯文本 LLM 调用：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line">纯文本 LLM:      session.prompt(&quot;问问题&quot;)       -&gt; 文本 -&gt; 文本</span><br><span class="line"></span><br><span class="line">Function Call:   session.prompt(&quot;问问题&quot;, &#123;functions&#125;)</span><br><span class="line">                                               -&gt; 文本 -&gt; 工具 -&gt; 文本</span><br></pre></td></tr></table></figure>
+
+<p>多出来的”工具”环节，就是 <strong>agency（能动性）</strong>——LLM 不再只是”生成文本”，而是可以：</p>
+<ol>
+<li><strong>感知外部世界</strong>（读时间、查天气、查数据库）</li>
+<li><strong>执行精确计算</strong>（不再靠”心算”）</li>
+<li><strong>改变系统状态</strong>（写文件、发邮件）</li>
+</ol>
+<p>这就是从 LLM 到 Agent 的第一步。</p>
+<h2 id="七、下一篇预告"><a href="#七、下一篇预告" class="headerlink" title="七、下一篇预告"></a>七、下一篇预告</h2><p>Function Call 入门之后，下一个关键问题是：<strong>如何让 LLM 正确地”使用”工具？</strong> 答案藏在 System Prompt 里。</p>
+<p>下一篇我们深入探讨 System Prompt 的结构化设计，以及纯 LLM 推理的边界——为什么”让 LLM 自己算”不可靠，而工具才是出路。</p>
+
+    </div>
+
+    
+    
+    
+
+    <footer class="post-footer">
+          
+
+<div class="post-copyright">
+<ul>
+  <li class="post-copyright-author">
+      <strong>本文作者： </strong>陌忆
+  </li>
+  <li class="post-copyright-link">
+      <strong>本文链接：</strong>
+      <a href="https://moyi-math.github.io/2026/07/30/%E4%BB%8E%E9%9B%B6%E5%AE%9E%E8%B7%B5-Function-Call-1-%E5%85%A5%E9%97%A8/" title="从零实践 Function Call（一）：从 LLM 到 Agent——Function Call 入门">https://moyi-math.github.io/2026/07/30/从零实践-Function-Call-1-入门/</a>
+  </li>
+  <li class="post-copyright-license">
+      <strong>版权声明： </strong>本博客所有文章除特别声明外，均采用 <a href="https://creativecommons.org/licenses/by-nc-sa/4.0/" rel="noopener" target="_blank"><i class="fab fa-fw fa-creative-commons"></i>BY-NC-SA</a> 许可协议。转载请注明出处！
+  </li>
+</ul>
+</div>
+
+          <div class="post-tags">
+              <a href="/tags/Agent/" rel="tag"># Agent</a>
+              <a href="/tags/LLM/" rel="tag"># LLM</a>
+              <a href="/tags/Tool-Use/" rel="tag"># Tool Use</a>
+              <a href="/tags/Function-Call/" rel="tag"># Function Call</a>
+          </div>
+
+        
+
+          <div class="post-nav">
+            <div class="post-nav-item">
+                <a href="/2026/07/29/Hello%E7%AE%97%E6%B3%95-7.1-%E4%BA%8C%E5%8F%89%E6%A0%91%EF%BC%9A%E4%B8%80%E5%AF%B9%E5%A4%9A%E7%9A%84%E5%B1%82%E6%AC%A1%E7%BB%93%E6%9E%84/" rel="prev" title="Hello算法 学习笔记 · 7.1 二叉树：一对多的层次结构">
+                  <i class="fa fa-angle-left"></i> Hello算法 学习笔记 · 7.1 二叉树：一对多的层次结构
+                </a>
+            </div>
+            <div class="post-nav-item">
+                <a href="/2026/07/30/%E4%BB%8E%E9%9B%B6%E5%AE%9E%E8%B7%B5-Function-Call-2-System-Prompt-%E4%B8%8E%E6%8E%A8%E7%90%86%E8%BE%B9%E7%95%8C/" rel="next" title="从零实践 Function Call（二）：System Prompt 的艺术与纯推理的边界">
+                  从零实践 Function Call（二）：System Prompt 的艺术与纯推理的边界 <i class="fa fa-angle-right"></i>
+                </a>
+            </div>
+          </div>
+    </footer>
+  </article>
+</div>
+
+
+
+
+
+
+</div>
+  </main>
+
+  <footer class="footer">
+    <div class="footer-inner">
+
+  <div class="copyright">
+    &copy; 
+    <span itemprop="copyrightYear">2026</span>
+    <span class="with-love">
+      <i class="fab fa-osi"></i>
+    </span>
+    <span class="author" itemprop="copyrightHolder">陌忆</span>
+  </div>
+<div class="wordcount">
+  <span class="post-meta-item">
+    <span class="post-meta-item-icon">
+      <i class="fa fa-chart-line"></i>
+    </span>
+    <span title="站点总字数">106k</span>
+  </span>
+  <span class="post-meta-item">
+    <span class="post-meta-item-icon">
+      <i class="fa fa-coffee"></i>
+    </span>
+    <span title="站点阅读时长">6:24</span>
+  </span>
+</div>
+  <div class="powered-by">由 <a href="https://hexo.io/" rel="noopener" target="_blank">Hexo</a> & <a href="https://theme-next.js.org/" rel="noopener" target="_blank">NexT.Gemini</a> 强力驱动
+  </div>
+
+    </div>
+  </footer>
+
+  
+  <div class="toggle sidebar-toggle" role="button">
+    <span class="toggle-line"></span>
+    <span class="toggle-line"></span>
+    <span class="toggle-line"></span>
+  </div>
+  <div class="sidebar-dimmer"></div>
+  <div class="back-to-top" role="button" aria-label="返回顶部">
+    <i class="fa fa-arrow-up fa-lg"></i>
+    <span>0%</span>
+  </div>
+
+<noscript>
+  <div class="noscript-warning">Theme NexT works best with JavaScript enabled</div>
+</noscript>
+<!-- Site running time -->
+<span id="timeDate" aria-live="off"></span>
+<script>
+(function() {
+  var start = new Date("2022-11-17T08:00:00+08:00");
+  function pad(n) { return n < 10 ? "0" + n : "" + n; }
+  function tick() {
+    var diff = Date.now() - start.getTime();
+    if (diff < 0) return;
+    var d = Math.floor(diff / 86400000);
+    var h = Math.floor((diff % 86400000) / 3600000);
+    var m = Math.floor((diff % 3600000) / 60000);
+    var timeDate = document.getElementById("timeDate");
+    if (!timeDate) return;
+    timeDate.textContent =
+      "\u672C\u7AD9\u5DF2\u5B89\u5168\u8FD0\u884C " + d + " \u5929 " + pad(h) + " \u5C0F\u65F6 " + pad(m) + " \u5206";
+  }
+  tick();
+  setInterval(tick, 60000);
+})();
+</script>
+
+</body>
+</html>

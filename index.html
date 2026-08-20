@@ -1,0 +1,485 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width">
+<meta name="theme-color" content="#222" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#222" media="(prefers-color-scheme: dark)"><meta name="generator" content="Hexo 7.3.0">
+<link rel="preconnect" href="https://cdnjs.cloudflare.com" crossorigin>
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon-next.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32-next.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next.png">
+  <link rel="mask-icon" href="/images/logo.svg" color="#222">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/7.0.0/css/all.min.css" integrity="sha256-VHqXKFhhMxcpubYf9xiWdCiojEbY9NexQ4jh8AxbvcM=" crossorigin="anonymous">
+
+<script class="next-config" data-name="main" type="application/json">{"hostname":"moyi-math.github.io","root":"/","images":"/images","scheme":"Gemini","darkmode":true,"version":"8.28.0","exturl":false,"sidebar":{"position":"left","width_expanded":320,"width_dual_column":240,"display":"post","padding":18,"offset":12},"hljswrap":true,"codeblock":{"theme":{"light":"default","dark":"stackoverflow-dark"},"prism":{"light":"prism","dark":"prism-dark"},"copy_button":{"enable":true,"style":null},"fold":{"enable":false,"height":500},"language":false},"bookmark":{"enable":false,"color":"#222","save":"auto"},"mediumzoom":false,"lazyload":true,"pangu":false,"comments":{"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},"stickytabs":false,"motion":{"enable":false,"async":false,"duration":200,"transition":{"menu_item":"fadeInDown","post_block":"fadeIn","post_header":"fadeInDown","post_body":"fadeInDown","coll_header":"fadeInLeft","sidebar":"fadeInUp"}},"prism":false,"i18n":{"placeholder":"搜索...","empty":"没有找到任何搜索结果：${query}","hits_time":"找到 ${hits} 个搜索结果（用时 ${time} 毫秒）","hits":"找到 ${hits} 个搜索结果"},"path":"/search.json","localsearch":{"enable":true,"top_n_per_article":1,"unescape":false,"preload":false}}</script><script src="/js/config.js" defer></script>
+
+    <meta name="description" content="记录 RAG、Agent、MCP、算法与软件工程实践，按专栏整理可复用的技术笔记。">
+<meta property="og:type" content="website">
+<meta property="og:title" content="陌忆的博客">
+<meta property="og:url" content="https://moyi-math.github.io/index.html">
+<meta property="og:site_name" content="陌忆的博客">
+<meta property="og:description" content="记录 RAG、Agent、MCP、算法与软件工程实践，按专栏整理可复用的技术笔记。">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:image" content="https://moyi-math.github.io/images/background.webp">
+<meta property="article:author" content="陌忆">
+<meta property="article:tag" content="RAG, Agent, MCP, LightRAG, Function Call, 数据结构, 算法">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:image" content="https://moyi-math.github.io/images/background.webp">
+
+
+<link rel="canonical" href="https://moyi-math.github.io/">
+
+
+<script class="next-config" data-name="page" type="application/json">{"sidebar":"","isHome":true,"isPost":false,"lang":"zh-CN","comments":"","permalink":"","path":"index.html","title":""}</script>
+
+<script class="next-config" data-name="calendar" type="application/json">""</script>
+<title>陌忆的博客</title>
+  
+
+
+
+
+
+
+
+
+  
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/animejs/3.2.1/anime.min.js" integrity="sha256-XL2inqUJaslATFnHdJOi9GfQ60on8Wx1C2H8DYiN1xY=" crossorigin="anonymous" defer></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/lozad.js/1.16.0/lozad.min.js" integrity="sha256-mOFREFhqmHeQbXpK2lp4nA3qooVgACfh88fpJftLBbc=" crossorigin="anonymous" defer></script>
+<script src="/js/utils.js" defer></script><script src="/js/sidebar.js" defer></script><script src="/js/next-boot.js" defer></script>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/hexo-generator-searchdb/1.5.0/search.js" integrity="sha256-xFC6PJ82SL9b3WkGjFavNiA9gm5z6UBxWPiu4CYjptg=" crossorigin="anonymous" defer></script>
+<script src="/js/third-party/search/local-search.js" defer></script>
+
+
+
+
+
+
+
+  
+
+
+
+
+  
+
+  <script class="next-config" data-name="enableMath" type="application/json">false</script><link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/katex.min.css" integrity="sha256-UF1fgpAiu3tPJN/uCqEUHNe7pnr+QR0SQDNfgglgtcM=" crossorigin="anonymous">
+
+
+<link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
+
+
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"WebSite","name":"陌忆的博客","url":"https://moyi-math.github.io","description":"记录 RAG、Agent、MCP、算法与软件工程实践，按专栏整理可复用的技术笔记。","inLanguage":"zh-CN","author":{"@type":"Person","name":"陌忆"}}</script>
+
+
+
+  <noscript>
+    <link rel="stylesheet" href="/css/noscript.css">
+  </noscript>
+<!-- hexo injector head_end start --><link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/katex.min.css" integrity="sha512-fHwaWebuwA7NSF5Qg/af4UeDx9XqUpYpOGgubo3yWu+b2IQR4UeQwbb42Ti7gVAjNtVoI/I9TEoYeu9omwcC6g==" crossorigin="anonymous" referrerpolicy="no-referrer" /><!-- hexo injector head_end end --><link rel="alternate" href="/atom.xml" title="陌忆的博客" type="application/atom+xml">
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage">
+  <div class="headband"></div>
+
+  <main class="main">
+    <div class="column">
+      <header class="header" itemscope itemtype="http://schema.org/WPHeader"><div class="site-brand-container">
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="切换导航栏" role="button">
+        <span class="toggle-line"></span>
+        <span class="toggle-line"></span>
+        <span class="toggle-line"></span>
+    </div>
+  </div>
+
+  <div class="site-meta">
+
+    <a href="/" class="brand" rel="start">
+      <i class="logo-line"></i>
+      <h1 class="site-title">陌忆的博客</h1>
+      <i class="logo-line"></i>
+    </a>
+      <p class="site-subtitle" itemprop="description">数据库无法得出结论</p>
+  </div>
+
+  <div class="site-nav-right">
+    <div class="toggle popup-trigger" aria-label="搜索" role="button">
+        <i class="fa fa-search fa-fw fa-lg"></i>
+    </div>
+  </div>
+</div>
+
+
+
+<nav class="site-nav">
+  <ul class="main-menu menu"><li class="menu-item menu-item-home"><a href="/" rel="section"><i class="fa fa-home fa-fw"></i>首页</a></li><li class="menu-item menu-item-about"><a href="/about/" rel="section"><i class="fa fa-user fa-fw"></i>关于</a></li><li class="menu-item menu-item-tags"><a href="/tags/" rel="section"><i class="fa fa-tags fa-fw"></i>标签</a></li><li class="menu-item menu-item-categories"><a href="/categories/" rel="section"><i class="fa fa-th fa-fw"></i>分类</a></li><li class="menu-item menu-item-archives"><a href="/archives/" rel="section"><i class="fa fa-archive fa-fw"></i>归档</a></li>
+      <li class="menu-item menu-item-search">
+        <a role="button" class="popup-trigger"><i class="fa fa-search fa-fw"></i>搜索
+        </a>
+      </li>
+  </ul>
+</nav>
+
+
+
+  <div class="search-pop-overlay">
+    <div class="popup search-popup">
+      <div class="search-header">
+        <span class="search-icon">
+          <i class="fa fa-search"></i>
+        </span>
+        <div class="search-input-container">
+          <input autocomplete="off" autocapitalize="off" maxlength="80"
+                placeholder="搜索..." spellcheck="false"
+                type="search" class="search-input">
+        </div>
+        <span class="popup-btn-close" role="button">
+          <i class="fa fa-times-circle"></i>
+        </span>
+      </div>
+      <div class="search-result-container">
+        <div class="search-result-icon">
+          <i class="fa fa-spinner fa-pulse fa-5x"></i>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</header>
+        
+  
+  <aside class="sidebar">
+
+    <div class="sidebar-inner sidebar-overview-active">
+      <ul class="sidebar-nav">
+        <li class="sidebar-nav-toc">
+          文章目录
+        </li>
+        <li class="sidebar-nav-overview">
+          站点概览
+        </li>
+      </ul>
+
+      <div class="sidebar-panel-container">
+        <!--noindex-->
+        <div class="post-toc-wrap sidebar-panel">
+        </div>
+        <!--/noindex-->
+
+        <div class="site-overview-wrap sidebar-panel">
+          <div class="site-author animated" itemprop="author" itemscope itemtype="http://schema.org/Person">
+    <img class="site-author-image" itemprop="image" alt="陌忆"
+      src="/images/avatar.webp">
+  <p class="site-author-name" itemprop="name">陌忆</p>
+  <div class="site-description" itemprop="description">记录 RAG、Agent、MCP、算法与软件工程实践，按专栏整理可复用的技术笔记。</div>
+</div>
+<div class="site-state-wrap animated">
+  <nav class="site-state">
+      <div class="site-state-item site-state-posts">
+        <a href="/archives/">
+          <span class="site-state-item-count">50</span>
+          <span class="site-state-item-name">日志</span>
+        </a>
+      </div>
+      <div class="site-state-item site-state-categories">
+          <a href="/categories/">
+        <span class="site-state-item-count">10</span>
+        <span class="site-state-item-name">分类</span></a>
+      </div>
+      <div class="site-state-item site-state-tags">
+          <a href="/tags/">
+        <span class="site-state-item-count">172</span>
+        <span class="site-state-item-name">标签</span></a>
+      </div>
+  </nav>
+</div>
+  <div class="links-of-author animated">
+      <span class="links-of-author-item">
+        <a href="https://github.com/moyi-math" title="GitHub → https:&#x2F;&#x2F;github.com&#x2F;moyi-math" rel="noopener me" target="_blank"><i class="fab fa-github fa-fw"></i>GitHub</a>
+      </span>
+  </div>
+  <div class="cc-license animated" itemprop="license">
+    <a href="https://creativecommons.org/licenses/by-nc-sa/4.0/" class="cc-opacity" rel="noopener" target="_blank"><img src="https://cdnjs.cloudflare.com/ajax/libs/creativecommons-vocabulary/2020.11.3/assets/license_badges/small/by_nc_sa.svg" alt="Creative Commons"></a>
+  </div>
+
+        </div>
+      </div>
+    </div>
+
+    
+  </aside>
+
+
+    </div>
+
+    <div class="main-inner index posts-expand">
+
+<section class="post-block home-latest" data-home-enhanced="true" aria-labelledby="home-latest-title">
+  <div class="home-section-heading">
+    <span class="home-section-heading__eyebrow">LATEST NOTES</span>
+    <h2 id="home-latest-title" class="home-section-heading__title">最近更新</h2>
+    <p class="home-section-heading__description">按时间查看最新的技术笔记。</p>
+  </div>
+  <div class="home-post-list">
+    
+    <a class="home-post-item" href="/2026/08/20/PostgreSQL-1-%E5%A4%9A%E8%BF%9B%E7%A8%8B%E3%80%81%E5%8F%8C%E9%87%8D%E7%BC%93%E5%AD%98%E4%B8%8EDirect-I-O/">
+      <div class="home-post-item__main">
+        <div class="home-post-item__meta">
+          <time datetime="2026-08-20">2026-08-20</time>
+          <span aria-hidden="true">/</span><span>PostgreSQL 原理</span>
+        </div>
+        <h3 class="home-post-item__title">PostgreSQL 的“离谱”设计：多进程、双重缓存与 Direct I/O</h3>
+        <p class="home-post-item__description">从每连接一进程、shared_buffers 与 OS Page Cache、Direct I/O 三条路径，拆解 PostgreSQL 的历史设计究竟贵在哪里、什么时候会成为问题，以及 PostgreSQL 18 的 AIO 改变了什么。</p>
+      </div>
+      <span class="home-post-item__more">阅读 <span aria-hidden="true">&rarr;</span></span>
+    </a>
+    <a class="home-post-item" href="/2026/08/20/Learn-Claude-Code-09-Memory/">
+      <div class="home-post-item__main">
+        <div class="home-post-item__meta">
+          <time datetime="2026-08-20">2026-08-20</time>
+          <span aria-hidden="true">/</span><span>Learn Claude Code</span>
+        </div>
+        <h3 class="home-post-item__title">Learn Claude Code 09：Memory——让重要信息跨越压缩与会话</h3>
+        <p class="home-post-item__description">从有损上下文压缩出发，拆解长期记忆的文件存储、相关召回、自动提取和周期巩固，并讨论冲突、隐私与遗忘机制。</p>
+      </div>
+      <span class="home-post-item__more">阅读 <span aria-hidden="true">&rarr;</span></span>
+    </a>
+    <a class="home-post-item" href="/2026/08/20/Learn-Claude-Code-08-Context-Compact/">
+      <div class="home-post-item__main">
+        <div class="home-post-item__meta">
+          <time datetime="2026-08-20">2026-08-20</time>
+          <span aria-hidden="true">/</span><span>Learn Claude Code</span>
+        </div>
+        <h3 class="home-post-item__title">Learn Claude Code 08：Context Compact——给长期运行的 Agent 腾出空间</h3>
+        <p class="home-post-item__description">从上下文窗口耗尽出发，拆解工具结果预算、历史裁剪、微压缩、语义摘要与应急恢复组成的分层压缩管线。</p>
+      </div>
+      <span class="home-post-item__more">阅读 <span aria-hidden="true">&rarr;</span></span>
+    </a>
+    <a class="home-post-item" href="/2026/08/20/Learn-Claude-Code-07-Skills/">
+      <div class="home-post-item__main">
+        <div class="home-post-item__meta">
+          <time datetime="2026-08-20">2026-08-20</time>
+          <span aria-hidden="true">/</span><span>Learn Claude Code</span>
+        </div>
+        <h3 class="home-post-item__title">Learn Claude Code 07：Skills——让专业知识按需进入上下文</h3>
+        <p class="home-post-item__description">从 System Prompt 膨胀出发，拆解 Skill 的两级加载、注册表、触发描述与资源引用，并厘清 Skill、Tool 和 Subagent 的职责边界。</p>
+      </div>
+      <span class="home-post-item__more">阅读 <span aria-hidden="true">&rarr;</span></span>
+    </a>
+    <a class="home-post-item" href="/2026/08/20/Learn-Claude-Code-06-Subagent/">
+      <div class="home-post-item__main">
+        <div class="home-post-item__meta">
+          <time datetime="2026-08-20">2026-08-20</time>
+          <span aria-hidden="true">/</span><span>Learn Claude Code</span>
+        </div>
+        <h3 class="home-post-item__title">Learn Claude Code 06：Subagent——用独立上下文拆解复杂任务</h3>
+        <p class="home-post-item__description">从上下文污染出发，拆解父子 Agent 的委派协议、独立消息历史、结果压缩、工具限制、权限冒泡与共享工作区风险。</p>
+      </div>
+      <span class="home-post-item__more">阅读 <span aria-hidden="true">&rarr;</span></span>
+    </a>
+  </div>
+</section>
+
+<section class="post-block columns-directory" aria-labelledby="columns-title">
+  <div class="post-content">
+    <div class="columns-directory__header">
+      <span class="columns-directory__eyebrow">CONTENT MAP</span>
+      <h2 id="columns-title" class="columns-directory__title">按专栏浏览</h2>
+      <p class="columns-directory__intro">按主题浏览文章，从一个方向开始持续阅读。</p>
+    </div>
+    <div class="columns-grid">
+      
+    <a class="column-card" href="/categories/Learn-Claude-Code/">
+      <div class="column-card__body">
+        <h3 class="column-card__title">Learn Claude Code</h3>
+        <p class="column-card__description">从最小 Agent 循环出发，逐步拆解 Claude Code 的工具、权限与工程化机制</p>
+      </div>
+      <div class="column-card__meta">
+        <span>9 篇文章</span>
+        <time datetime="2026-08-20">最近更新 2026-08-20</time>
+        <span class="column-card__arrow" aria-hidden="true">&rarr;</span>
+      </div>
+    </a>
+    <a class="column-card" href="/categories/PostgreSQL-%E5%8E%9F%E7%90%86/">
+      <div class="column-card__body">
+        <h3 class="column-card__title">PostgreSQL 原理</h3>
+        <p class="column-card__description">从进程模型、缓存与 I/O 路径出发，理解 PostgreSQL 的架构取舍</p>
+      </div>
+      <div class="column-card__meta">
+        <span>1 篇文章</span>
+        <time datetime="2026-08-20">最近更新 2026-08-20</time>
+        <span class="column-card__arrow" aria-hidden="true">&rarr;</span>
+      </div>
+    </a>
+    <a class="column-card" href="/categories/%E7%BD%91%E7%BB%9C%E7%BC%96%E7%A8%8B/">
+      <div class="column-card__body">
+        <h3 class="column-card__title">网络编程</h3>
+        <p class="column-card__description">从 Reactor、事件循环到高并发网络服务，理解 I/O 与线程模型</p>
+      </div>
+      <div class="column-card__meta">
+        <span>1 篇文章</span>
+        <time datetime="2026-08-16">最近更新 2026-08-16</time>
+        <span class="column-card__arrow" aria-hidden="true">&rarr;</span>
+      </div>
+    </a>
+    <a class="column-card" href="/categories/PostGIS-%E5%AE%9E%E6%88%98/">
+      <div class="column-card__body">
+        <h3 class="column-card__title">PostGIS 实战</h3>
+        <p class="column-card__description">记录空间数据精度、拓扑修复与工程化验证中的典型问题</p>
+      </div>
+      <div class="column-card__meta">
+        <span>1 篇文章</span>
+        <time datetime="2026-08-05">最近更新 2026-08-05</time>
+        <span class="column-card__arrow" aria-hidden="true">&rarr;</span>
+      </div>
+    </a>
+    <a class="column-card" href="/categories/MCP-%E5%AD%A6%E4%B9%A0%E7%AC%94%E8%AE%B0/">
+      <div class="column-card__body">
+        <h3 class="column-card__title">MCP 学习笔记</h3>
+        <p class="column-card__description">从协议原语到安全、调试与测试，系统理解 MCP</p>
+      </div>
+      <div class="column-card__meta">
+        <span>4 篇文章</span>
+        <time datetime="2026-07-31">最近更新 2026-07-31</time>
+        <span class="column-card__arrow" aria-hidden="true">&rarr;</span>
+      </div>
+    </a>
+    <a class="column-card" href="/categories/Hello%E7%AE%97%E6%B3%95%E5%AD%A6%E4%B9%A0%E7%AC%94%E8%AE%B0/">
+      <div class="column-card__body">
+        <h3 class="column-card__title">Hello算法学习笔记</h3>
+        <p class="column-card__description">用清晰的代码和图解打牢数据结构与算法基础</p>
+      </div>
+      <div class="column-card__meta">
+        <span>10 篇文章</span>
+        <time datetime="2026-07-30">最近更新 2026-07-30</time>
+        <span class="column-card__arrow" aria-hidden="true">&rarr;</span>
+      </div>
+    </a>
+    <a class="column-card" href="/categories/%E4%BB%8E%E9%9B%B6%E5%AE%9E%E8%B7%B5-Function-Call/">
+      <div class="column-card__body">
+        <h3 class="column-card__title">从零实践 Function Call</h3>
+        <p class="column-card__description">从工具调用出发，构建可规划、可容错的 Agent 系统</p>
+      </div>
+      <div class="column-card__meta">
+        <span>6 篇文章</span>
+        <time datetime="2026-07-30">最近更新 2026-07-30</time>
+        <span class="column-card__arrow" aria-hidden="true">&rarr;</span>
+      </div>
+    </a>
+    <a class="column-card" href="/categories/Coding-Agent-%E5%8E%9F%E7%90%86/">
+      <div class="column-card__body">
+        <h3 class="column-card__title">Coding Agent 原理</h3>
+        <p class="column-card__description">拆解 Agent 的核心循环、记忆、容错与上下文管理</p>
+      </div>
+      <div class="column-card__meta">
+        <span>5 篇文章</span>
+        <time datetime="2026-07-29">最近更新 2026-07-29</time>
+        <span class="column-card__arrow" aria-hidden="true">&rarr;</span>
+      </div>
+    </a>
+    <a class="column-card" href="/categories/LightRAG%E6%BA%90%E7%A0%81%E5%88%86%E6%9E%90/">
+      <div class="column-card__body">
+        <h3 class="column-card__title">LightRAG 源码解读</h3>
+        <p class="column-card__description">从查询、检索到知识图谱，逐层拆解 LightRAG 的实现</p>
+      </div>
+      <div class="column-card__meta">
+        <span>9 篇文章</span>
+        <time datetime="2026-07-25">最近更新 2026-07-25</time>
+        <span class="column-card__arrow" aria-hidden="true">&rarr;</span>
+      </div>
+    </a>
+    <a class="column-card" href="/categories/RAG%E5%AD%A6%E4%B9%A0%E7%AC%94%E8%AE%B0/">
+      <div class="column-card__body">
+        <h3 class="column-card__title">RAG 学习笔记</h3>
+        <p class="column-card__description">从基础概念到检索、生成与 RAG 架构演进</p>
+      </div>
+      <div class="column-card__meta">
+        <span>4 篇文章</span>
+        <time datetime="2026-07-12">最近更新 2026-07-12</time>
+        <span class="column-card__arrow" aria-hidden="true">&rarr;</span>
+      </div>
+    </a>
+    </div>
+  </div>
+</section>
+</div>
+  </main>
+
+  <footer class="footer">
+    <div class="footer-inner">
+
+  <div class="copyright">
+    &copy; 
+    <span itemprop="copyrightYear">2026</span>
+    <span class="with-love">
+      <i class="fab fa-osi"></i>
+    </span>
+    <span class="author" itemprop="copyrightHolder">陌忆</span>
+  </div>
+<div class="wordcount">
+  <span class="post-meta-item">
+    <span class="post-meta-item-icon">
+      <i class="fa fa-chart-line"></i>
+    </span>
+    <span title="站点总字数">106k</span>
+  </span>
+  <span class="post-meta-item">
+    <span class="post-meta-item-icon">
+      <i class="fa fa-coffee"></i>
+    </span>
+    <span title="站点阅读时长">6:24</span>
+  </span>
+</div>
+  <div class="powered-by">由 <a href="https://hexo.io/" rel="noopener" target="_blank">Hexo</a> & <a href="https://theme-next.js.org/" rel="noopener" target="_blank">NexT.Gemini</a> 强力驱动
+  </div>
+
+    </div>
+  </footer>
+
+  
+  <div class="toggle sidebar-toggle" role="button">
+    <span class="toggle-line"></span>
+    <span class="toggle-line"></span>
+    <span class="toggle-line"></span>
+  </div>
+  <div class="sidebar-dimmer"></div>
+  <div class="back-to-top" role="button" aria-label="返回顶部">
+    <i class="fa fa-arrow-up fa-lg"></i>
+    <span>0%</span>
+  </div>
+
+<noscript>
+  <div class="noscript-warning">Theme NexT works best with JavaScript enabled</div>
+</noscript>
+<!-- Site running time -->
+<span id="timeDate" aria-live="off"></span>
+<script>
+(function() {
+  var start = new Date("2022-11-17T08:00:00+08:00");
+  function pad(n) { return n < 10 ? "0" + n : "" + n; }
+  function tick() {
+    var diff = Date.now() - start.getTime();
+    if (diff < 0) return;
+    var d = Math.floor(diff / 86400000);
+    var h = Math.floor((diff % 86400000) / 3600000);
+    var m = Math.floor((diff % 3600000) / 60000);
+    var timeDate = document.getElementById("timeDate");
+    if (!timeDate) return;
+    timeDate.textContent =
+      "\u672C\u7AD9\u5DF2\u5B89\u5168\u8FD0\u884C " + d + " \u5929 " + pad(h) + " \u5C0F\u65F6 " + pad(m) + " \u5206";
+  }
+  tick();
+  setInterval(tick, 60000);
+})();
+</script>
+
+</body>
+</html>

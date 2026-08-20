@@ -1,0 +1,549 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width">
+<meta name="theme-color" content="#222" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#222" media="(prefers-color-scheme: dark)"><meta name="generator" content="Hexo 7.3.0">
+<link rel="preconnect" href="https://cdnjs.cloudflare.com" crossorigin>
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon-next.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32-next.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next.png">
+  <link rel="mask-icon" href="/images/logo.svg" color="#222">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/7.0.0/css/all.min.css" integrity="sha256-VHqXKFhhMxcpubYf9xiWdCiojEbY9NexQ4jh8AxbvcM=" crossorigin="anonymous">
+
+<script class="next-config" data-name="main" type="application/json">{"hostname":"moyi-math.github.io","root":"/","images":"/images","scheme":"Gemini","darkmode":true,"version":"8.28.0","exturl":false,"sidebar":{"position":"left","width_expanded":320,"width_dual_column":240,"display":"post","padding":18,"offset":12},"hljswrap":true,"codeblock":{"theme":{"light":"default","dark":"stackoverflow-dark"},"prism":{"light":"prism","dark":"prism-dark"},"copy_button":{"enable":true,"style":null},"fold":{"enable":false,"height":500},"language":false},"bookmark":{"enable":false,"color":"#222","save":"auto"},"mediumzoom":false,"lazyload":true,"pangu":false,"comments":{"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},"stickytabs":false,"motion":{"enable":false,"async":false,"duration":200,"transition":{"menu_item":"fadeInDown","post_block":"fadeIn","post_header":"fadeInDown","post_body":"fadeInDown","coll_header":"fadeInLeft","sidebar":"fadeInUp"}},"prism":false,"i18n":{"placeholder":"搜索...","empty":"没有找到任何搜索结果：${query}","hits_time":"找到 ${hits} 个搜索结果（用时 ${time} 毫秒）","hits":"找到 ${hits} 个搜索结果"},"path":"/search.json","localsearch":{"enable":true,"top_n_per_article":1,"unescape":false,"preload":false}}</script><script src="/js/config.js" defer></script>
+
+    <meta name="description" content="面对大量工具时，用 Embedding 做语义路由，先筛选候选工具再交给 LLM 决策以降低上下文成本。">
+<meta property="og:type" content="article">
+<meta property="og:title" content="从零实践 Function Call（六）：当工具有几十个——用 Embedding 做工具路由">
+<meta property="og:url" content="https://moyi-math.github.io/2026/07/30/%E4%BB%8E%E9%9B%B6%E5%AE%9E%E8%B7%B5-Function-Call-6-Embedding%E5%B7%A5%E5%85%B7%E8%B7%AF%E7%94%B1/index.html">
+<meta property="og:site_name" content="陌忆的博客">
+<meta property="og:description" content="面对大量工具时，用 Embedding 做语义路由，先筛选候选工具再交给 LLM 决策以降低上下文成本。">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:image" content="https://moyi-math.github.io/images/background.webp">
+<meta property="article:published_time" content="2026-07-30T08:20:00.000Z">
+<meta property="article:modified_time" content="2026-08-20T14:47:37.222Z">
+<meta property="article:author" content="陌忆">
+<meta property="article:tag" content="Agent">
+<meta property="article:tag" content="LLM">
+<meta property="article:tag" content="Embedding">
+<meta property="article:tag" content="Function Call">
+<meta property="article:tag" content="Tool Routing">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:image" content="https://moyi-math.github.io/images/background.webp">
+
+
+<link rel="canonical" href="https://moyi-math.github.io/2026/07/30/%E4%BB%8E%E9%9B%B6%E5%AE%9E%E8%B7%B5-Function-Call-6-Embedding%E5%B7%A5%E5%85%B7%E8%B7%AF%E7%94%B1/">
+
+
+<script class="next-config" data-name="page" type="application/json">{"sidebar":"","isHome":false,"isPost":true,"lang":"zh-CN","comments":true,"permalink":"https://moyi-math.github.io/2026/07/30/%E4%BB%8E%E9%9B%B6%E5%AE%9E%E8%B7%B5-Function-Call-6-Embedding%E5%B7%A5%E5%85%B7%E8%B7%AF%E7%94%B1/","path":"2026/07/30/从零实践-Function-Call-6-Embedding工具路由/","title":"从零实践 Function Call（六）：当工具有几十个——用 Embedding 做工具路由"}</script>
+
+<script class="next-config" data-name="calendar" type="application/json">""</script>
+<title>从零实践 Function Call（六）：当工具有几十个——用 Embedding 做工具路由 | 陌忆的博客</title>
+  
+
+
+
+
+
+
+
+
+  
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/animejs/3.2.1/anime.min.js" integrity="sha256-XL2inqUJaslATFnHdJOi9GfQ60on8Wx1C2H8DYiN1xY=" crossorigin="anonymous" defer></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/lozad.js/1.16.0/lozad.min.js" integrity="sha256-mOFREFhqmHeQbXpK2lp4nA3qooVgACfh88fpJftLBbc=" crossorigin="anonymous" defer></script>
+<script src="/js/utils.js" defer></script><script src="/js/sidebar.js" defer></script><script src="/js/next-boot.js" defer></script>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/hexo-generator-searchdb/1.5.0/search.js" integrity="sha256-xFC6PJ82SL9b3WkGjFavNiA9gm5z6UBxWPiu4CYjptg=" crossorigin="anonymous" defer></script>
+<script src="/js/third-party/search/local-search.js" defer></script>
+
+
+
+
+
+
+
+  
+
+
+
+
+  
+
+  <script class="next-config" data-name="enableMath" type="application/json">false</script><link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/katex.min.css" integrity="sha256-UF1fgpAiu3tPJN/uCqEUHNe7pnr+QR0SQDNfgglgtcM=" crossorigin="anonymous">
+
+
+<link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
+
+
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"WebSite","name":"陌忆的博客","url":"https://moyi-math.github.io","description":"记录 RAG、Agent、MCP、算法与软件工程实践，按专栏整理可复用的技术笔记。","inLanguage":"zh-CN","author":{"@type":"Person","name":"陌忆"}}</script>
+
+
+
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"Article","headline":"从零实践 Function Call（六）：当工具有几十个——用 Embedding 做工具路由","description":"面对大量工具时，用 Embedding 做语义路由，先筛选候选工具再交给 LLM 决策以降低上下文成本。","datePublished":"2026-07-30T08:20:00.000Z","dateModified":"2026-08-20T14:47:37.222Z","inLanguage":"zh-CN","mainEntityOfPage":{"@type":"WebPage","@id":"https://moyi-math.github.io/2026/07/30/%E4%BB%8E%E9%9B%B6%E5%AE%9E%E8%B7%B5-Function-Call-6-Embedding%E5%B7%A5%E5%85%B7%E8%B7%AF%E7%94%B1/index.html"},"author":{"@type":"Person","name":"陌忆"}}</script>
+<meta name="author" content="陌忆">
+
+
+  <noscript>
+    <link rel="stylesheet" href="/css/noscript.css">
+  </noscript>
+<!-- hexo injector head_end start --><link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/katex.min.css" integrity="sha512-fHwaWebuwA7NSF5Qg/af4UeDx9XqUpYpOGgubo3yWu+b2IQR4UeQwbb42Ti7gVAjNtVoI/I9TEoYeu9omwcC6g==" crossorigin="anonymous" referrerpolicy="no-referrer" /><!-- hexo injector head_end end --><link rel="alternate" href="/atom.xml" title="陌忆的博客" type="application/atom+xml">
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage">
+  <div class="headband"></div>
+
+  <main class="main">
+    <div class="column">
+      <header class="header" itemscope itemtype="http://schema.org/WPHeader"><div class="site-brand-container">
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="切换导航栏" role="button">
+        <span class="toggle-line"></span>
+        <span class="toggle-line"></span>
+        <span class="toggle-line"></span>
+    </div>
+  </div>
+
+  <div class="site-meta">
+
+    <a href="/" class="brand" rel="start">
+      <i class="logo-line"></i>
+      <p class="site-title">陌忆的博客</p>
+      <i class="logo-line"></i>
+    </a>
+      <p class="site-subtitle" itemprop="description">数据库无法得出结论</p>
+  </div>
+
+  <div class="site-nav-right">
+    <div class="toggle popup-trigger" aria-label="搜索" role="button">
+        <i class="fa fa-search fa-fw fa-lg"></i>
+    </div>
+  </div>
+</div>
+
+
+
+<nav class="site-nav">
+  <ul class="main-menu menu"><li class="menu-item menu-item-home"><a href="/" rel="section"><i class="fa fa-home fa-fw"></i>首页</a></li><li class="menu-item menu-item-about"><a href="/about/" rel="section"><i class="fa fa-user fa-fw"></i>关于</a></li><li class="menu-item menu-item-tags"><a href="/tags/" rel="section"><i class="fa fa-tags fa-fw"></i>标签</a></li><li class="menu-item menu-item-categories"><a href="/categories/" rel="section"><i class="fa fa-th fa-fw"></i>分类</a></li><li class="menu-item menu-item-archives"><a href="/archives/" rel="section"><i class="fa fa-archive fa-fw"></i>归档</a></li>
+      <li class="menu-item menu-item-search">
+        <a role="button" class="popup-trigger"><i class="fa fa-search fa-fw"></i>搜索
+        </a>
+      </li>
+  </ul>
+</nav>
+
+
+
+  <div class="search-pop-overlay">
+    <div class="popup search-popup">
+      <div class="search-header">
+        <span class="search-icon">
+          <i class="fa fa-search"></i>
+        </span>
+        <div class="search-input-container">
+          <input autocomplete="off" autocapitalize="off" maxlength="80"
+                placeholder="搜索..." spellcheck="false"
+                type="search" class="search-input">
+        </div>
+        <span class="popup-btn-close" role="button">
+          <i class="fa fa-times-circle"></i>
+        </span>
+      </div>
+      <div class="search-result-container">
+        <div class="search-result-icon">
+          <i class="fa fa-spinner fa-pulse fa-5x"></i>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</header>
+        
+  
+  <aside class="sidebar">
+
+    <div class="sidebar-inner sidebar-nav-active sidebar-toc-active">
+      <ul class="sidebar-nav">
+        <li class="sidebar-nav-toc">
+          文章目录
+        </li>
+        <li class="sidebar-nav-overview">
+          站点概览
+        </li>
+      </ul>
+
+      <div class="sidebar-panel-container">
+        <!--noindex-->
+        <div class="post-toc-wrap sidebar-panel">
+            <div class="post-toc animated"><ol class="nav"><li class="nav-item nav-level-2"><a class="nav-link" href="#%E4%B8%80%E3%80%81%E9%97%AE%E9%A2%98%EF%BC%9A09-%E5%8F%AA%E6%9C%89-4-%E4%B8%AA%E5%B7%A5%E5%85%B7%EF%BC%8C%E4%BD%86%E7%9C%9F%E5%AE%9E%E7%B3%BB%E7%BB%9F%E6%9C%89%E5%87%A0%E5%8D%81%E4%B8%AA"><span class="nav-text">一、问题：09 只有 4 个工具，但真实系统有几十个</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E4%BA%8C%E3%80%81%E8%A7%A3%E6%B3%95%EF%BC%9ARAG-%E6%80%9D%E6%83%B3%E7%94%A8%E5%9C%A8%E5%B7%A5%E5%85%B7%E9%80%89%E6%8B%A9%E4%B8%8A"><span class="nav-text">二、解法：RAG 思想用在工具选择上</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E4%B8%89%E3%80%81%E6%A0%B8%E5%BF%83%E4%BB%A3%E7%A0%81%E5%B0%B1%E4%B8%A4%E4%B8%AA%E5%87%BD%E6%95%B0"><span class="nav-text">三、核心代码就两个函数</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#%E8%AF%84%E5%88%86%E5%87%BD%E6%95%B0"><span class="nav-text">评分函数</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E9%80%89%E6%8B%A9%E5%87%BD%E6%95%B0"><span class="nav-text">选择函数</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%9B%9B%E3%80%81%E4%BB%80%E4%B9%88%E6%98%AF-Pinned%EF%BC%88%E9%92%89%E5%AD%90%E5%B7%A5%E5%85%B7%EF%BC%89"><span class="nav-text">四、什么是 Pinned（钉子工具）</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E4%BA%94%E3%80%816-%E4%B8%AA%E6%BC%94%E7%A4%BA%E5%9C%BA%E6%99%AF"><span class="nav-text">五、6 个演示场景</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%85%AD%E3%80%81%E4%B8%BA%E4%BB%80%E4%B9%88%E6%B2%A1%E6%9C%89-Cross-encoder-%E9%87%8D%E6%8E%92%E5%BA%8F%EF%BC%9F"><span class="nav-text">六、为什么没有 Cross-encoder 重排序？</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E4%B8%83%E3%80%81%E4%B8%89%E4%B8%AA%E5%85%B3%E9%94%AE%E8%AE%BE%E8%AE%A1%E5%86%B3%E7%AD%96"><span class="nav-text">七、三个关键设计决策</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%85%AB%E3%80%81%E6%A0%B8%E5%BF%83%E6%B4%9E%E8%A7%81"><span class="nav-text">八、核心洞见</span></a></li></ol></div>
+        </div>
+        <!--/noindex-->
+
+        <div class="site-overview-wrap sidebar-panel">
+          <div class="site-author animated" itemprop="author" itemscope itemtype="http://schema.org/Person">
+    <img class="site-author-image" itemprop="image" alt="陌忆"
+      src="/images/avatar.webp">
+  <p class="site-author-name" itemprop="name">陌忆</p>
+  <div class="site-description" itemprop="description">记录 RAG、Agent、MCP、算法与软件工程实践，按专栏整理可复用的技术笔记。</div>
+</div>
+<div class="site-state-wrap animated">
+  <nav class="site-state">
+      <div class="site-state-item site-state-posts">
+        <a href="/archives/">
+          <span class="site-state-item-count">50</span>
+          <span class="site-state-item-name">日志</span>
+        </a>
+      </div>
+      <div class="site-state-item site-state-categories">
+          <a href="/categories/">
+        <span class="site-state-item-count">10</span>
+        <span class="site-state-item-name">分类</span></a>
+      </div>
+      <div class="site-state-item site-state-tags">
+          <a href="/tags/">
+        <span class="site-state-item-count">172</span>
+        <span class="site-state-item-name">标签</span></a>
+      </div>
+  </nav>
+</div>
+  <div class="links-of-author animated">
+      <span class="links-of-author-item">
+        <a href="https://github.com/moyi-math" title="GitHub → https:&#x2F;&#x2F;github.com&#x2F;moyi-math" rel="noopener me" target="_blank"><i class="fab fa-github fa-fw"></i>GitHub</a>
+      </span>
+  </div>
+  <div class="cc-license animated" itemprop="license">
+    <a href="https://creativecommons.org/licenses/by-nc-sa/4.0/" class="cc-opacity" rel="noopener" target="_blank"><img src="https://cdnjs.cloudflare.com/ajax/libs/creativecommons-vocabulary/2020.11.3/assets/license_badges/small/by_nc_sa.svg" alt="Creative Commons"></a>
+  </div>
+
+        </div>
+      </div>
+    </div>
+
+    
+  </aside>
+
+
+    </div>
+
+    <div class="main-inner post posts-expand">
+
+
+  
+
+
+<div class="post-block">
+  
+  
+
+  <article itemscope itemtype="http://schema.org/Article" class="post-content" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="https://moyi-math.github.io/2026/07/30/%E4%BB%8E%E9%9B%B6%E5%AE%9E%E8%B7%B5-Function-Call-6-Embedding%E5%B7%A5%E5%85%B7%E8%B7%AF%E7%94%B1/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.webp">
+      <meta itemprop="name" content="陌忆">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="陌忆的博客">
+      <meta itemprop="description" content="记录 RAG、Agent、MCP、算法与软件工程实践，按专栏整理可复用的技术笔记。">
+    </span>
+
+    <span hidden itemprop="post" itemscope itemtype="http://schema.org/CreativeWork">
+      <meta itemprop="name" content="从零实践 Function Call（六）：当工具有几十个——用 Embedding 做工具路由 | 陌忆的博客">
+      <meta itemprop="description" content="面对大量工具时，用 Embedding 做语义路由，先筛选候选工具再交给 LLM 决策以降低上下文成本。">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          从零实践 Function Call（六）：当工具有几十个——用 Embedding 做工具路由
+        </h1>
+
+        <div class="post-meta-container">
+          <div class="post-meta">
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-calendar"></i>
+      </span>
+      <span class="post-meta-item-text">发表于</span>
+
+      <time title="创建时间：2026-07-30 16:20:00" itemprop="dateCreated datePublished" datetime="2026-07-30T16:20:00+08:00">2026-07-30</time>
+    </span>
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-calendar-check"></i>
+      </span>
+      <span class="post-meta-item-text">更新于</span>
+      <time title="修改时间：2026-08-20 22:47:37" itemprop="dateModified" datetime="2026-08-20T22:47:37+08:00">2026-08-20</time>
+    </span>
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-folder"></i>
+      </span>
+      <span class="post-meta-item-text">分类于</span>
+        <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+          <a href="/categories/%E4%BB%8E%E9%9B%B6%E5%AE%9E%E8%B7%B5-Function-Call/" itemprop="url" rel="index"><span itemprop="name">从零实践 Function Call</span></a>
+        </span>
+    </span>
+
+  
+    <span class="post-meta-break"></span>
+    <span class="post-meta-item" title="本文字数">
+      <span class="post-meta-item-icon">
+        <i class="far fa-file-word"></i>
+      </span>
+      <span class="post-meta-item-text">本文字数：</span>
+      <span>1.2k</span>
+    </span>
+    <span class="post-meta-item" title="阅读时长">
+      <span class="post-meta-item-icon">
+        <i class="far fa-clock"></i>
+      </span>
+      <span class="post-meta-item-text">阅读时长 &asymp;</span>
+      <span>5 分钟</span>
+    </span>
+</div>
+
+            <div class="post-description">面对大量工具时，用 Embedding 做语义路由，先筛选候选工具再交给 LLM 决策以降低上下文成本。</div>
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody"><span id="more"></span>
+
+<h2 id="一、问题：09-只有-4-个工具，但真实系统有几十个"><a href="#一、问题：09-只有-4-个工具，但真实系统有几十个" class="headerlink" title="一、问题：09 只有 4 个工具，但真实系统有几十个"></a>一、问题：09 只有 4 个工具，但真实系统有几十个</h2><p>回顾 09_react-agent 的工具集：</p>
+<figure class="highlight javascript"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">const</span> functions = &#123;add, multiply, subtract, divide&#125;;  <span class="comment">// 4 个工具</span></span><br></pre></td></tr></table></figure>
+
+<p>全部传给 LLM 没问题。但如果系统涨到了 80 个工具呢？</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">每个工具 = name + description + JSON Schema（几十到上百 token）</span><br><span class="line">80 个工具 = 几千个额外 token</span><br></pre></td></tr></table></figure>
+
+<p>带来的问题：</p>
+<ol>
+<li><strong>上下文成本</strong>：大量 token 被工具定义占用，留给对话的 token 变少</li>
+<li><strong>选错概率</strong>：工具越多，LLM 选到相似但错误工具的概率越高</li>
+<li><strong>延迟</strong>：工具定义过多可能拉长首 token 时间</li>
+</ol>
+<h2 id="二、解法：RAG-思想用在工具选择上"><a href="#二、解法：RAG-思想用在工具选择上" class="headerlink" title="二、解法：RAG 思想用在工具选择上"></a>二、解法：RAG 思想用在工具选择上</h2><figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br></pre></td><td class="code"><pre><span class="line">用户消息</span><br><span class="line">    ↓</span><br><span class="line">小模型做 Embedding（bge-small-en，37MB）</span><br><span class="line">    ↓</span><br><span class="line">和每个工具的&quot;示范短语&quot;算余弦相似度</span><br><span class="line">    ↓</span><br><span class="line">只取 Top-K 个</span><br><span class="line">    ↓</span><br><span class="line">加上&quot;始终包含&quot;的工具（pinned）</span><br><span class="line">    ↓</span><br><span class="line">只把这 k+pinned 个工具传给 LLM</span><br></pre></td></tr></table></figure>
+
+<p>核心思想：<strong>Tool routing &#x3D; RAG for tools</strong>。示范短语就是文档，用户消息就是查询，余弦相似度就是检索。</p>
+<h2 id="三、核心代码就两个函数"><a href="#三、核心代码就两个函数" class="headerlink" title="三、核心代码就两个函数"></a>三、核心代码就两个函数</h2><h3 id="评分函数"><a href="#评分函数" class="headerlink" title="评分函数"></a>评分函数</h3><figure class="highlight javascript"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">function</span> <span class="title function_">scoreTools</span>(<span class="params">queryEmbedding, exemplarRows</span>) &#123;</span><br><span class="line">  <span class="keyword">const</span> maxByTool = <span class="keyword">new</span> <span class="title class_">Map</span>();</span><br><span class="line">  <span class="keyword">for</span> (<span class="keyword">const</span> row <span class="keyword">of</span> exemplarRows) &#123;</span><br><span class="line">    <span class="keyword">const</span> sim = queryEmbedding.<span class="title function_">calculateCosineSimilarity</span>(row.<span class="property">embedding</span>);</span><br><span class="line">    <span class="keyword">const</span> prev = maxByTool.<span class="title function_">get</span>(row.<span class="property">toolKey</span>) ?? -<span class="title class_">Infinity</span>;</span><br><span class="line">    <span class="keyword">if</span> (sim &gt; prev) maxByTool.<span class="title function_">set</span>(row.<span class="property">toolKey</span>, sim);  <span class="comment">// 取 max</span></span><br><span class="line">  &#125;</span><br><span class="line">  <span class="keyword">return</span> maxByTool;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>一个工具可以有多个示范短语。评分取<strong>最大值</strong>——只要有一个短语匹配上，工具就应该被考虑。</p>
+<h3 id="选择函数"><a href="#选择函数" class="headerlink" title="选择函数"></a>选择函数</h3><figure class="highlight javascript"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">function</span> <span class="title function_">selectToolKeys</span>(<span class="params">scores, k, alwaysInclude</span>) &#123;</span><br><span class="line">  <span class="keyword">const</span> ranked = [...scores.<span class="title function_">entries</span>()].<span class="title function_">sort</span>(<span class="function">(<span class="params">a, b</span>) =&gt;</span> b[<span class="number">1</span>] - a[<span class="number">1</span>]);</span><br><span class="line">  <span class="keyword">const</span> out = <span class="keyword">new</span> <span class="title class_">Set</span>(alwaysInclude);     <span class="comment">// 先加入钉子工具</span></span><br><span class="line">  <span class="keyword">for</span> (<span class="keyword">const</span> key <span class="keyword">of</span> ranked) &#123;</span><br><span class="line">    <span class="keyword">if</span> (out.<span class="property">size</span> &gt;= alwaysInclude.<span class="property">size</span> + k) <span class="keyword">break</span>;</span><br><span class="line">    <span class="keyword">if</span> (alwaysInclude.<span class="title function_">has</span>(key)) <span class="keyword">continue</span>;</span><br><span class="line">    out.<span class="title function_">add</span>(key);                         <span class="comment">// 再加入 top-k</span></span><br><span class="line">  &#125;</span><br><span class="line">  <span class="keyword">return</span> out;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>两步分开，每步可独立测试。这是好的工程设计的标志。</p>
+<h2 id="四、什么是-Pinned（钉子工具）"><a href="#四、什么是-Pinned（钉子工具）" class="headerlink" title="四、什么是 Pinned（钉子工具）"></a>四、什么是 Pinned（钉子工具）</h2><p>有些工具<strong>不参与相似度竞争，永远在结果集里</strong>：</p>
+<figure class="highlight javascript"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// 合规工具：每个请求都提供</span></span><br><span class="line"><span class="attr">alwaysInclude</span>: <span class="keyword">new</span> <span class="title class_">Set</span>([<span class="string">&quot;createSupportTicket&quot;</span>])</span><br><span class="line"></span><br><span class="line"><span class="comment">// 安全工具：涉及敏感话题时必须可用</span></span><br><span class="line"><span class="attr">alwaysInclude</span>: <span class="keyword">new</span> <span class="title class_">Set</span>([<span class="string">&quot;escalateToSpecialist&quot;</span>])</span><br><span class="line"></span><br><span class="line"><span class="comment">// 核心工具：agent 每次运行都有</span></span><br><span class="line"><span class="attr">alwaysInclude</span>: <span class="keyword">new</span> <span class="title class_">Set</span>([<span class="string">&quot;getUserAccount&quot;</span>])</span><br></pre></td></tr></table></figure>
+
+<p>pinned 的工具不消耗 k 的配额。<code>k=1 + pinned=1</code> → LLM 实际看到 2 个工具，但只用了 1 个检索槽位。</p>
+<h2 id="五、6-个演示场景"><a href="#五、6-个演示场景" class="headerlink" title="五、6 个演示场景"></a>五、6 个演示场景</h2><table>
+<thead>
+<tr>
+<th>场景</th>
+<th>用户说</th>
+<th>k</th>
+<th>选中工具</th>
+<th>结果</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>VPN 故障</td>
+<td>“Cisco 客户端连不上”</td>
+<td>1</td>
+<td>checkVPNStatus ✓</td>
+<td>精准命中</td>
+</tr>
+<tr>
+<td>账户锁定</td>
+<td>“密码输错太多次”</td>
+<td>1</td>
+<td>getUserAccount ✓</td>
+<td>精准命中</td>
+</tr>
+<tr>
+<td>电脑崩溃</td>
+<td>“蓝屏了，查日志并跑硬件诊断”</td>
+<td>2</td>
+<td>getSystemLogs + runDiagnostic ✓</td>
+<td>双意图命中</td>
+</tr>
+<tr>
+<td>磁盘满 + 版本查询</td>
+<td>“装不上更新，顺便问 Office 版本”</td>
+<td>2</td>
+<td>checkDiskSpace + getInstalledSoftware ✓</td>
+<td>双意图命中</td>
+</tr>
+<tr>
+<td>VPN + 锁定（k&#x3D;1）</td>
+<td>“VPN 认证失败，密码也不对了”</td>
+<td>1</td>
+<td>只有 checkVPNStatus ✗</td>
+<td><strong>漏了账户工具</strong></td>
+</tr>
+<tr>
+<td>同上 + pinned</td>
+<td>同样的话</td>
+<td>1+pinned</td>
+<td>checkVPNStatus + getUserAccount ✓</td>
+<td>全命中</td>
+</tr>
+</tbody></table>
+<p>第五个场景是特意设计的<strong>召回失败</strong>演示——用户说了两件事（VPN + 账户），但 k&#x3D;1 只取到相似度更高的 VPN 工具。</p>
+<p>第六个场景展示 pinned 的解法：<code>getUserAccount</code> 被钉入 always-include，不占 k 的配额。</p>
+<h2 id="六、为什么没有-Cross-encoder-重排序？"><a href="#六、为什么没有-Cross-encoder-重排序？" class="headerlink" title="六、为什么没有 Cross-encoder 重排序？"></a>六、为什么没有 Cross-encoder 重排序？</h2><p>你可能会问：只用 bi-encoder 够吗？为什么不需要 cross-encoder 做第二阶段重排？</p>
+<p>对比两种 Embedding 模型：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br></pre></td><td class="code"><pre><span class="line">Bi-encoder（当前，如 bge-small-en）：</span><br><span class="line">  把整段文本压缩成一个向量</span><br><span class="line">  &quot;VPN client disconnected&quot; → 向量 A</span><br><span class="line">  &quot;check VPN status&quot;       → 向量 B</span><br><span class="line">  cos(A, B)                 → 一次点积，几毫秒</span><br><span class="line"></span><br><span class="line">Cross-encoder：</span><br><span class="line">  每对文本单独跑一次模型</span><br><span class="line">  (&quot;VPN client disconnected&quot;, &quot;check VPN status&quot;) → 精确分数</span><br><span class="line">  每对几百毫秒</span><br></pre></td></tr></table></figure>
+
+<p>当前代码只有 12 个工具 × 3 个示范短语 &#x3D; 36 次相似度计算，bi-encoder 几毫秒跑完。cross-encoder 虽然更精确，但要跑 36 次推理，慢 10-100 倍。对于这个规模，<strong>精度提升不值得多花的时间</strong>。</p>
+<p>真需要 rerank 的场景是几百个工具：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line">500 个工具</span><br><span class="line">  ↓ bi-encoder（快，宽召回）</span><br><span class="line">top-50 候选</span><br><span class="line">  ↓ cross-encoder（慢，精确）</span><br><span class="line">top-5 最终传给 LLM</span><br></pre></td></tr></table></figure>
+
+<p>这就是 RAG 里经典的<strong>两阶段检索</strong>：先用轻量模型宽召回，再用重量模型做精排。</p>
+<h2 id="七、三个关键设计决策"><a href="#七、三个关键设计决策" class="headerlink" title="七、三个关键设计决策"></a>七、三个关键设计决策</h2><ol>
+<li><p><strong>用 max 不是 mean</strong>：一个工具多个示范短语，取最高分而不是平均分——只要有一个短语强烈匹配，工具就应该被考虑。</p>
+</li>
+<li><p><strong>k 的权衡</strong>：k 太小 → 漏工具（recall 失败）；k 太大 → 噪声重新进入 prompt。需要实测找到平衡点。</p>
+</li>
+<li><p><strong>示范短语 ≠ 用户问题的拷贝</strong>：好的示范短语是多样化的 paraphrase，不是从真实对话里复制粘贴。否则路由看起来”准”，但换个说法就露馅。</p>
+</li>
+</ol>
+<h2 id="八、核心洞见"><a href="#八、核心洞见" class="headerlink" title="八、核心洞见"></a>八、核心洞见</h2><p>这个例子没有改变 function call 的机制——它改变的是<strong>决定把哪些工具传给 function call</strong>。</p>
+<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line">没有路由：12 个工具 → 12 个 Schema 进 prompt（还好）</span><br><span class="line">          80 个工具 → 80 个 Schema 进 prompt（太挤了）</span><br><span class="line">          500 个工具 → 不可能</span><br><span class="line"></span><br><span class="line">有路由：  500 个工具，k=4 → 只有 4 个 Schema 进 prompt</span><br></pre></td></tr></table></figure>
+
+<p>就像 RAG 让 LLM 不需要记住所有知识一样，工具路由让 LLM 不需要看到所有工具。</p>
+
+    </div>
+
+    
+    
+    
+
+    <footer class="post-footer">
+          
+
+<div class="post-copyright">
+<ul>
+  <li class="post-copyright-author">
+      <strong>本文作者： </strong>陌忆
+  </li>
+  <li class="post-copyright-link">
+      <strong>本文链接：</strong>
+      <a href="https://moyi-math.github.io/2026/07/30/%E4%BB%8E%E9%9B%B6%E5%AE%9E%E8%B7%B5-Function-Call-6-Embedding%E5%B7%A5%E5%85%B7%E8%B7%AF%E7%94%B1/" title="从零实践 Function Call（六）：当工具有几十个——用 Embedding 做工具路由">https://moyi-math.github.io/2026/07/30/从零实践-Function-Call-6-Embedding工具路由/</a>
+  </li>
+  <li class="post-copyright-license">
+      <strong>版权声明： </strong>本博客所有文章除特别声明外，均采用 <a href="https://creativecommons.org/licenses/by-nc-sa/4.0/" rel="noopener" target="_blank"><i class="fab fa-fw fa-creative-commons"></i>BY-NC-SA</a> 许可协议。转载请注明出处！
+  </li>
+</ul>
+</div>
+
+          <div class="post-tags">
+              <a href="/tags/Agent/" rel="tag"># Agent</a>
+              <a href="/tags/LLM/" rel="tag"># LLM</a>
+              <a href="/tags/Embedding/" rel="tag"># Embedding</a>
+              <a href="/tags/Function-Call/" rel="tag"># Function Call</a>
+              <a href="/tags/Tool-Routing/" rel="tag"># Tool Routing</a>
+          </div>
+
+        
+
+          <div class="post-nav">
+            <div class="post-nav-item">
+                <a href="/2026/07/30/%E4%BB%8E%E9%9B%B6%E5%AE%9E%E8%B7%B5-Function-Call-5-Agent%E5%AE%B9%E9%94%99%E4%BD%93%E7%B3%BB/" rel="prev" title="从零实践 Function Call（五）：Agent 的六层容错体系">
+                  <i class="fa fa-angle-left"></i> 从零实践 Function Call（五）：Agent 的六层容错体系
+                </a>
+            </div>
+            <div class="post-nav-item">
+                <a href="/2026/07/31/MCP%E5%85%A5%E9%97%A8-%E4%B8%80-%E4%B8%BA%E4%BB%80%E4%B9%88AI%E9%9C%80%E8%A6%81USB-C/" rel="next" title="MCP 入门（一）：为什么 AI 需要 USB-C——从痛点理解 Model Context Protocol">
+                  MCP 入门（一）：为什么 AI 需要 USB-C——从痛点理解 Model Context Protocol <i class="fa fa-angle-right"></i>
+                </a>
+            </div>
+          </div>
+    </footer>
+  </article>
+</div>
+
+
+
+
+
+
+</div>
+  </main>
+
+  <footer class="footer">
+    <div class="footer-inner">
+
+  <div class="copyright">
+    &copy; 
+    <span itemprop="copyrightYear">2026</span>
+    <span class="with-love">
+      <i class="fab fa-osi"></i>
+    </span>
+    <span class="author" itemprop="copyrightHolder">陌忆</span>
+  </div>
+<div class="wordcount">
+  <span class="post-meta-item">
+    <span class="post-meta-item-icon">
+      <i class="fa fa-chart-line"></i>
+    </span>
+    <span title="站点总字数">106k</span>
+  </span>
+  <span class="post-meta-item">
+    <span class="post-meta-item-icon">
+      <i class="fa fa-coffee"></i>
+    </span>
+    <span title="站点阅读时长">6:24</span>
+  </span>
+</div>
+  <div class="powered-by">由 <a href="https://hexo.io/" rel="noopener" target="_blank">Hexo</a> & <a href="https://theme-next.js.org/" rel="noopener" target="_blank">NexT.Gemini</a> 强力驱动
+  </div>
+
+    </div>
+  </footer>
+
+  
+  <div class="toggle sidebar-toggle" role="button">
+    <span class="toggle-line"></span>
+    <span class="toggle-line"></span>
+    <span class="toggle-line"></span>
+  </div>
+  <div class="sidebar-dimmer"></div>
+  <div class="back-to-top" role="button" aria-label="返回顶部">
+    <i class="fa fa-arrow-up fa-lg"></i>
+    <span>0%</span>
+  </div>
+
+<noscript>
+  <div class="noscript-warning">Theme NexT works best with JavaScript enabled</div>
+</noscript>
+<!-- Site running time -->
+<span id="timeDate" aria-live="off"></span>
+<script>
+(function() {
+  var start = new Date("2022-11-17T08:00:00+08:00");
+  function pad(n) { return n < 10 ? "0" + n : "" + n; }
+  function tick() {
+    var diff = Date.now() - start.getTime();
+    if (diff < 0) return;
+    var d = Math.floor(diff / 86400000);
+    var h = Math.floor((diff % 86400000) / 3600000);
+    var m = Math.floor((diff % 3600000) / 60000);
+    var timeDate = document.getElementById("timeDate");
+    if (!timeDate) return;
+    timeDate.textContent =
+      "\u672C\u7AD9\u5DF2\u5B89\u5168\u8FD0\u884C " + d + " \u5929 " + pad(h) + " \u5C0F\u65F6 " + pad(m) + " \u5206";
+  }
+  tick();
+  setInterval(tick, 60000);
+})();
+</script>
+
+</body>
+</html>

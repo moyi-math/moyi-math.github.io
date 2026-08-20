@@ -1,0 +1,615 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width">
+<meta name="theme-color" content="#222" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#222" media="(prefers-color-scheme: dark)"><meta name="generator" content="Hexo 7.3.0">
+<link rel="preconnect" href="https://cdnjs.cloudflare.com" crossorigin>
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon-next.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32-next.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next.png">
+  <link rel="mask-icon" href="/images/logo.svg" color="#222">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/7.0.0/css/all.min.css" integrity="sha256-VHqXKFhhMxcpubYf9xiWdCiojEbY9NexQ4jh8AxbvcM=" crossorigin="anonymous">
+
+<script class="next-config" data-name="main" type="application/json">{"hostname":"moyi-math.github.io","root":"/","images":"/images","scheme":"Gemini","darkmode":true,"version":"8.28.0","exturl":false,"sidebar":{"position":"left","width_expanded":320,"width_dual_column":240,"display":"post","padding":18,"offset":12},"hljswrap":true,"codeblock":{"theme":{"light":"default","dark":"stackoverflow-dark"},"prism":{"light":"prism","dark":"prism-dark"},"copy_button":{"enable":true,"style":null},"fold":{"enable":false,"height":500},"language":false},"bookmark":{"enable":false,"color":"#222","save":"auto"},"mediumzoom":false,"lazyload":true,"pangu":false,"comments":{"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},"stickytabs":false,"motion":{"enable":false,"async":false,"duration":200,"transition":{"menu_item":"fadeInDown","post_block":"fadeIn","post_header":"fadeInDown","post_body":"fadeInDown","coll_header":"fadeInLeft","sidebar":"fadeInUp"}},"prism":false,"i18n":{"placeholder":"搜索...","empty":"没有找到任何搜索结果：${query}","hits_time":"找到 ${hits} 个搜索结果（用时 ${time} 毫秒）","hits":"找到 ${hits} 个搜索结果"},"path":"/search.json","localsearch":{"enable":true,"top_n_per_article":1,"unescape":false,"preload":false}}</script><script src="/js/config.js" defer></script>
+
+    <meta name="description" content="从一个最小三角形案例解释 ST_ReducePrecision 的 snap-rounding 机制，并给出兼顾六位精度与面要素接边的处理、验证流程。">
+<meta property="og:type" content="article">
+<meta property="og:title" content="PostGIS 精度归约避坑：ST_ReducePrecision 为什么会制造接边缝隙">
+<meta property="og:url" content="https://moyi-math.github.io/2026/08/05/PostGIS-%E7%B2%BE%E5%BA%A6%E5%BD%92%E7%BA%A6%E9%81%BF%E5%9D%91%EF%BC%9AST-ReducePrecision-%E4%B8%BA%E4%BB%80%E4%B9%88%E4%BC%9A%E5%88%B6%E9%80%A0%E6%8E%A5%E8%BE%B9%E7%BC%9D%E9%9A%99/index.html">
+<meta property="og:site_name" content="陌忆的博客">
+<meta property="og:description" content="从一个最小三角形案例解释 ST_ReducePrecision 的 snap-rounding 机制，并给出兼顾六位精度与面要素接边的处理、验证流程。">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:image" content="https://moyi-math.github.io/images/background.webp">
+<meta property="article:published_time" content="2026-08-05T14:00:00.000Z">
+<meta property="article:modified_time" content="2026-08-20T14:47:37.221Z">
+<meta property="article:author" content="陌忆">
+<meta property="article:tag" content="PostGIS">
+<meta property="article:tag" content="PostgreSQL">
+<meta property="article:tag" content="GIS">
+<meta property="article:tag" content="空间数据">
+<meta property="article:tag" content="拓扑">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:image" content="https://moyi-math.github.io/images/background.webp">
+
+
+<link rel="canonical" href="https://moyi-math.github.io/2026/08/05/PostGIS-%E7%B2%BE%E5%BA%A6%E5%BD%92%E7%BA%A6%E9%81%BF%E5%9D%91%EF%BC%9AST-ReducePrecision-%E4%B8%BA%E4%BB%80%E4%B9%88%E4%BC%9A%E5%88%B6%E9%80%A0%E6%8E%A5%E8%BE%B9%E7%BC%9D%E9%9A%99/">
+
+
+<script class="next-config" data-name="page" type="application/json">{"sidebar":"","isHome":false,"isPost":true,"lang":"zh-CN","comments":true,"permalink":"https://moyi-math.github.io/2026/08/05/PostGIS-%E7%B2%BE%E5%BA%A6%E5%BD%92%E7%BA%A6%E9%81%BF%E5%9D%91%EF%BC%9AST-ReducePrecision-%E4%B8%BA%E4%BB%80%E4%B9%88%E4%BC%9A%E5%88%B6%E9%80%A0%E6%8E%A5%E8%BE%B9%E7%BC%9D%E9%9A%99/","path":"2026/08/05/PostGIS-精度归约避坑：ST-ReducePrecision-为什么会制造接边缝隙/","title":"PostGIS 精度归约避坑：ST_ReducePrecision 为什么会制造接边缝隙"}</script>
+
+<script class="next-config" data-name="calendar" type="application/json">""</script>
+<title>PostGIS 精度归约避坑：ST_ReducePrecision 为什么会制造接边缝隙 | 陌忆的博客</title>
+  
+
+
+
+
+
+
+
+
+  
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/animejs/3.2.1/anime.min.js" integrity="sha256-XL2inqUJaslATFnHdJOi9GfQ60on8Wx1C2H8DYiN1xY=" crossorigin="anonymous" defer></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/lozad.js/1.16.0/lozad.min.js" integrity="sha256-mOFREFhqmHeQbXpK2lp4nA3qooVgACfh88fpJftLBbc=" crossorigin="anonymous" defer></script>
+<script src="/js/utils.js" defer></script><script src="/js/sidebar.js" defer></script><script src="/js/next-boot.js" defer></script>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/hexo-generator-searchdb/1.5.0/search.js" integrity="sha256-xFC6PJ82SL9b3WkGjFavNiA9gm5z6UBxWPiu4CYjptg=" crossorigin="anonymous" defer></script>
+<script src="/js/third-party/search/local-search.js" defer></script>
+
+
+
+
+
+
+
+  
+
+
+
+
+  
+
+  <script class="next-config" data-name="enableMath" type="application/json">false</script><link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/katex.min.css" integrity="sha256-UF1fgpAiu3tPJN/uCqEUHNe7pnr+QR0SQDNfgglgtcM=" crossorigin="anonymous">
+
+
+<link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
+
+
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"WebSite","name":"陌忆的博客","url":"https://moyi-math.github.io","description":"记录 RAG、Agent、MCP、算法与软件工程实践，按专栏整理可复用的技术笔记。","inLanguage":"zh-CN","author":{"@type":"Person","name":"陌忆"}}</script>
+
+
+
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"Article","headline":"PostGIS 精度归约避坑：ST_ReducePrecision 为什么会制造接边缝隙","description":"从一个最小三角形案例解释 ST_ReducePrecision 的 snap-rounding 机制，并给出兼顾六位精度与面要素接边的处理、验证流程。","datePublished":"2026-08-05T14:00:00.000Z","dateModified":"2026-08-20T14:47:37.221Z","inLanguage":"zh-CN","mainEntityOfPage":{"@type":"WebPage","@id":"https://moyi-math.github.io/2026/08/05/PostGIS-%E7%B2%BE%E5%BA%A6%E5%BD%92%E7%BA%A6%E9%81%BF%E5%9D%91%EF%BC%9AST-ReducePrecision-%E4%B8%BA%E4%BB%80%E4%B9%88%E4%BC%9A%E5%88%B6%E9%80%A0%E6%8E%A5%E8%BE%B9%E7%BC%9D%E9%9A%99/index.html"},"author":{"@type":"Person","name":"陌忆"}}</script>
+<meta name="author" content="陌忆">
+
+
+  <noscript>
+    <link rel="stylesheet" href="/css/noscript.css">
+  </noscript>
+<!-- hexo injector head_end start --><link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/katex.min.css" integrity="sha512-fHwaWebuwA7NSF5Qg/af4UeDx9XqUpYpOGgubo3yWu+b2IQR4UeQwbb42Ti7gVAjNtVoI/I9TEoYeu9omwcC6g==" crossorigin="anonymous" referrerpolicy="no-referrer" /><!-- hexo injector head_end end --><link rel="alternate" href="/atom.xml" title="陌忆的博客" type="application/atom+xml">
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage">
+  <div class="headband"></div>
+
+  <main class="main">
+    <div class="column">
+      <header class="header" itemscope itemtype="http://schema.org/WPHeader"><div class="site-brand-container">
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="切换导航栏" role="button">
+        <span class="toggle-line"></span>
+        <span class="toggle-line"></span>
+        <span class="toggle-line"></span>
+    </div>
+  </div>
+
+  <div class="site-meta">
+
+    <a href="/" class="brand" rel="start">
+      <i class="logo-line"></i>
+      <p class="site-title">陌忆的博客</p>
+      <i class="logo-line"></i>
+    </a>
+      <p class="site-subtitle" itemprop="description">数据库无法得出结论</p>
+  </div>
+
+  <div class="site-nav-right">
+    <div class="toggle popup-trigger" aria-label="搜索" role="button">
+        <i class="fa fa-search fa-fw fa-lg"></i>
+    </div>
+  </div>
+</div>
+
+
+
+<nav class="site-nav">
+  <ul class="main-menu menu"><li class="menu-item menu-item-home"><a href="/" rel="section"><i class="fa fa-home fa-fw"></i>首页</a></li><li class="menu-item menu-item-about"><a href="/about/" rel="section"><i class="fa fa-user fa-fw"></i>关于</a></li><li class="menu-item menu-item-tags"><a href="/tags/" rel="section"><i class="fa fa-tags fa-fw"></i>标签</a></li><li class="menu-item menu-item-categories"><a href="/categories/" rel="section"><i class="fa fa-th fa-fw"></i>分类</a></li><li class="menu-item menu-item-archives"><a href="/archives/" rel="section"><i class="fa fa-archive fa-fw"></i>归档</a></li>
+      <li class="menu-item menu-item-search">
+        <a role="button" class="popup-trigger"><i class="fa fa-search fa-fw"></i>搜索
+        </a>
+      </li>
+  </ul>
+</nav>
+
+
+
+  <div class="search-pop-overlay">
+    <div class="popup search-popup">
+      <div class="search-header">
+        <span class="search-icon">
+          <i class="fa fa-search"></i>
+        </span>
+        <div class="search-input-container">
+          <input autocomplete="off" autocapitalize="off" maxlength="80"
+                placeholder="搜索..." spellcheck="false"
+                type="search" class="search-input">
+        </div>
+        <span class="popup-btn-close" role="button">
+          <i class="fa fa-times-circle"></i>
+        </span>
+      </div>
+      <div class="search-result-container">
+        <div class="search-result-icon">
+          <i class="fa fa-spinner fa-pulse fa-5x"></i>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</header>
+        
+  
+  <aside class="sidebar">
+
+    <div class="sidebar-inner sidebar-nav-active sidebar-toc-active">
+      <ul class="sidebar-nav">
+        <li class="sidebar-nav-toc">
+          文章目录
+        </li>
+        <li class="sidebar-nav-overview">
+          站点概览
+        </li>
+      </ul>
+
+      <div class="sidebar-panel-container">
+        <!--noindex-->
+        <div class="post-toc-wrap sidebar-panel">
+            <div class="post-toc animated"><ol class="nav"><li class="nav-item nav-level-2"><a class="nav-link" href="#%E4%B8%80%E3%80%81%E5%85%88%E8%AF%B4%E7%BB%93%E8%AE%BA"><span class="nav-text">一、先说结论</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E4%BA%8C%E3%80%81%E6%A1%88%E4%BE%8B%EF%BC%9A%E4%B8%80%E4%B8%AA%E5%85%AD%E4%BD%8D%E5%B0%8F%E6%95%B0%E9%A1%B6%E7%82%B9%E4%B8%BA%E4%BB%80%E4%B9%88%E6%B6%88%E5%A4%B1%E4%BA%86"><span class="nav-text">二、案例：一个六位小数顶点为什么消失了</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E4%B8%89%E3%80%81ST-ReducePrecision-%E4%B8%8D%E5%8F%AA%E6%98%AF%E2%80%9C%E5%9B%9B%E8%88%8D%E4%BA%94%E5%85%A5%E2%80%9D"><span class="nav-text">三、ST_ReducePrecision 不只是“四舍五入”</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#%E6%8A%8A%E6%A1%88%E4%BE%8B%E6%94%BE%E5%88%B0%E6%95%B4%E6%95%B0%E7%BD%91%E6%A0%BC%E4%B8%8A"><span class="nav-text">把案例放到整数网格上</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%9B%9B%E3%80%81%E4%B8%89%E4%B8%AA%E5%AE%B9%E6%98%93%E6%B7%B7%E6%B7%86%E7%9A%84%E7%9B%AE%E6%A0%87"><span class="nav-text">四、三个容易混淆的目标</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E4%BA%94%E3%80%81%E4%B8%BA%E4%BB%80%E4%B9%88-SnapToGrid-%E4%BC%9A%E6%89%93%E5%8D%B0%E5%87%BA%E6%9B%B4%E5%A4%9A%E5%B0%8F%E6%95%B0"><span class="nav-text">五、为什么 SnapToGrid 会打印出更多小数</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%85%AD%E3%80%81%E4%B8%BA%E4%BB%80%E4%B9%88%E4%B8%8D%E8%83%BD%E5%8F%AA%E5%AF%B9%E9%83%A8%E5%88%86%E9%9D%A2%E4%BD%BF%E7%94%A8-ReducePrecision"><span class="nav-text">六、为什么不能只对部分面使用 ReducePrecision</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E4%B8%83%E3%80%81%E4%B8%80%E5%A5%97%E5%8F%AF%E5%9B%9E%E6%BB%9A%E3%80%81%E5%8F%AF%E9%AA%8C%E8%AF%81%E7%9A%84%E5%A4%84%E7%90%86%E6%B5%81%E7%A8%8B"><span class="nav-text">七、一套可回滚、可验证的处理流程</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#1-%E7%BB%9F%E8%AE%A1%E7%9C%9F%E6%AD%A3%E9%9C%80%E8%A6%81%E5%A4%84%E7%90%86%E7%9A%84%E8%A6%81%E7%B4%A0"><span class="nav-text">1. 统计真正需要处理的要素</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#2-%E6%A3%80%E6%9F%A5%E5%A4%84%E7%90%86%E5%89%8D%E7%9A%84-coverage"><span class="nav-text">2. 检查处理前的 coverage</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#3-%E5%86%99%E5%85%A5%E6%96%B0%E8%A1%A8%EF%BC%8C%E4%B8%8D%E8%A6%81%E5%8E%9F%E5%9C%B0-UPDATE"><span class="nav-text">3. 写入新表，不要原地 UPDATE</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#4-%E6%89%BE%E5%87%BA%E6%97%A0%E6%95%88%E3%80%81%E6%8A%98%E5%8F%A0%E5%92%8C%E9%9D%A2%E7%A7%AF%E5%BC%82%E5%B8%B8"><span class="nav-text">4. 找出无效、折叠和面积异常</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#5-%E9%87%8D%E6%96%B0%E6%A3%80%E6%9F%A5-coverage"><span class="nav-text">5. 重新检查 coverage</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%85%AB%E3%80%81%E5%A4%8D%E7%8E%B0%E5%AE%9E%E9%AA%8C%EF%BC%9A%E5%AF%B9%E6%AF%94%E4%B8%A4%E4%B8%AA%E7%B2%BE%E5%BA%A6%E7%AE%97%E5%AD%90"><span class="nav-text">八、复现实验：对比两个精度算子</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E4%B9%9D%E3%80%81pprepair-%E8%BE%93%E5%87%BA%E8%BF%98%E8%A6%81%E9%A2%9D%E5%A4%96%E9%98%B2%E4%B8%A4%E7%B1%BB%E9%A3%8E%E9%99%A9"><span class="nav-text">九、pprepair 输出还要额外防两类风险</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%8D%81%E3%80%81CoverageSimplify-%E8%83%BD%E8%A7%A3%E5%86%B3%E4%BB%80%E4%B9%88"><span class="nav-text">十、CoverageSimplify 能解决什么</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%8D%81%E4%B8%80%E3%80%81%E5%88%AB%E5%BF%98%E4%BA%86-EPSG-4326-%E7%9A%84%E5%8D%95%E4%BD%8D%E6%98%AF%E5%BA%A6"><span class="nav-text">十一、别忘了 EPSG:4326 的单位是度</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%8D%81%E4%BA%8C%E3%80%81%E6%9C%80%E7%BB%88%E5%86%B3%E7%AD%96%E6%B8%85%E5%8D%95"><span class="nav-text">十二、最终决策清单</span></a></li></ol></div>
+        </div>
+        <!--/noindex-->
+
+        <div class="site-overview-wrap sidebar-panel">
+          <div class="site-author animated" itemprop="author" itemscope itemtype="http://schema.org/Person">
+    <img class="site-author-image" itemprop="image" alt="陌忆"
+      src="/images/avatar.webp">
+  <p class="site-author-name" itemprop="name">陌忆</p>
+  <div class="site-description" itemprop="description">记录 RAG、Agent、MCP、算法与软件工程实践，按专栏整理可复用的技术笔记。</div>
+</div>
+<div class="site-state-wrap animated">
+  <nav class="site-state">
+      <div class="site-state-item site-state-posts">
+        <a href="/archives/">
+          <span class="site-state-item-count">50</span>
+          <span class="site-state-item-name">日志</span>
+        </a>
+      </div>
+      <div class="site-state-item site-state-categories">
+          <a href="/categories/">
+        <span class="site-state-item-count">10</span>
+        <span class="site-state-item-name">分类</span></a>
+      </div>
+      <div class="site-state-item site-state-tags">
+          <a href="/tags/">
+        <span class="site-state-item-count">172</span>
+        <span class="site-state-item-name">标签</span></a>
+      </div>
+  </nav>
+</div>
+  <div class="links-of-author animated">
+      <span class="links-of-author-item">
+        <a href="https://github.com/moyi-math" title="GitHub → https:&#x2F;&#x2F;github.com&#x2F;moyi-math" rel="noopener me" target="_blank"><i class="fab fa-github fa-fw"></i>GitHub</a>
+      </span>
+  </div>
+  <div class="cc-license animated" itemprop="license">
+    <a href="https://creativecommons.org/licenses/by-nc-sa/4.0/" class="cc-opacity" rel="noopener" target="_blank"><img src="https://cdnjs.cloudflare.com/ajax/libs/creativecommons-vocabulary/2020.11.3/assets/license_badges/small/by_nc_sa.svg" alt="Creative Commons"></a>
+  </div>
+
+        </div>
+      </div>
+    </div>
+
+    
+  </aside>
+
+
+    </div>
+
+    <div class="main-inner post posts-expand">
+
+
+  
+
+
+<div class="post-block">
+  
+  
+
+  <article itemscope itemtype="http://schema.org/Article" class="post-content" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="https://moyi-math.github.io/2026/08/05/PostGIS-%E7%B2%BE%E5%BA%A6%E5%BD%92%E7%BA%A6%E9%81%BF%E5%9D%91%EF%BC%9AST-ReducePrecision-%E4%B8%BA%E4%BB%80%E4%B9%88%E4%BC%9A%E5%88%B6%E9%80%A0%E6%8E%A5%E8%BE%B9%E7%BC%9D%E9%9A%99/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.webp">
+      <meta itemprop="name" content="陌忆">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="陌忆的博客">
+      <meta itemprop="description" content="记录 RAG、Agent、MCP、算法与软件工程实践，按专栏整理可复用的技术笔记。">
+    </span>
+
+    <span hidden itemprop="post" itemscope itemtype="http://schema.org/CreativeWork">
+      <meta itemprop="name" content="PostGIS 精度归约避坑：ST_ReducePrecision 为什么会制造接边缝隙 | 陌忆的博客">
+      <meta itemprop="description" content="从一个最小三角形案例解释 ST_ReducePrecision 的 snap-rounding 机制，并给出兼顾六位精度与面要素接边的处理、验证流程。">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          PostGIS 精度归约避坑：ST_ReducePrecision 为什么会制造接边缝隙
+        </h1>
+
+        <div class="post-meta-container">
+          <div class="post-meta">
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-calendar"></i>
+      </span>
+      <span class="post-meta-item-text">发表于</span>
+
+      <time title="创建时间：2026-08-05 22:00:00" itemprop="dateCreated datePublished" datetime="2026-08-05T22:00:00+08:00">2026-08-05</time>
+    </span>
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-calendar-check"></i>
+      </span>
+      <span class="post-meta-item-text">更新于</span>
+      <time title="修改时间：2026-08-20 22:47:37" itemprop="dateModified" datetime="2026-08-20T22:47:37+08:00">2026-08-20</time>
+    </span>
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-folder"></i>
+      </span>
+      <span class="post-meta-item-text">分类于</span>
+        <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+          <a href="/categories/PostGIS-%E5%AE%9E%E6%88%98/" itemprop="url" rel="index"><span itemprop="name">PostGIS 实战</span></a>
+        </span>
+    </span>
+
+  
+    <span class="post-meta-break"></span>
+    <span class="post-meta-item" title="本文字数">
+      <span class="post-meta-item-icon">
+        <i class="far fa-file-word"></i>
+      </span>
+      <span class="post-meta-item-text">本文字数：</span>
+      <span>3.1k</span>
+    </span>
+    <span class="post-meta-item" title="阅读时长">
+      <span class="post-meta-item-icon">
+        <i class="far fa-clock"></i>
+      </span>
+      <span class="post-meta-item-text">阅读时长 &asymp;</span>
+      <span>11 分钟</span>
+    </span>
+</div>
+
+            <div class="post-description">从一个最小三角形案例解释 ST_ReducePrecision 的 snap-rounding 机制，并给出兼顾六位精度与面要素接边的处理、验证流程。</div>
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody"><span id="more"></span>
+
+<p>空间数据做完拓扑修复后，往往还要统一坐标精度。看起来，这只是把经纬度四舍五入到六位小数；实际用 <code>ST_ReducePrecision</code> 处理面数据时，却可能发现某个共享顶点消失了，两块原本严丝合缝的面之间也多出了一条细缝。</p>
+<p>问题不在“四舍五入”，而在 <code>ST_ReducePrecision</code> 不只做四舍五入。它还会在新的精度模型下重建几何，并清理无法稳定表达的细小结构。</p>
+<p>本文从一个真实案例出发，解释这种现象的成因，并整理一套适用于面覆盖数据（polygon coverage）的精度处理流程。</p>
+<h2 id="一、先说结论"><a href="#一、先说结论" class="headerlink" title="一、先说结论"></a>一、先说结论</h2><p>面对“坐标落在 <code>1e-6</code> 网格，同时不新增接边缝隙与压盖”这个需求，先记住四点：</p>
+<ol>
+<li><code>ST_ReducePrecision</code> 是<strong>精度归约加几何重建</strong>，不是单纯的坐标取整；它可以删除顶点，也可能让相邻面采用不同的折叠结果。</li>
+<li><code>ST_SnapToGrid</code> 更接近逐坐标网格化。对共享坐标一致的相邻面使用同一原点和网格参数，双方会得到相同的共享边结果；但窄条、短边和小环仍可能退化。</li>
+<li>浮点几何“落在六位小数网格上”与“任意方式打印都只有六位小数”不是一回事。文本输出应单独控制精度。</li>
+<li>无论选择哪种算子，都不要原地更新后直接交付。应写入新表，并在处理前后分别检查有效性、退化、面积变化和 coverage。</li>
+</ol>
+<h2 id="二、案例：一个六位小数顶点为什么消失了"><a href="#二、案例：一个六位小数顶点为什么消失了" class="headerlink" title="二、案例：一个六位小数顶点为什么消失了"></a>二、案例：一个六位小数顶点为什么消失了</h2><p>案例数据位于 EPSG:4326，纬度约 41°。使用 <code>1e-6</code> 度作为网格大小：</p>
+<figure class="highlight sql"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">SELECT</span> ST_AsText(</span><br><span class="line">         ST_ReducePrecision(ST_Union(geom), <span class="number">1e-6</span>)</span><br><span class="line">       ) <span class="keyword">AS</span> geo</span><br><span class="line"><span class="keyword">FROM</span> sd_pdd_bad_town_v10</span><br><span class="line"><span class="keyword">WHERE</span> guid <span class="operator">=</span> <span class="string">&#x27;ef6fbca1-f9f6-4187-9c23-72dbb8563726&#x27;</span>;</span><br></pre></td></tr></table></figure>
+
+<p>与原始 <code>ST_Union(geom)</code> 相比，结果少了一个顶点：</p>
+<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">B = (119.737784, 41.212651)</span><br></pre></td></tr></table></figure>
+
+<p>它前后的两个邻点是：</p>
+<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">A = (119.737784, 41.212652)</span><br><span class="line">C = (119.737782, 41.212653)</span><br></pre></td></tr></table></figure>
+
+<p>三个点本来都只有六位小数。问题在于 B 同时也是邻面的共享节点：当前面的边界从 <code>A → B → C</code> 变成 <code>A → C</code> 后，邻面仍可能保留 B。两侧边界不再重合，于是产生了约 <code>0.009 m²</code> 的三角形缝隙。</p>
+<h2 id="三、ST-ReducePrecision-不只是“四舍五入”"><a href="#三、ST-ReducePrecision-不只是“四舍五入”" class="headerlink" title="三、ST_ReducePrecision 不只是“四舍五入”"></a>三、ST_ReducePrecision 不只是“四舍五入”</h2><p><code>ST_ReducePrecision(geom, gridsize)</code> 的目标可以概括为：输出坐标落在指定网格上，并让结果在该精度模型下保持有效。它大致经历三个阶段：</p>
+<ol>
+<li>将坐标归约到网格；</li>
+<li>执行 snap-rounding，对相交或触碰 hot pixel 的线段重新节点化；</li>
+<li>清理重建后产生的零面积尖刺、重复点和其他退化结构。</li>
+</ol>
+<p>输入坐标已经是六位小数，只能说明第一步可能不改变它，不能保证后两步不改变几何。</p>
+<h3 id="把案例放到整数网格上"><a href="#把案例放到整数网格上" class="headerlink" title="把案例放到整数网格上"></a>把案例放到整数网格上</h3><p>以 <code>1e-6</code> 度为一个网格单位，三点可以写成：</p>
+<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">A = (119737784, 41212652)</span><br><span class="line">B = (119737784, 41212651)</span><br><span class="line">C = (119737782, 41212653)</span><br></pre></td></tr></table></figure>
+
+<p>这里有两个关键特征：</p>
+<ul>
+<li>A 与 B 的距离恰好是一个网格单位；</li>
+<li>三角形 ABC 的面积恰好是一个网格单位的平方。</li>
+</ul>
+<p>A 对应的 hot pixel 覆盖半个网格到半个网格的邻域。线段 <code>B → C</code> 恰好擦过它的角点，snap-rounding 会让这条线经过 A。环随之变成 <code>A → B → A → C</code>，其中 <code>A → B → A</code> 是零面积尖刺，清理阶段便会删掉 B。</p>
+<p>不同 GEOS 版本在 hot pixel 边界命中细节上可能存在差异，但工程结论不变：<strong>尺寸接近网格大小的结构，在精度归约时不能视为稳定结构。</strong></p>
+<p>因此，让一个几何原封不动地通过 <code>ST_ReducePrecision(g, 1e-6)</code>，仅有“坐标能用六位小数表示”还不够。相邻点距离、点到非相邻线段的距离、窄条宽度等特征尺寸，都应明显大于一个网格单位。</p>
+<h2 id="四、三个容易混淆的目标"><a href="#四、三个容易混淆的目标" class="headerlink" title="四、三个容易混淆的目标"></a>四、三个容易混淆的目标</h2><p>处理精度前，最好先确认真正要满足的是哪一个目标：</p>
+<table>
+<thead>
+<tr>
+<th>目标</th>
+<th>更合适的工具</th>
+<th>需要接受的代价</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>坐标落在 <code>1e-6</code> 网格</td>
+<td><code>ST_SnapToGrid</code></td>
+<td>结果可能自交、折叠或丢失小部件</td>
+</tr>
+<tr>
+<td>单个几何在新精度模型下有效</td>
+<td><code>ST_ReducePrecision</code></td>
+<td>会重建几何，可能删除顶点并破坏面间接边</td>
+</tr>
+<tr>
+<td>整层共享边同步简化</td>
+<td><code>ST_CoverageSimplify</code></td>
+<td>这是简化算子，不等于六位小数归约</td>
+</tr>
+<tr>
+<td>文本只输出六位小数</td>
+<td><code>ST_AsText</code> &#x2F; <code>ST_AsGeoJSON</code></td>
+<td>只控制序列化，不改变底层几何</td>
+</tr>
+</tbody></table>
+<p>不存在一个逐要素算子，能在所有数据上同时保证“网格化、单体有效、细节不丢、整层拓扑不变”。特征尺寸小于或接近网格时，必须做取舍并检查异常要素。</p>
+<h2 id="五、为什么-SnapToGrid-会打印出更多小数"><a href="#五、为什么-SnapToGrid-会打印出更多小数" class="headerlink" title="五、为什么 SnapToGrid 会打印出更多小数"></a>五、为什么 SnapToGrid 会打印出更多小数</h2><p>下面两种结果都存储为双精度浮点数：</p>
+<figure class="highlight sql"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">ST_SnapToGrid(geom, <span class="number">0</span>, <span class="number">0</span>, <span class="number">1e-6</span>, <span class="number">1e-6</span>)</span><br><span class="line">ST_ReducePrecision(geom, <span class="number">1e-6</span>)</span><br></pre></td></tr></table></figure>
+
+<p>但用 17 位 round-trip 精度输出时，前者有时会显示为：</p>
+<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">119.73778399999999</span><br></pre></td></tr></table></figure>
+
+<p>这不代表它没有对齐网格，而是 IEEE 754 双精度浮点数无法精确表示大多数十进制小数。<code>ST_SnapToGrid</code> 的计算路径近似于：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">p.x = rint((p-&gt;x - ipx) / gsid_x) * gsid_x + ipx;</span><br></pre></td></tr></table></figure>
+
+<p><code>1e-6</code> 本身就不能被二进制浮点数精确表示，除法和乘法还会继续引入舍入误差。为了让文本再次解析后得到同一个 double，17 位输出必须暴露这些尾数。</p>
+<p>因此应该把两个需求分开：</p>
+<ul>
+<li><strong>计算与存储层</strong>：检查坐标是否落在目标网格；</li>
+<li><strong>交换与展示层</strong>：明确指定文本的小数位数。</li>
+</ul>
+<figure class="highlight sql"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">SELECT</span> ST_AsText(geom_snap, <span class="number">6</span>)</span><br><span class="line"><span class="keyword">FROM</span> sd_pdd_bad_town_v10_snap;</span><br><span class="line"></span><br><span class="line"><span class="keyword">SELECT</span> ST_AsGeoJSON(geom_snap, <span class="number">6</span>)</span><br><span class="line"><span class="keyword">FROM</span> sd_pdd_bad_town_v10_snap;</span><br></pre></td></tr></table></figure>
+
+<p>如果下游严格要求 WKB 中每个 double 的最短十进制表示都不超过六位，这已经不是普通的“显示精度”需求。此时要么接受几何重建并做完整 coverage 验证，要么改用定点整数坐标存储，例如以 <code>1e-6</code> 度为单位保存为 <code>bigint</code>。</p>
+<h2 id="六、为什么不能只对部分面使用-ReducePrecision"><a href="#六、为什么不能只对部分面使用-ReducePrecision" class="headerlink" title="六、为什么不能只对部分面使用 ReducePrecision"></a>六、为什么不能只对部分面使用 ReducePrecision</h2><p>一种常见优化思路是：只处理包含高精度节点的面，其余面不动。对 <code>ST_ReducePrecision</code> 而言，这并不安全。</p>
+<p>假设面 X 与面 Y 共享边 E，只有 X 被选中。即使 E 上的坐标原本都已经落在网格上，X 仍会经历重新节点化和几何清理，Y 却保持原样。只要 X 的某个共享顶点被删除，两侧就会裂开。</p>
+<p>即使 X、Y 同时处理，也不能据此认定安全。顶点是否折叠取决于它在各自环内的局部构型；共享边两侧的环结构不同，重建决策也可能不同。</p>
+<p><code>ST_SnapToGrid</code> 的情况不同：对已经落在目标网格上的坐标，它不会触发整套 overlay 重建。可以先筛出确实发生变化的要素：</p>
+<figure class="highlight sql"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">SELECT</span> guid</span><br><span class="line"><span class="keyword">FROM</span> sd_pdd_bad_town_v10</span><br><span class="line"><span class="keyword">WHERE</span> <span class="keyword">NOT</span> ST_OrderingEquals(</span><br><span class="line">  geom,</span><br><span class="line">  ST_SnapToGrid(geom, <span class="number">0</span>, <span class="number">0</span>, <span class="number">1e-6</span>, <span class="number">1e-6</span>)</span><br><span class="line">);</span><br></pre></td></tr></table></figure>
+
+<p>不过，除非数据量让全量计算不可接受，实践中仍建议全量生成新表。这样流程更容易复现，也不容易因筛选条件变化留下混合状态。</p>
+<h2 id="七、一套可回滚、可验证的处理流程"><a href="#七、一套可回滚、可验证的处理流程" class="headerlink" title="七、一套可回滚、可验证的处理流程"></a>七、一套可回滚、可验证的处理流程</h2><p>以下流程以 <code>ST_SnapToGrid</code> 为主，目标是让共享坐标以相同规则落到网格上，同时把退化风险显式暴露出来。</p>
+<h3 id="1-统计真正需要处理的要素"><a href="#1-统计真正需要处理的要素" class="headerlink" title="1. 统计真正需要处理的要素"></a>1. 统计真正需要处理的要素</h3><figure class="highlight sql"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">SELECT</span> <span class="built_in">count</span>(<span class="operator">*</span>) <span class="keyword">AS</span> need_fix</span><br><span class="line"><span class="keyword">FROM</span> sd_pdd_bad_town_v10</span><br><span class="line"><span class="keyword">WHERE</span> <span class="keyword">NOT</span> ST_OrderingEquals(</span><br><span class="line">  geom,</span><br><span class="line">  ST_SnapToGrid(geom, <span class="number">0</span>, <span class="number">0</span>, <span class="number">1e-6</span>, <span class="number">1e-6</span>)</span><br><span class="line">);</span><br></pre></td></tr></table></figure>
+
+<p>如果结果为 0，就不必为了“看起来更整齐”再重建几何，文本输出时限制精度即可。</p>
+<h3 id="2-检查处理前的-coverage"><a href="#2-检查处理前的-coverage" class="headerlink" title="2. 检查处理前的 coverage"></a>2. 检查处理前的 coverage</h3><p>PostGIS 3.4 及以上可以使用 coverage 窗口函数：</p>
+<figure class="highlight sql"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">WITH</span> checked <span class="keyword">AS</span> (</span><br><span class="line">  <span class="keyword">SELECT</span> guid,</span><br><span class="line">         ST_CoverageInvalidEdges(geom, <span class="number">1e-9</span>) <span class="keyword">OVER</span> () <span class="keyword">AS</span> bad_edge</span><br><span class="line">  <span class="keyword">FROM</span> sd_pdd_bad_town_v10</span><br><span class="line">)</span><br><span class="line"><span class="keyword">SELECT</span> guid, bad_edge</span><br><span class="line"><span class="keyword">FROM</span> checked</span><br><span class="line"><span class="keyword">WHERE</span> <span class="keyword">NOT</span> ST_IsEmpty(bad_edge);</span><br></pre></td></tr></table></figure>
+
+<p>处理前已有的缝隙或压盖应单独记录，避免把历史问题误判为精度归约造成的问题。</p>
+<h3 id="3-写入新表，不要原地-UPDATE"><a href="#3-写入新表，不要原地-UPDATE" class="headerlink" title="3. 写入新表，不要原地 UPDATE"></a>3. 写入新表，不要原地 UPDATE</h3><figure class="highlight sql"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">CREATE TABLE</span> sd_pdd_bad_town_v10_snap <span class="keyword">AS</span></span><br><span class="line"><span class="keyword">SELECT</span> t.<span class="operator">*</span>,</span><br><span class="line">       ST_SnapToGrid(t.geom, <span class="number">0</span>, <span class="number">0</span>, <span class="number">1e-6</span>, <span class="number">1e-6</span>) <span class="keyword">AS</span> geom_snap</span><br><span class="line"><span class="keyword">FROM</span> sd_pdd_bad_town_v10 <span class="keyword">AS</span> t;</span><br><span class="line"></span><br><span class="line"><span class="keyword">CREATE</span> INDEX sd_pdd_bad_town_v10_snap_geom_gix</span><br><span class="line"><span class="keyword">ON</span> sd_pdd_bad_town_v10_snap</span><br><span class="line"><span class="keyword">USING</span> gist (geom_snap);</span><br></pre></td></tr></table></figure>
+
+<p>保留原始 <code>geom</code>，便于逐要素对比，也能在发现异常时快速回滚。</p>
+<h3 id="4-找出无效、折叠和面积异常"><a href="#4-找出无效、折叠和面积异常" class="headerlink" title="4. 找出无效、折叠和面积异常"></a>4. 找出无效、折叠和面积异常</h3><figure class="highlight sql"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">SELECT</span> guid,</span><br><span class="line">       ST_IsValidReason(geom_snap) <span class="keyword">AS</span> reason,</span><br><span class="line">       ST_NPoints(geom) <span class="operator">-</span> ST_NPoints(geom_snap) <span class="keyword">AS</span> dropped_points,</span><br><span class="line">       ST_NumGeometries(geom) <span class="operator">-</span> ST_NumGeometries(geom_snap) <span class="keyword">AS</span> lost_parts,</span><br><span class="line">       <span class="built_in">abs</span>(</span><br><span class="line">         ST_Area(geom_snap::geography)</span><br><span class="line">         <span class="operator">-</span> ST_Area(geom::geography)</span><br><span class="line">       ) <span class="keyword">AS</span> delta_area_m2</span><br><span class="line"><span class="keyword">FROM</span> sd_pdd_bad_town_v10_snap</span><br><span class="line"><span class="keyword">WHERE</span> <span class="keyword">NOT</span> ST_IsValid(geom_snap)</span><br><span class="line">   <span class="keyword">OR</span> ST_NPoints(geom) <span class="operator">&lt;&gt;</span> ST_NPoints(geom_snap)</span><br><span class="line">   <span class="keyword">OR</span> ST_NumGeometries(geom) <span class="operator">&lt;&gt;</span> ST_NumGeometries(geom_snap);</span><br></pre></td></tr></table></figure>
+
+<p>这里顶点数变化不一定是错误，但它是很有价值的审查信号。<code>lost_parts &gt; 0</code>、空几何或面积突变通常意味着窄条、小环已经塌掉，应回到原数据逐一处理，而不是直接发布整表。</p>
+<h3 id="5-重新检查-coverage"><a href="#5-重新检查-coverage" class="headerlink" title="5. 重新检查 coverage"></a>5. 重新检查 coverage</h3><figure class="highlight sql"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">WITH</span> checked <span class="keyword">AS</span> (</span><br><span class="line">  <span class="keyword">SELECT</span> guid,</span><br><span class="line">         ST_CoverageInvalidEdges(geom_snap, <span class="number">1e-9</span>) <span class="keyword">OVER</span> () <span class="keyword">AS</span> bad_edge</span><br><span class="line">  <span class="keyword">FROM</span> sd_pdd_bad_town_v10_snap</span><br><span class="line">)</span><br><span class="line"><span class="keyword">SELECT</span> guid, bad_edge</span><br><span class="line"><span class="keyword">FROM</span> checked</span><br><span class="line"><span class="keyword">WHERE</span> <span class="keyword">NOT</span> ST_IsEmpty(bad_edge);</span><br></pre></td></tr></table></figure>
+
+<p>只有将处理前后的异常边进行对比，才能回答“本次操作是否新增了缝隙或压盖”。</p>
+<h2 id="八、复现实验：对比两个精度算子"><a href="#八、复现实验：对比两个精度算子" class="headerlink" title="八、复现实验：对比两个精度算子"></a>八、复现实验：对比两个精度算子</h2><p>下面的查询可以直观看到 <code>ST_ReducePrecision</code> 是否删除了案例顶点：</p>
+<figure class="highlight sql"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">WITH</span> compared <span class="keyword">AS</span> (</span><br><span class="line">  <span class="keyword">SELECT</span> geom <span class="keyword">AS</span> raw,</span><br><span class="line">         ST_SnapToGrid(geom, <span class="number">0</span>, <span class="number">0</span>, <span class="number">1e-6</span>, <span class="number">1e-6</span>) <span class="keyword">AS</span> snapped,</span><br><span class="line">         ST_ReducePrecision(geom, <span class="number">1e-6</span>) <span class="keyword">AS</span> reduced</span><br><span class="line">  <span class="keyword">FROM</span> sd_pdd_bad_town_v10</span><br><span class="line">  <span class="keyword">WHERE</span> guid <span class="operator">=</span> <span class="string">&#x27;ef6fbca1-f9f6-4187-9c23-72dbb8563726&#x27;</span></span><br><span class="line">)</span><br><span class="line"><span class="keyword">SELECT</span> ST_AsText(snapped, <span class="number">17</span>) <span class="keyword">AS</span> snapped_17,</span><br><span class="line">       ST_AsText(reduced, <span class="number">17</span>) <span class="keyword">AS</span> reduced_17,</span><br><span class="line">       ST_NPoints(raw) <span class="keyword">AS</span> raw_points,</span><br><span class="line">       ST_NPoints(snapped) <span class="keyword">AS</span> snap_points,</span><br><span class="line">       ST_NPoints(reduced) <span class="keyword">AS</span> reduce_points</span><br><span class="line"><span class="keyword">FROM</span> compared;</span><br></pre></td></tr></table></figure>
+
+<p>再验证邻面是否仍保留顶点 B，以及精度归约前后是否出现差异区域：</p>
+<figure class="highlight sql"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">WITH</span> raw <span class="keyword">AS</span> (</span><br><span class="line">  <span class="keyword">SELECT</span> ST_Union(geom) <span class="keyword">AS</span> geom</span><br><span class="line">  <span class="keyword">FROM</span> sd_pdd_bad_town_v10</span><br><span class="line">  <span class="keyword">WHERE</span> guid <span class="operator">=</span> <span class="string">&#x27;ef6fbca1-f9f6-4187-9c23-72dbb8563726&#x27;</span></span><br><span class="line">), reduced <span class="keyword">AS</span> (</span><br><span class="line">  <span class="keyword">SELECT</span> ST_ReducePrecision(ST_Union(geom), <span class="number">1e-6</span>) <span class="keyword">AS</span> geom</span><br><span class="line">  <span class="keyword">FROM</span> sd_pdd_bad_town_v10</span><br><span class="line">  <span class="keyword">WHERE</span> guid <span class="operator">=</span> <span class="string">&#x27;ef6fbca1-f9f6-4187-9c23-72dbb8563726&#x27;</span></span><br><span class="line">), neighbor <span class="keyword">AS</span> (</span><br><span class="line">  <span class="keyword">SELECT</span> guid, ST_Union(geom) <span class="keyword">AS</span> geom</span><br><span class="line">  <span class="keyword">FROM</span> sd_pdd_bad_town_v10</span><br><span class="line">  <span class="keyword">WHERE</span> guid <span class="operator">&lt;&gt;</span> <span class="string">&#x27;ef6fbca1-f9f6-4187-9c23-72dbb8563726&#x27;</span></span><br><span class="line">    <span class="keyword">AND</span> ST_DWithin(</span><br><span class="line">      geom,</span><br><span class="line">      ST_SetSRID(ST_Point(<span class="number">119.737784</span>, <span class="number">41.212651</span>), <span class="number">4326</span>),</span><br><span class="line">      <span class="number">1e-5</span></span><br><span class="line">    )</span><br><span class="line">  <span class="keyword">GROUP</span> <span class="keyword">BY</span> guid</span><br><span class="line">)</span><br><span class="line"><span class="keyword">SELECT</span> neighbor.guid,</span><br><span class="line">       ST_Intersects(</span><br><span class="line">         neighbor.geom,</span><br><span class="line">         ST_SetSRID(ST_Point(<span class="number">119.737784</span>, <span class="number">41.212651</span>), <span class="number">4326</span>)</span><br><span class="line">       ) <span class="keyword">AS</span> neighbor_has_b,</span><br><span class="line">       ST_Area(</span><br><span class="line">         ST_Difference(</span><br><span class="line">           ST_SymDifference(raw.geom, reduced.geom),</span><br><span class="line">           neighbor.geom</span><br><span class="line">         )::geography</span><br><span class="line">       ) <span class="keyword">AS</span> difference_area_m2</span><br><span class="line"><span class="keyword">FROM</span> neighbor</span><br><span class="line"><span class="keyword">CROSS</span> <span class="keyword">JOIN</span> raw</span><br><span class="line"><span class="keyword">CROSS</span> <span class="keyword">JOIN</span> reduced;</span><br></pre></td></tr></table></figure>
+
+<p><code>neighbor_has_b = true</code> 且 <code>difference_area_m2 &gt; 0</code>，就串起了“当前面删点、邻面保留、边界出现差异”的完整证据链。</p>
+<h2 id="九、pprepair-输出还要额外防两类风险"><a href="#九、pprepair-输出还要额外防两类风险" class="headerlink" title="九、pprepair 输出还要额外防两类风险"></a>九、pprepair 输出还要额外防两类风险</h2><p>本案例的数据已经经过 pprepair。精确拓扑修复会引入新的交点，因此还要特别关注：</p>
+<ol>
+<li><strong>距离远小于网格的节点</strong>：新交点可能只与既有节点相差微米级，snap 后会落到同一格点，形成零长边或退化环。</li>
+<li><strong>用于填补缝隙的窄条</strong>：宽度小于网格尺度的 sliver 可能整体消失。如果它是独立面，会留下真正的空洞；如果只是共享边上的薄凸起，则可能在两侧同步折叠。</li>
+</ol>
+<p>这也是为什么“共享边会同步网格化”并不等于“整层一定仍然有效”。网格化之后，单体有效性和 coverage 都必须重新验证。</p>
+<h2 id="十、CoverageSimplify-能解决什么"><a href="#十、CoverageSimplify-能解决什么" class="headerlink" title="十、CoverageSimplify 能解决什么"></a>十、CoverageSimplify 能解决什么</h2><p>如果真正的目标不是限制小数位，而是“按容差简化整层，并让共享边同步变化”，应使用 coverage-aware 算子：</p>
+<figure class="highlight sql"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">SELECT</span> guid,</span><br><span class="line">       ST_CoverageSimplify(geom, <span class="number">1e-6</span>) <span class="keyword">OVER</span> () <span class="keyword">AS</span> geom_simplified</span><br><span class="line"><span class="keyword">FROM</span> sd_pdd_bad_town_v10;</span><br></pre></td></tr></table></figure>
+
+<p><code>ST_CoverageSimplify</code> 把整组面作为一个覆盖处理，共享边只简化一次，再同步给两侧。它适合整层拓扑一致的简化，但不会替代 <code>ST_SnapToGrid</code> 的十进制网格归约目标。</p>
+<h2 id="十一、别忘了-EPSG-4326-的单位是度"><a href="#十一、别忘了-EPSG-4326-的单位是度" class="headerlink" title="十一、别忘了 EPSG:4326 的单位是度"></a>十一、别忘了 EPSG:4326 的单位是度</h2><p>本文中的 <code>1e-6</code> 是角度，不是米。在纬度约 41° 的位置：</p>
+<ul>
+<li>纬向 <code>1e-6</code> 度约为 <code>0.111 m</code>；</li>
+<li>经向 <code>1e-6</code> 度约为 <code>0.084 m</code>。</li>
+</ul>
+<p>如果业务规则要求固定的米级容差，应先转换到合适的投影坐标系，例如对应区域的 CGCS2000 &#x2F; Gauss-Krüger 投影带，在平面坐标中处理后再转换回 EPSG:4326。</p>
+<h2 id="十二、最终决策清单"><a href="#十二、最终决策清单" class="headerlink" title="十二、最终决策清单"></a>十二、最终决策清单</h2><table>
+<thead>
+<tr>
+<th>需求</th>
+<th>推荐做法</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>坐标统一落在 <code>1e-6</code> 网格</td>
+<td>全量 <code>ST_SnapToGrid</code>，写入新表</td>
+</tr>
+<tr>
+<td>只要求 WKT &#x2F; GeoJSON 显示六位</td>
+<td><code>ST_AsText(geom, 6)</code> 或 <code>ST_AsGeoJSON(geom, 6)</code></td>
+</tr>
+<tr>
+<td>单个几何必须符合新精度模型</td>
+<td><code>ST_ReducePrecision</code>，并接受几何重建的代价</td>
+</tr>
+<tr>
+<td>整层按容差简化且共享边同步</td>
+<td><code>ST_CoverageSimplify</code> 窗口函数</td>
+</tr>
+<tr>
+<td>数据来自 pprepair 等拓扑修复工具</td>
+<td>额外检查近邻节点、窄条、空几何和部件丢失</td>
+</tr>
+<tr>
+<td>结果准备交付</td>
+<td>对比处理前后 validity、coverage、顶点数、部件数与面积</td>
+</tr>
+</tbody></table>
+<p>真正可靠的精度处理，不是找到一个“万能函数”，而是先区分网格化、几何有效、拓扑一致和文本显示这四个目标，再用可回滚的数据流和可量化的检查把风险收住。</p>
+
+    </div>
+
+    
+    
+    
+
+    <footer class="post-footer">
+          
+
+<div class="post-copyright">
+<ul>
+  <li class="post-copyright-author">
+      <strong>本文作者： </strong>陌忆
+  </li>
+  <li class="post-copyright-link">
+      <strong>本文链接：</strong>
+      <a href="https://moyi-math.github.io/2026/08/05/PostGIS-%E7%B2%BE%E5%BA%A6%E5%BD%92%E7%BA%A6%E9%81%BF%E5%9D%91%EF%BC%9AST-ReducePrecision-%E4%B8%BA%E4%BB%80%E4%B9%88%E4%BC%9A%E5%88%B6%E9%80%A0%E6%8E%A5%E8%BE%B9%E7%BC%9D%E9%9A%99/" title="PostGIS 精度归约避坑：ST_ReducePrecision 为什么会制造接边缝隙">https://moyi-math.github.io/2026/08/05/PostGIS-精度归约避坑：ST-ReducePrecision-为什么会制造接边缝隙/</a>
+  </li>
+  <li class="post-copyright-license">
+      <strong>版权声明： </strong>本博客所有文章除特别声明外，均采用 <a href="https://creativecommons.org/licenses/by-nc-sa/4.0/" rel="noopener" target="_blank"><i class="fab fa-fw fa-creative-commons"></i>BY-NC-SA</a> 许可协议。转载请注明出处！
+  </li>
+</ul>
+</div>
+
+          <div class="post-tags">
+              <a href="/tags/PostGIS/" rel="tag"># PostGIS</a>
+              <a href="/tags/PostgreSQL/" rel="tag"># PostgreSQL</a>
+              <a href="/tags/GIS/" rel="tag"># GIS</a>
+              <a href="/tags/%E7%A9%BA%E9%97%B4%E6%95%B0%E6%8D%AE/" rel="tag"># 空间数据</a>
+              <a href="/tags/%E6%8B%93%E6%89%91/" rel="tag"># 拓扑</a>
+          </div>
+
+        
+
+          <div class="post-nav">
+            <div class="post-nav-item">
+                <a href="/2026/07/31/MCP%E5%85%A5%E9%97%A8-%E5%9B%9B-%E8%B0%83%E8%AF%95%E4%B8%8E%E6%B5%8B%E8%AF%95/" rel="prev" title="MCP 入门（四）：调试与测试——三层机制拆解">
+                  <i class="fa fa-angle-left"></i> MCP 入门（四）：调试与测试——三层机制拆解
+                </a>
+            </div>
+            <div class="post-nav-item">
+                <a href="/2026/08/15/Reactor-1-%E4%BB%80%E4%B9%88%E6%98%AFReactor%E6%A8%A1%E5%9E%8B/" rel="next" title="什么是 Reactor 模型：监控 + 通知 + 异步">
+                  什么是 Reactor 模型：监控 + 通知 + 异步 <i class="fa fa-angle-right"></i>
+                </a>
+            </div>
+          </div>
+    </footer>
+  </article>
+</div>
+
+
+
+
+
+
+</div>
+  </main>
+
+  <footer class="footer">
+    <div class="footer-inner">
+
+  <div class="copyright">
+    &copy; 
+    <span itemprop="copyrightYear">2026</span>
+    <span class="with-love">
+      <i class="fab fa-osi"></i>
+    </span>
+    <span class="author" itemprop="copyrightHolder">陌忆</span>
+  </div>
+<div class="wordcount">
+  <span class="post-meta-item">
+    <span class="post-meta-item-icon">
+      <i class="fa fa-chart-line"></i>
+    </span>
+    <span title="站点总字数">106k</span>
+  </span>
+  <span class="post-meta-item">
+    <span class="post-meta-item-icon">
+      <i class="fa fa-coffee"></i>
+    </span>
+    <span title="站点阅读时长">6:24</span>
+  </span>
+</div>
+  <div class="powered-by">由 <a href="https://hexo.io/" rel="noopener" target="_blank">Hexo</a> & <a href="https://theme-next.js.org/" rel="noopener" target="_blank">NexT.Gemini</a> 强力驱动
+  </div>
+
+    </div>
+  </footer>
+
+  
+  <div class="toggle sidebar-toggle" role="button">
+    <span class="toggle-line"></span>
+    <span class="toggle-line"></span>
+    <span class="toggle-line"></span>
+  </div>
+  <div class="sidebar-dimmer"></div>
+  <div class="back-to-top" role="button" aria-label="返回顶部">
+    <i class="fa fa-arrow-up fa-lg"></i>
+    <span>0%</span>
+  </div>
+
+<noscript>
+  <div class="noscript-warning">Theme NexT works best with JavaScript enabled</div>
+</noscript>
+<!-- Site running time -->
+<span id="timeDate" aria-live="off"></span>
+<script>
+(function() {
+  var start = new Date("2022-11-17T08:00:00+08:00");
+  function pad(n) { return n < 10 ? "0" + n : "" + n; }
+  function tick() {
+    var diff = Date.now() - start.getTime();
+    if (diff < 0) return;
+    var d = Math.floor(diff / 86400000);
+    var h = Math.floor((diff % 86400000) / 3600000);
+    var m = Math.floor((diff % 3600000) / 60000);
+    var timeDate = document.getElementById("timeDate");
+    if (!timeDate) return;
+    timeDate.textContent =
+      "\u672C\u7AD9\u5DF2\u5B89\u5168\u8FD0\u884C " + d + " \u5929 " + pad(h) + " \u5C0F\u65F6 " + pad(m) + " \u5206";
+  }
+  tick();
+  setInterval(tick, 60000);
+})();
+</script>
+
+</body>
+</html>

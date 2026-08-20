@@ -1,0 +1,530 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width">
+<meta name="theme-color" content="#222" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#222" media="(prefers-color-scheme: dark)"><meta name="generator" content="Hexo 7.3.0">
+<link rel="preconnect" href="https://cdnjs.cloudflare.com" crossorigin>
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon-next.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32-next.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next.png">
+  <link rel="mask-icon" href="/images/logo.svg" color="#222">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/7.0.0/css/all.min.css" integrity="sha256-VHqXKFhhMxcpubYf9xiWdCiojEbY9NexQ4jh8AxbvcM=" crossorigin="anonymous">
+
+<script class="next-config" data-name="main" type="application/json">{"hostname":"moyi-math.github.io","root":"/","images":"/images","scheme":"Gemini","darkmode":true,"version":"8.28.0","exturl":false,"sidebar":{"position":"left","width_expanded":320,"width_dual_column":240,"display":"post","padding":18,"offset":12},"hljswrap":true,"codeblock":{"theme":{"light":"default","dark":"stackoverflow-dark"},"prism":{"light":"prism","dark":"prism-dark"},"copy_button":{"enable":true,"style":null},"fold":{"enable":false,"height":500},"language":false},"bookmark":{"enable":false,"color":"#222","save":"auto"},"mediumzoom":false,"lazyload":true,"pangu":false,"comments":{"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},"stickytabs":false,"motion":{"enable":false,"async":false,"duration":200,"transition":{"menu_item":"fadeInDown","post_block":"fadeIn","post_header":"fadeInDown","post_body":"fadeInDown","coll_header":"fadeInLeft","sidebar":"fadeInUp"}},"prism":false,"i18n":{"placeholder":"搜索...","empty":"没有找到任何搜索结果：${query}","hits_time":"找到 ${hits} 个搜索结果（用时 ${time} 毫秒）","hits":"找到 ${hits} 个搜索结果"},"path":"/search.json","localsearch":{"enable":true,"top_n_per_article":1,"unescape":false,"preload":false}}</script><script src="/js/config.js" defer></script>
+
+    <meta name="description" content="介绍 AoT 先计划再执行的 Agent 模式，说明如何把任务拆解交给确定性执行器完成。">
+<meta property="og:type" content="article">
+<meta property="og:title" content="从零实践 Function Call（四）：AoT——先计划再执行，让 LLM 只负责&quot;想&quot;">
+<meta property="og:url" content="https://moyi-math.github.io/2026/07/30/%E4%BB%8E%E9%9B%B6%E5%AE%9E%E8%B7%B5-Function-Call-4-AoT-%E5%85%88%E8%AE%A1%E5%88%92%E5%86%8D%E6%89%A7%E8%A1%8C/index.html">
+<meta property="og:site_name" content="陌忆的博客">
+<meta property="og:description" content="介绍 AoT 先计划再执行的 Agent 模式，说明如何把任务拆解交给确定性执行器完成。">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:image" content="https://moyi-math.github.io/images/background.webp">
+<meta property="article:published_time" content="2026-07-30T08:00:00.000Z">
+<meta property="article:modified_time" content="2026-08-20T14:47:37.221Z">
+<meta property="article:author" content="陌忆">
+<meta property="article:tag" content="Agent">
+<meta property="article:tag" content="LLM">
+<meta property="article:tag" content="Planning">
+<meta property="article:tag" content="Function Call">
+<meta property="article:tag" content="AoT">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:image" content="https://moyi-math.github.io/images/background.webp">
+
+
+<link rel="canonical" href="https://moyi-math.github.io/2026/07/30/%E4%BB%8E%E9%9B%B6%E5%AE%9E%E8%B7%B5-Function-Call-4-AoT-%E5%85%88%E8%AE%A1%E5%88%92%E5%86%8D%E6%89%A7%E8%A1%8C/">
+
+
+<script class="next-config" data-name="page" type="application/json">{"sidebar":"","isHome":false,"isPost":true,"lang":"zh-CN","comments":true,"permalink":"https://moyi-math.github.io/2026/07/30/%E4%BB%8E%E9%9B%B6%E5%AE%9E%E8%B7%B5-Function-Call-4-AoT-%E5%85%88%E8%AE%A1%E5%88%92%E5%86%8D%E6%89%A7%E8%A1%8C/","path":"2026/07/30/从零实践-Function-Call-4-AoT-先计划再执行/","title":"从零实践 Function Call（四）：AoT——先计划再执行，让 LLM 只负责\"想\""}</script>
+
+<script class="next-config" data-name="calendar" type="application/json">""</script>
+<title>从零实践 Function Call（四）：AoT——先计划再执行，让 LLM 只负责"想" | 陌忆的博客</title>
+  
+
+
+
+
+
+
+
+
+  
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/animejs/3.2.1/anime.min.js" integrity="sha256-XL2inqUJaslATFnHdJOi9GfQ60on8Wx1C2H8DYiN1xY=" crossorigin="anonymous" defer></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/lozad.js/1.16.0/lozad.min.js" integrity="sha256-mOFREFhqmHeQbXpK2lp4nA3qooVgACfh88fpJftLBbc=" crossorigin="anonymous" defer></script>
+<script src="/js/utils.js" defer></script><script src="/js/sidebar.js" defer></script><script src="/js/next-boot.js" defer></script>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/hexo-generator-searchdb/1.5.0/search.js" integrity="sha256-xFC6PJ82SL9b3WkGjFavNiA9gm5z6UBxWPiu4CYjptg=" crossorigin="anonymous" defer></script>
+<script src="/js/third-party/search/local-search.js" defer></script>
+
+
+
+
+
+
+
+  
+
+
+
+
+  
+
+  <script class="next-config" data-name="enableMath" type="application/json">false</script><link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/katex.min.css" integrity="sha256-UF1fgpAiu3tPJN/uCqEUHNe7pnr+QR0SQDNfgglgtcM=" crossorigin="anonymous">
+
+
+<link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
+
+
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"WebSite","name":"陌忆的博客","url":"https://moyi-math.github.io","description":"记录 RAG、Agent、MCP、算法与软件工程实践，按专栏整理可复用的技术笔记。","inLanguage":"zh-CN","author":{"@type":"Person","name":"陌忆"}}</script>
+
+
+
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"Article","headline":"从零实践 Function Call（四）：AoT——先计划再执行，让 LLM 只负责\"想\"","description":"介绍 AoT 先计划再执行的 Agent 模式，说明如何把任务拆解交给确定性执行器完成。","datePublished":"2026-07-30T08:00:00.000Z","dateModified":"2026-08-20T14:47:37.221Z","inLanguage":"zh-CN","mainEntityOfPage":{"@type":"WebPage","@id":"https://moyi-math.github.io/2026/07/30/%E4%BB%8E%E9%9B%B6%E5%AE%9E%E8%B7%B5-Function-Call-4-AoT-%E5%85%88%E8%AE%A1%E5%88%92%E5%86%8D%E6%89%A7%E8%A1%8C/index.html"},"author":{"@type":"Person","name":"陌忆"}}</script>
+<meta name="author" content="陌忆">
+
+
+  <noscript>
+    <link rel="stylesheet" href="/css/noscript.css">
+  </noscript>
+<!-- hexo injector head_end start --><link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/katex.min.css" integrity="sha512-fHwaWebuwA7NSF5Qg/af4UeDx9XqUpYpOGgubo3yWu+b2IQR4UeQwbb42Ti7gVAjNtVoI/I9TEoYeu9omwcC6g==" crossorigin="anonymous" referrerpolicy="no-referrer" /><!-- hexo injector head_end end --><link rel="alternate" href="/atom.xml" title="陌忆的博客" type="application/atom+xml">
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage">
+  <div class="headband"></div>
+
+  <main class="main">
+    <div class="column">
+      <header class="header" itemscope itemtype="http://schema.org/WPHeader"><div class="site-brand-container">
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="切换导航栏" role="button">
+        <span class="toggle-line"></span>
+        <span class="toggle-line"></span>
+        <span class="toggle-line"></span>
+    </div>
+  </div>
+
+  <div class="site-meta">
+
+    <a href="/" class="brand" rel="start">
+      <i class="logo-line"></i>
+      <p class="site-title">陌忆的博客</p>
+      <i class="logo-line"></i>
+    </a>
+      <p class="site-subtitle" itemprop="description">数据库无法得出结论</p>
+  </div>
+
+  <div class="site-nav-right">
+    <div class="toggle popup-trigger" aria-label="搜索" role="button">
+        <i class="fa fa-search fa-fw fa-lg"></i>
+    </div>
+  </div>
+</div>
+
+
+
+<nav class="site-nav">
+  <ul class="main-menu menu"><li class="menu-item menu-item-home"><a href="/" rel="section"><i class="fa fa-home fa-fw"></i>首页</a></li><li class="menu-item menu-item-about"><a href="/about/" rel="section"><i class="fa fa-user fa-fw"></i>关于</a></li><li class="menu-item menu-item-tags"><a href="/tags/" rel="section"><i class="fa fa-tags fa-fw"></i>标签</a></li><li class="menu-item menu-item-categories"><a href="/categories/" rel="section"><i class="fa fa-th fa-fw"></i>分类</a></li><li class="menu-item menu-item-archives"><a href="/archives/" rel="section"><i class="fa fa-archive fa-fw"></i>归档</a></li>
+      <li class="menu-item menu-item-search">
+        <a role="button" class="popup-trigger"><i class="fa fa-search fa-fw"></i>搜索
+        </a>
+      </li>
+  </ul>
+</nav>
+
+
+
+  <div class="search-pop-overlay">
+    <div class="popup search-popup">
+      <div class="search-header">
+        <span class="search-icon">
+          <i class="fa fa-search"></i>
+        </span>
+        <div class="search-input-container">
+          <input autocomplete="off" autocapitalize="off" maxlength="80"
+                placeholder="搜索..." spellcheck="false"
+                type="search" class="search-input">
+        </div>
+        <span class="popup-btn-close" role="button">
+          <i class="fa fa-times-circle"></i>
+        </span>
+      </div>
+      <div class="search-result-container">
+        <div class="search-result-icon">
+          <i class="fa fa-spinner fa-pulse fa-5x"></i>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</header>
+        
+  
+  <aside class="sidebar">
+
+    <div class="sidebar-inner sidebar-nav-active sidebar-toc-active">
+      <ul class="sidebar-nav">
+        <li class="sidebar-nav-toc">
+          文章目录
+        </li>
+        <li class="sidebar-nav-overview">
+          站点概览
+        </li>
+      </ul>
+
+      <div class="sidebar-panel-container">
+        <!--noindex-->
+        <div class="post-toc-wrap sidebar-panel">
+            <div class="post-toc animated"><ol class="nav"><li class="nav-item nav-level-2"><a class="nav-link" href="#%E4%B8%80%E3%80%81%E4%B8%A4%E7%A7%8D%E5%AF%B9%E7%AB%8B%E7%9A%84%E5%93%B2%E5%AD%A6"><span class="nav-text">一、两种对立的哲学</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E4%BA%8C%E3%80%81%E6%A0%B8%E5%BF%83%E6%A6%82%E5%BF%B5%EF%BC%9AAtom"><span class="nav-text">二、核心概念：Atom</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E4%B8%89%E3%80%81%E4%B8%89%E6%AE%B5%E5%BC%8F%E6%9E%B6%E6%9E%84"><span class="nav-text">三、三段式架构</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#Phase-1%EF%BC%9ALLM-%E7%94%9F%E6%88%90%E8%AE%A1%E5%88%92"><span class="nav-text">Phase 1：LLM 生成计划</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#Phase-2%EF%BC%9A%E7%B3%BB%E7%BB%9F%E9%AA%8C%E8%AF%81"><span class="nav-text">Phase 2：系统验证</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#Phase-3%EF%BC%9A%E7%B3%BB%E7%BB%9F%E6%89%A7%E8%A1%8C"><span class="nav-text">Phase 3：系统执行</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%9B%9B%E3%80%81%E5%90%8C%E9%A2%98%E5%AF%B9%E6%AF%94%EF%BC%9AReAct-vs-AoT"><span class="nav-text">四、同题对比：ReAct vs AoT</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E4%BA%94%E3%80%81%E6%A0%B8%E5%BF%83%E5%B7%AE%E5%BC%82%E6%80%BB%E7%BB%93"><span class="nav-text">五、核心差异总结</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%85%AD%E3%80%81%E9%80%82%E7%94%A8%E8%8C%83%E5%9B%B4"><span class="nav-text">六、适用范围</span></a></li></ol></div>
+        </div>
+        <!--/noindex-->
+
+        <div class="site-overview-wrap sidebar-panel">
+          <div class="site-author animated" itemprop="author" itemscope itemtype="http://schema.org/Person">
+    <img class="site-author-image" itemprop="image" alt="陌忆"
+      src="/images/avatar.webp">
+  <p class="site-author-name" itemprop="name">陌忆</p>
+  <div class="site-description" itemprop="description">记录 RAG、Agent、MCP、算法与软件工程实践，按专栏整理可复用的技术笔记。</div>
+</div>
+<div class="site-state-wrap animated">
+  <nav class="site-state">
+      <div class="site-state-item site-state-posts">
+        <a href="/archives/">
+          <span class="site-state-item-count">50</span>
+          <span class="site-state-item-name">日志</span>
+        </a>
+      </div>
+      <div class="site-state-item site-state-categories">
+          <a href="/categories/">
+        <span class="site-state-item-count">10</span>
+        <span class="site-state-item-name">分类</span></a>
+      </div>
+      <div class="site-state-item site-state-tags">
+          <a href="/tags/">
+        <span class="site-state-item-count">172</span>
+        <span class="site-state-item-name">标签</span></a>
+      </div>
+  </nav>
+</div>
+  <div class="links-of-author animated">
+      <span class="links-of-author-item">
+        <a href="https://github.com/moyi-math" title="GitHub → https:&#x2F;&#x2F;github.com&#x2F;moyi-math" rel="noopener me" target="_blank"><i class="fab fa-github fa-fw"></i>GitHub</a>
+      </span>
+  </div>
+  <div class="cc-license animated" itemprop="license">
+    <a href="https://creativecommons.org/licenses/by-nc-sa/4.0/" class="cc-opacity" rel="noopener" target="_blank"><img src="https://cdnjs.cloudflare.com/ajax/libs/creativecommons-vocabulary/2020.11.3/assets/license_badges/small/by_nc_sa.svg" alt="Creative Commons"></a>
+  </div>
+
+        </div>
+      </div>
+    </div>
+
+    
+  </aside>
+
+
+    </div>
+
+    <div class="main-inner post posts-expand">
+
+
+  
+
+
+<div class="post-block">
+  
+  
+
+  <article itemscope itemtype="http://schema.org/Article" class="post-content" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="https://moyi-math.github.io/2026/07/30/%E4%BB%8E%E9%9B%B6%E5%AE%9E%E8%B7%B5-Function-Call-4-AoT-%E5%85%88%E8%AE%A1%E5%88%92%E5%86%8D%E6%89%A7%E8%A1%8C/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.webp">
+      <meta itemprop="name" content="陌忆">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="陌忆的博客">
+      <meta itemprop="description" content="记录 RAG、Agent、MCP、算法与软件工程实践，按专栏整理可复用的技术笔记。">
+    </span>
+
+    <span hidden itemprop="post" itemscope itemtype="http://schema.org/CreativeWork">
+      <meta itemprop="name" content="从零实践 Function Call（四）：AoT——先计划再执行，让 LLM 只负责&quot;想&quot; | 陌忆的博客">
+      <meta itemprop="description" content="介绍 AoT 先计划再执行的 Agent 模式，说明如何把任务拆解交给确定性执行器完成。">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          从零实践 Function Call（四）：AoT——先计划再执行，让 LLM 只负责"想"
+        </h1>
+
+        <div class="post-meta-container">
+          <div class="post-meta">
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-calendar"></i>
+      </span>
+      <span class="post-meta-item-text">发表于</span>
+
+      <time title="创建时间：2026-07-30 16:00:00" itemprop="dateCreated datePublished" datetime="2026-07-30T16:00:00+08:00">2026-07-30</time>
+    </span>
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-calendar-check"></i>
+      </span>
+      <span class="post-meta-item-text">更新于</span>
+      <time title="修改时间：2026-08-20 22:47:37" itemprop="dateModified" datetime="2026-08-20T22:47:37+08:00">2026-08-20</time>
+    </span>
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-folder"></i>
+      </span>
+      <span class="post-meta-item-text">分类于</span>
+        <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+          <a href="/categories/%E4%BB%8E%E9%9B%B6%E5%AE%9E%E8%B7%B5-Function-Call/" itemprop="url" rel="index"><span itemprop="name">从零实践 Function Call</span></a>
+        </span>
+    </span>
+
+  
+    <span class="post-meta-break"></span>
+    <span class="post-meta-item" title="本文字数">
+      <span class="post-meta-item-icon">
+        <i class="far fa-file-word"></i>
+      </span>
+      <span class="post-meta-item-text">本文字数：</span>
+      <span>777</span>
+    </span>
+    <span class="post-meta-item" title="阅读时长">
+      <span class="post-meta-item-icon">
+        <i class="far fa-clock"></i>
+      </span>
+      <span class="post-meta-item-text">阅读时长 &asymp;</span>
+      <span>3 分钟</span>
+    </span>
+</div>
+
+            <div class="post-description">介绍 AoT 先计划再执行的 Agent 模式，说明如何把任务拆解交给确定性执行器完成。</div>
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody"><span id="more"></span>
+
+<h2 id="一、两种对立的哲学"><a href="#一、两种对立的哲学" class="headerlink" title="一、两种对立的哲学"></a>一、两种对立的哲学</h2><p>ReAct（前一篇讲的）和 AoT（Atom of Thought，这篇要讲的）代表了 Agent 设计的两种完全相反的哲学：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line">ReAct: &quot;边想边做&quot;</span><br><span class="line">  Thought → Action → Observation → Thought → Action → ...</span><br><span class="line">  LLM 既负责&quot;想&quot;也负责&quot;做&quot;</span><br><span class="line"></span><br><span class="line">AoT: &quot;先想好再做&quot;</span><br><span class="line">  [LLM 生成完整计划] → [系统验证] → [系统按计划执行]</span><br><span class="line">  LLM 只负责&quot;想&quot;，系统负责&quot;做&quot;</span><br></pre></td></tr></table></figure>
+
+<h2 id="二、核心概念：Atom"><a href="#二、核心概念：Atom" class="headerlink" title="二、核心概念：Atom"></a>二、核心概念：Atom</h2><p>AoT 把推理分解成原子步骤（Atom）。一个 atom 是<strong>最小的、不可再分的推理单元</strong>。</p>
+<p>比如 “(15 + 7) × 3 - 10” 会被分解成：</p>
+<figure class="highlight json"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line"><span class="punctuation">&#123;</span></span><br><span class="line">  <span class="attr">&quot;atoms&quot;</span><span class="punctuation">:</span> <span class="punctuation">[</span></span><br><span class="line">    <span class="punctuation">&#123;</span><span class="attr">&quot;id&quot;</span><span class="punctuation">:</span> <span class="number">1</span><span class="punctuation">,</span> <span class="attr">&quot;kind&quot;</span><span class="punctuation">:</span> <span class="string">&quot;tool&quot;</span><span class="punctuation">,</span> <span class="attr">&quot;name&quot;</span><span class="punctuation">:</span> <span class="string">&quot;add&quot;</span><span class="punctuation">,</span>      <span class="attr">&quot;input&quot;</span><span class="punctuation">:</span> <span class="punctuation">&#123;</span><span class="attr">&quot;a&quot;</span><span class="punctuation">:</span> <span class="number">15</span><span class="punctuation">,</span> <span class="attr">&quot;b&quot;</span><span class="punctuation">:</span> <span class="number">7</span><span class="punctuation">&#125;</span><span class="punctuation">&#125;</span><span class="punctuation">,</span></span><br><span class="line">    <span class="punctuation">&#123;</span><span class="attr">&quot;id&quot;</span><span class="punctuation">:</span> <span class="number">2</span><span class="punctuation">,</span> <span class="attr">&quot;kind&quot;</span><span class="punctuation">:</span> <span class="string">&quot;tool&quot;</span><span class="punctuation">,</span> <span class="attr">&quot;name&quot;</span><span class="punctuation">:</span> <span class="string">&quot;multiply&quot;</span><span class="punctuation">,</span>  <span class="attr">&quot;input&quot;</span><span class="punctuation">:</span> <span class="punctuation">&#123;</span><span class="attr">&quot;a&quot;</span><span class="punctuation">:</span> <span class="string">&quot;&lt;result_of_1&gt;&quot;</span><span class="punctuation">,</span> <span class="attr">&quot;b&quot;</span><span class="punctuation">:</span> <span class="number">3</span><span class="punctuation">&#125;</span><span class="punctuation">,</span> <span class="attr">&quot;dependsOn&quot;</span><span class="punctuation">:</span> <span class="punctuation">[</span><span class="number">1</span><span class="punctuation">]</span><span class="punctuation">&#125;</span><span class="punctuation">,</span></span><br><span class="line">    <span class="punctuation">&#123;</span><span class="attr">&quot;id&quot;</span><span class="punctuation">:</span> <span class="number">3</span><span class="punctuation">,</span> <span class="attr">&quot;kind&quot;</span><span class="punctuation">:</span> <span class="string">&quot;tool&quot;</span><span class="punctuation">,</span> <span class="attr">&quot;name&quot;</span><span class="punctuation">:</span> <span class="string">&quot;subtract&quot;</span><span class="punctuation">,</span>  <span class="attr">&quot;input&quot;</span><span class="punctuation">:</span> <span class="punctuation">&#123;</span><span class="attr">&quot;a&quot;</span><span class="punctuation">:</span> <span class="string">&quot;&lt;result_of_2&gt;&quot;</span><span class="punctuation">,</span> <span class="attr">&quot;b&quot;</span><span class="punctuation">:</span> <span class="number">10</span><span class="punctuation">&#125;</span><span class="punctuation">,</span> <span class="attr">&quot;dependsOn&quot;</span><span class="punctuation">:</span> <span class="punctuation">[</span><span class="number">2</span><span class="punctuation">]</span><span class="punctuation">&#125;</span><span class="punctuation">,</span></span><br><span class="line">    <span class="punctuation">&#123;</span><span class="attr">&quot;id&quot;</span><span class="punctuation">:</span> <span class="number">4</span><span class="punctuation">,</span> <span class="attr">&quot;kind&quot;</span><span class="punctuation">:</span> <span class="string">&quot;final&quot;</span><span class="punctuation">,</span> <span class="attr">&quot;name&quot;</span><span class="punctuation">:</span> <span class="string">&quot;report&quot;</span><span class="punctuation">,</span>   <span class="attr">&quot;dependsOn&quot;</span><span class="punctuation">:</span> <span class="punctuation">[</span><span class="number">3</span><span class="punctuation">]</span><span class="punctuation">&#125;</span></span><br><span class="line">  <span class="punctuation">]</span></span><br><span class="line"><span class="punctuation">&#125;</span></span><br></pre></td></tr></table></figure>
+
+<p>每个 atom 包含：</p>
+<ul>
+<li><strong>id</strong>：唯一标识</li>
+<li><strong>kind</strong>：类型（tool &#x2F; decision &#x2F; final）</li>
+<li><strong>name</strong>：操作名</li>
+<li><strong>input</strong>：显式的输入参数</li>
+<li><strong>dependsOn</strong>：依赖的前序 atom</li>
+</ul>
+<p>注意 <code>&lt;result_of_1&gt;</code> 这种引用——它让数据流变得<strong>显式</strong>。不是黑盒推理，而是白盒管道。</p>
+<h2 id="三、三段式架构"><a href="#三、三段式架构" class="headerlink" title="三、三段式架构"></a>三、三段式架构</h2><figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">PHASE 1:  PLANNING       ← LLM 输出 JSON 计划</span><br><span class="line">PHASE 2:  VALIDATION     ← 系统检查计划是否合法</span><br><span class="line">PHASE 3:  EXECUTION      ← 系统按计划执行，LLM 不参与</span><br></pre></td></tr></table></figure>
+
+<h3 id="Phase-1：LLM-生成计划"><a href="#Phase-1：LLM-生成计划" class="headerlink" title="Phase 1：LLM 生成计划"></a>Phase 1：LLM 生成计划</h3><p>通过 <code>grammar</code> 约束强制输出合法 JSON：</p>
+<figure class="highlight javascript"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">const</span> grammar = <span class="keyword">await</span> llama.<span class="title function_">createGrammarForJsonSchema</span>(planSchema);</span><br><span class="line"><span class="keyword">const</span> planText = <span class="keyword">await</span> session.<span class="title function_">prompt</span>(enhancedPrompt, &#123; grammar &#125;);</span><br></pre></td></tr></table></figure>
+
+<p>这比”在 prompt 里请求 JSON”可靠得多——<strong>grammar 约束让 LLM 只能输出有效 token</strong>，永远不会出现格式错误。</p>
+<h3 id="Phase-2：系统验证"><a href="#Phase-2：系统验证" class="headerlink" title="Phase 2：系统验证"></a>Phase 2：系统验证</h3><p>验证器检查每个 atom：</p>
+<figure class="highlight javascript"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">function</span> <span class="title function_">validatePlan</span>(<span class="params">plan</span>) &#123;</span><br><span class="line">  <span class="comment">// 检查：无重复 ID、工具名合法、依赖存在、输入非空</span></span><br><span class="line">  <span class="keyword">for</span> (<span class="keyword">const</span> atom <span class="keyword">of</span> plan.<span class="property">atoms</span>) &#123;</span><br><span class="line">    <span class="keyword">if</span> (ids.<span class="title function_">has</span>(atom.<span class="property">id</span>)) <span class="keyword">throw</span> <span class="keyword">new</span> <span class="title class_">Error</span>(<span class="string">&quot;Duplicate ID&quot;</span>);</span><br><span class="line">    <span class="keyword">if</span> (!allowedTools.<span class="title function_">has</span>(atom.<span class="property">name</span>)) <span class="keyword">throw</span> <span class="keyword">new</span> <span class="title class_">Error</span>(<span class="string">&quot;Unknown tool&quot;</span>);</span><br><span class="line">    <span class="keyword">if</span> (atom.<span class="property">input</span>.<span class="property">a</span> === <span class="literal">undefined</span>) <span class="keyword">throw</span> <span class="keyword">new</span> <span class="title class_">Error</span>(<span class="string">&quot;Missing input&quot;</span>);</span><br><span class="line">  &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<h3 id="Phase-3：系统执行"><a href="#Phase-3：系统执行" class="headerlink" title="Phase 3：系统执行"></a>Phase 3：系统执行</h3><p>执行器按顺序运行 atom，解析引用：</p>
+<figure class="highlight javascript"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// 关键：&lt;result_of_2&gt; → state[2] 的值</span></span><br><span class="line"><span class="keyword">for</span> (<span class="keyword">const</span> [key, value] <span class="keyword">of</span> <span class="title class_">Object</span>.<span class="title function_">entries</span>(resolvedInput)) &#123;</span><br><span class="line">  <span class="keyword">if</span> (value.<span class="title function_">startsWith</span>(<span class="string">&quot;&lt;result_of_&quot;</span>)) &#123;</span><br><span class="line">    <span class="keyword">const</span> refId = <span class="built_in">parseInt</span>(value.<span class="title function_">match</span>(<span class="regexp">/\d+/</span>)[<span class="number">0</span>]);</span><br><span class="line">    resolvedInput[key] = state[refId];</span><br><span class="line">  &#125;</span><br><span class="line">&#125;</span><br><span class="line">state[atom.<span class="property">id</span>] = <span class="title function_">tool</span>(resolvedInput.<span class="property">a</span>, resolvedInput.<span class="property">b</span>);</span><br></pre></td></tr></table></figure>
+
+<h2 id="四、同题对比：ReAct-vs-AoT"><a href="#四、同题对比：ReAct-vs-AoT" class="headerlink" title="四、同题对比：ReAct vs AoT"></a>四、同题对比：ReAct vs AoT</h2><p>问题：”100 divided by 5, then add 3, then multiply by 2”</p>
+<p><strong>ReAct 输出</strong>（文本流）：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line">Iteration 1: Thought → Action: divide(100,5) → Observation: 20</span><br><span class="line">Iteration 2: Thought → Action: add(20,3) → Observation: 23</span><br><span class="line">Iteration 3: Thought → Action: multiply(23,2) → Observation: 46</span><br><span class="line">Iteration 4: Answer: 46</span><br></pre></td></tr></table></figure>
+<p>每次迭代调用一次 <code>session.prompt()</code>，LLM 全程参与。</p>
+<p><strong>AoT 输出</strong>（JSON 计划）：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">Phase 1: LLM 一次生成 4 个 atom</span><br><span class="line">Phase 2: 系统验证（不调 LLM）</span><br><span class="line">Phase 3: 系统执行 4 个 atom（不调 LLM）</span><br></pre></td></tr></table></figure>
+<p>LLM 只被调用一次。</p>
+<h2 id="五、核心差异总结"><a href="#五、核心差异总结" class="headerlink" title="五、核心差异总结"></a>五、核心差异总结</h2><table>
+<thead>
+<tr>
+<th>维度</th>
+<th>ReAct</th>
+<th>AoT</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>LLM 调用次数</td>
+<td>每步 1 次 → N 次</td>
+<td>1 次</td>
+</tr>
+<tr>
+<td>执行者</td>
+<td>LLM 决定下一步</td>
+<td>系统按计划执行</td>
+</tr>
+<tr>
+<td>验证</td>
+<td>无</td>
+<td>JSON Schema + 代码验证</td>
+</tr>
+<tr>
+<td>可重现</td>
+<td>必须重跑整套对话</td>
+<td>可从任意 atom 重跑</td>
+</tr>
+<tr>
+<td>错误定位</td>
+<td>重读整个推理链</td>
+<td>“atom 3 挂了，看输入”</td>
+</tr>
+<tr>
+<td>测试难度</td>
+<td>需要 mock 完整 LLM</td>
+<td>可单独测试执行器</td>
+</tr>
+</tbody></table>
+<h2 id="六、适用范围"><a href="#六、适用范围" class="headerlink" title="六、适用范围"></a>六、适用范围</h2><p>AoT 最适合<strong>计划可预见、执行要可靠</strong>的场景：</p>
+<ul>
+<li>数据管道（提取 → 转换 → 加载 → 验证）</li>
+<li>金融交易（每步可审计、可回滚）</li>
+<li>API 编排（调 A 拿结果 → 用结果调 B）</li>
+<li>合规敏感系统（每步都有记录）</li>
+</ul>
+<p>不适合：开放性探索、头脑风暴、创意写作。</p>
+
+    </div>
+
+    
+    
+    
+
+    <footer class="post-footer">
+          
+
+<div class="post-copyright">
+<ul>
+  <li class="post-copyright-author">
+      <strong>本文作者： </strong>陌忆
+  </li>
+  <li class="post-copyright-link">
+      <strong>本文链接：</strong>
+      <a href="https://moyi-math.github.io/2026/07/30/%E4%BB%8E%E9%9B%B6%E5%AE%9E%E8%B7%B5-Function-Call-4-AoT-%E5%85%88%E8%AE%A1%E5%88%92%E5%86%8D%E6%89%A7%E8%A1%8C/" title="从零实践 Function Call（四）：AoT——先计划再执行，让 LLM 只负责&quot;想&quot;">https://moyi-math.github.io/2026/07/30/从零实践-Function-Call-4-AoT-先计划再执行/</a>
+  </li>
+  <li class="post-copyright-license">
+      <strong>版权声明： </strong>本博客所有文章除特别声明外，均采用 <a href="https://creativecommons.org/licenses/by-nc-sa/4.0/" rel="noopener" target="_blank"><i class="fab fa-fw fa-creative-commons"></i>BY-NC-SA</a> 许可协议。转载请注明出处！
+  </li>
+</ul>
+</div>
+
+          <div class="post-tags">
+              <a href="/tags/Agent/" rel="tag"># Agent</a>
+              <a href="/tags/LLM/" rel="tag"># LLM</a>
+              <a href="/tags/Planning/" rel="tag"># Planning</a>
+              <a href="/tags/Function-Call/" rel="tag"># Function Call</a>
+              <a href="/tags/AoT/" rel="tag"># AoT</a>
+          </div>
+
+        
+
+          <div class="post-nav">
+            <div class="post-nav-item">
+                <a href="/2026/07/30/%E4%BB%8E%E9%9B%B6%E5%AE%9E%E8%B7%B5-Function-Call-3-ReAct-%E6%A8%A1%E5%BC%8F/" rel="prev" title="从零实践 Function Call（三）：ReAct 模式——Thought、Action、Observation">
+                  <i class="fa fa-angle-left"></i> 从零实践 Function Call（三）：ReAct 模式——Thought、Action、Observation
+                </a>
+            </div>
+            <div class="post-nav-item">
+                <a href="/2026/07/30/%E4%BB%8E%E9%9B%B6%E5%AE%9E%E8%B7%B5-Function-Call-5-Agent%E5%AE%B9%E9%94%99%E4%BD%93%E7%B3%BB/" rel="next" title="从零实践 Function Call（五）：Agent 的六层容错体系">
+                  从零实践 Function Call（五）：Agent 的六层容错体系 <i class="fa fa-angle-right"></i>
+                </a>
+            </div>
+          </div>
+    </footer>
+  </article>
+</div>
+
+
+
+
+
+
+</div>
+  </main>
+
+  <footer class="footer">
+    <div class="footer-inner">
+
+  <div class="copyright">
+    &copy; 
+    <span itemprop="copyrightYear">2026</span>
+    <span class="with-love">
+      <i class="fab fa-osi"></i>
+    </span>
+    <span class="author" itemprop="copyrightHolder">陌忆</span>
+  </div>
+<div class="wordcount">
+  <span class="post-meta-item">
+    <span class="post-meta-item-icon">
+      <i class="fa fa-chart-line"></i>
+    </span>
+    <span title="站点总字数">106k</span>
+  </span>
+  <span class="post-meta-item">
+    <span class="post-meta-item-icon">
+      <i class="fa fa-coffee"></i>
+    </span>
+    <span title="站点阅读时长">6:24</span>
+  </span>
+</div>
+  <div class="powered-by">由 <a href="https://hexo.io/" rel="noopener" target="_blank">Hexo</a> & <a href="https://theme-next.js.org/" rel="noopener" target="_blank">NexT.Gemini</a> 强力驱动
+  </div>
+
+    </div>
+  </footer>
+
+  
+  <div class="toggle sidebar-toggle" role="button">
+    <span class="toggle-line"></span>
+    <span class="toggle-line"></span>
+    <span class="toggle-line"></span>
+  </div>
+  <div class="sidebar-dimmer"></div>
+  <div class="back-to-top" role="button" aria-label="返回顶部">
+    <i class="fa fa-arrow-up fa-lg"></i>
+    <span>0%</span>
+  </div>
+
+<noscript>
+  <div class="noscript-warning">Theme NexT works best with JavaScript enabled</div>
+</noscript>
+<!-- Site running time -->
+<span id="timeDate" aria-live="off"></span>
+<script>
+(function() {
+  var start = new Date("2022-11-17T08:00:00+08:00");
+  function pad(n) { return n < 10 ? "0" + n : "" + n; }
+  function tick() {
+    var diff = Date.now() - start.getTime();
+    if (diff < 0) return;
+    var d = Math.floor(diff / 86400000);
+    var h = Math.floor((diff % 86400000) / 3600000);
+    var m = Math.floor((diff % 3600000) / 60000);
+    var timeDate = document.getElementById("timeDate");
+    if (!timeDate) return;
+    timeDate.textContent =
+      "\u672C\u7AD9\u5DF2\u5B89\u5168\u8FD0\u884C " + d + " \u5929 " + pad(h) + " \u5C0F\u65F6 " + pad(m) + " \u5206";
+  }
+  tick();
+  setInterval(tick, 60000);
+})();
+</script>
+
+</body>
+</html>

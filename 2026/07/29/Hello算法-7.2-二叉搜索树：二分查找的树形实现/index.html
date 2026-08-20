@@ -1,0 +1,587 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width">
+<meta name="theme-color" content="#222" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#222" media="(prefers-color-scheme: dark)"><meta name="generator" content="Hexo 7.3.0">
+<link rel="preconnect" href="https://cdnjs.cloudflare.com" crossorigin>
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon-next.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32-next.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next.png">
+  <link rel="mask-icon" href="/images/logo.svg" color="#222">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/7.0.0/css/all.min.css" integrity="sha256-VHqXKFhhMxcpubYf9xiWdCiojEbY9NexQ4jh8AxbvcM=" crossorigin="anonymous">
+
+<script class="next-config" data-name="main" type="application/json">{"hostname":"moyi-math.github.io","root":"/","images":"/images","scheme":"Gemini","darkmode":true,"version":"8.28.0","exturl":false,"sidebar":{"position":"left","width_expanded":320,"width_dual_column":240,"display":"post","padding":18,"offset":12},"hljswrap":true,"codeblock":{"theme":{"light":"default","dark":"stackoverflow-dark"},"prism":{"light":"prism","dark":"prism-dark"},"copy_button":{"enable":true,"style":null},"fold":{"enable":false,"height":500},"language":false},"bookmark":{"enable":false,"color":"#222","save":"auto"},"mediumzoom":false,"lazyload":true,"pangu":false,"comments":{"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},"stickytabs":false,"motion":{"enable":false,"async":false,"duration":200,"transition":{"menu_item":"fadeInDown","post_block":"fadeIn","post_header":"fadeInDown","post_body":"fadeInDown","coll_header":"fadeInLeft","sidebar":"fadeInUp"}},"prism":false,"i18n":{"placeholder":"搜索...","empty":"没有找到任何搜索结果：${query}","hits_time":"找到 ${hits} 个搜索结果（用时 ${time} 毫秒）","hits":"找到 ${hits} 个搜索结果"},"path":"/search.json","localsearch":{"enable":true,"top_n_per_article":1,"unescape":false,"preload":false}}</script><script src="/js/config.js" defer></script>
+
+    <meta name="description" content="二叉搜索树在二叉树的基础上加了一条规则——左">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Hello算法 学习笔记 · 7.2 二叉搜索树：二分查找的树形实现">
+<meta property="og:url" content="https://moyi-math.github.io/2026/07/29/Hello%E7%AE%97%E6%B3%95-7.2-%E4%BA%8C%E5%8F%89%E6%90%9C%E7%B4%A2%E6%A0%91%EF%BC%9A%E4%BA%8C%E5%88%86%E6%9F%A5%E6%89%BE%E7%9A%84%E6%A0%91%E5%BD%A2%E5%AE%9E%E7%8E%B0/index.html">
+<meta property="og:site_name" content="陌忆的博客">
+<meta property="og:description" content="二叉搜索树在二叉树的基础上加了一条规则——左">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:image" content="https://moyi-math.github.io/images/background.webp">
+<meta property="article:published_time" content="2026-07-29T16:00:00.000Z">
+<meta property="article:modified_time" content="2026-07-29T16:00:00.000Z">
+<meta property="article:author" content="陌忆">
+<meta property="article:tag" content="算法">
+<meta property="article:tag" content="数据结构">
+<meta property="article:tag" content="Python">
+<meta property="article:tag" content="O(log n)">
+<meta property="article:tag" content="二叉树">
+<meta property="article:tag" content="二叉搜索树">
+<meta property="article:tag" content="BST">
+<meta property="article:tag" content="二分查找">
+<meta property="article:tag" content="删除节点">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:image" content="https://moyi-math.github.io/images/background.webp">
+
+
+<link rel="canonical" href="https://moyi-math.github.io/2026/07/29/Hello%E7%AE%97%E6%B3%95-7.2-%E4%BA%8C%E5%8F%89%E6%90%9C%E7%B4%A2%E6%A0%91%EF%BC%9A%E4%BA%8C%E5%88%86%E6%9F%A5%E6%89%BE%E7%9A%84%E6%A0%91%E5%BD%A2%E5%AE%9E%E7%8E%B0/">
+
+
+<script class="next-config" data-name="page" type="application/json">{"sidebar":"","isHome":false,"isPost":true,"lang":"zh-CN","comments":true,"permalink":"https://moyi-math.github.io/2026/07/29/Hello%E7%AE%97%E6%B3%95-7.2-%E4%BA%8C%E5%8F%89%E6%90%9C%E7%B4%A2%E6%A0%91%EF%BC%9A%E4%BA%8C%E5%88%86%E6%9F%A5%E6%89%BE%E7%9A%84%E6%A0%91%E5%BD%A2%E5%AE%9E%E7%8E%B0/","path":"2026/07/29/Hello算法-7.2-二叉搜索树：二分查找的树形实现/","title":"Hello算法 学习笔记 · 7.2 二叉搜索树：二分查找的树形实现"}</script>
+
+<script class="next-config" data-name="calendar" type="application/json">""</script>
+<title>Hello算法 学习笔记 · 7.2 二叉搜索树：二分查找的树形实现 | 陌忆的博客</title>
+  
+
+
+
+
+
+
+
+
+  
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/animejs/3.2.1/anime.min.js" integrity="sha256-XL2inqUJaslATFnHdJOi9GfQ60on8Wx1C2H8DYiN1xY=" crossorigin="anonymous" defer></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/lozad.js/1.16.0/lozad.min.js" integrity="sha256-mOFREFhqmHeQbXpK2lp4nA3qooVgACfh88fpJftLBbc=" crossorigin="anonymous" defer></script>
+<script src="/js/utils.js" defer></script><script src="/js/sidebar.js" defer></script><script src="/js/next-boot.js" defer></script>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/hexo-generator-searchdb/1.5.0/search.js" integrity="sha256-xFC6PJ82SL9b3WkGjFavNiA9gm5z6UBxWPiu4CYjptg=" crossorigin="anonymous" defer></script>
+<script src="/js/third-party/search/local-search.js" defer></script>
+
+
+
+
+
+
+
+  
+
+
+
+
+  
+
+  <script class="next-config" data-name="enableMath" type="application/json">false</script><link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/katex.min.css" integrity="sha256-UF1fgpAiu3tPJN/uCqEUHNe7pnr+QR0SQDNfgglgtcM=" crossorigin="anonymous">
+
+
+<link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
+
+
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"WebSite","name":"陌忆的博客","url":"https://moyi-math.github.io","description":"记录 RAG、Agent、MCP、算法与软件工程实践，按专栏整理可复用的技术笔记。","inLanguage":"zh-CN","author":{"@type":"Person","name":"陌忆"}}</script>
+
+
+
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"Article","headline":"Hello算法 学习笔记 · 7.2 二叉搜索树：二分查找的树形实现","description":"二叉搜索树在二叉树的基础上加了一条规则——左<根<右。这条规则让查找变成了二分查找，从 O(n) 降到 O(log n)。插入也是 O(log n)，删除要处理三种情况。理解 BST 是理解平衡树、红黑树、数据库索引的基础。","datePublished":"2026-07-29T16:00:00.000Z","dateModified":"2026-07-29T16:00:00.000Z","inLanguage":"zh-CN","mainEntityOfPage":{"@type":"WebPage","@id":"https://moyi-math.github.io/2026/07/29/Hello%E7%AE%97%E6%B3%95-7.2-%E4%BA%8C%E5%8F%89%E6%90%9C%E7%B4%A2%E6%A0%91%EF%BC%9A%E4%BA%8C%E5%88%86%E6%9F%A5%E6%89%BE%E7%9A%84%E6%A0%91%E5%BD%A2%E5%AE%9E%E7%8E%B0/index.html"},"author":{"@type":"Person","name":"陌忆"}}</script>
+<meta name="author" content="陌忆">
+
+
+  <noscript>
+    <link rel="stylesheet" href="/css/noscript.css">
+  </noscript>
+<!-- hexo injector head_end start --><link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/katex.min.css" integrity="sha512-fHwaWebuwA7NSF5Qg/af4UeDx9XqUpYpOGgubo3yWu+b2IQR4UeQwbb42Ti7gVAjNtVoI/I9TEoYeu9omwcC6g==" crossorigin="anonymous" referrerpolicy="no-referrer" /><!-- hexo injector head_end end --><link rel="alternate" href="/atom.xml" title="陌忆的博客" type="application/atom+xml">
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage">
+  <div class="headband"></div>
+
+  <main class="main">
+    <div class="column">
+      <header class="header" itemscope itemtype="http://schema.org/WPHeader"><div class="site-brand-container">
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="切换导航栏" role="button">
+        <span class="toggle-line"></span>
+        <span class="toggle-line"></span>
+        <span class="toggle-line"></span>
+    </div>
+  </div>
+
+  <div class="site-meta">
+
+    <a href="/" class="brand" rel="start">
+      <i class="logo-line"></i>
+      <p class="site-title">陌忆的博客</p>
+      <i class="logo-line"></i>
+    </a>
+      <p class="site-subtitle" itemprop="description">数据库无法得出结论</p>
+  </div>
+
+  <div class="site-nav-right">
+    <div class="toggle popup-trigger" aria-label="搜索" role="button">
+        <i class="fa fa-search fa-fw fa-lg"></i>
+    </div>
+  </div>
+</div>
+
+
+
+<nav class="site-nav">
+  <ul class="main-menu menu"><li class="menu-item menu-item-home"><a href="/" rel="section"><i class="fa fa-home fa-fw"></i>首页</a></li><li class="menu-item menu-item-about"><a href="/about/" rel="section"><i class="fa fa-user fa-fw"></i>关于</a></li><li class="menu-item menu-item-tags"><a href="/tags/" rel="section"><i class="fa fa-tags fa-fw"></i>标签</a></li><li class="menu-item menu-item-categories"><a href="/categories/" rel="section"><i class="fa fa-th fa-fw"></i>分类</a></li><li class="menu-item menu-item-archives"><a href="/archives/" rel="section"><i class="fa fa-archive fa-fw"></i>归档</a></li>
+      <li class="menu-item menu-item-search">
+        <a role="button" class="popup-trigger"><i class="fa fa-search fa-fw"></i>搜索
+        </a>
+      </li>
+  </ul>
+</nav>
+
+
+
+  <div class="search-pop-overlay">
+    <div class="popup search-popup">
+      <div class="search-header">
+        <span class="search-icon">
+          <i class="fa fa-search"></i>
+        </span>
+        <div class="search-input-container">
+          <input autocomplete="off" autocapitalize="off" maxlength="80"
+                placeholder="搜索..." spellcheck="false"
+                type="search" class="search-input">
+        </div>
+        <span class="popup-btn-close" role="button">
+          <i class="fa fa-times-circle"></i>
+        </span>
+      </div>
+      <div class="search-result-container">
+        <div class="search-result-icon">
+          <i class="fa fa-spinner fa-pulse fa-5x"></i>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</header>
+        
+  
+  <aside class="sidebar">
+
+    <div class="sidebar-inner sidebar-nav-active sidebar-toc-active">
+      <ul class="sidebar-nav">
+        <li class="sidebar-nav-toc">
+          文章目录
+        </li>
+        <li class="sidebar-nav-overview">
+          站点概览
+        </li>
+      </ul>
+
+      <div class="sidebar-panel-container">
+        <!--noindex-->
+        <div class="post-toc-wrap sidebar-panel">
+            <div class="post-toc animated"><ol class="nav"><li class="nav-item nav-level-2"><a class="nav-link" href="#%E6%91%98%E8%A6%81-Abstract"><span class="nav-text">摘要(Abstract)</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E4%B8%80%E3%80%81BST-%E7%9A%84%E8%A7%84%E5%88%99%E2%80%94%E2%80%94%E5%B7%A6-%E6%A0%B9-%E5%8F%B3"><span class="nav-text">一、BST 的规则——左 &lt; 根 &lt; 右</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E4%BA%8C%E3%80%81%E6%9F%A5%E6%89%BE-search%E2%80%94%E2%80%94%E4%BA%8C%E5%88%86%E6%9F%A5%E6%89%BE"><span class="nav-text">二、查找 search——二分查找</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E4%B8%89%E3%80%81%E6%8F%92%E5%85%A5-insert%E2%80%94%E2%80%94%E5%85%88%E6%89%BE%E4%BD%8D%E7%BD%AE%EF%BC%8C%E5%86%8D%E6%8C%82%E4%B8%8A"><span class="nav-text">三、插入 insert——先找位置，再挂上</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%9B%9B%E3%80%81%E5%88%A0%E9%99%A4-remove%E2%80%94%E2%80%94%E4%B8%89%E7%A7%8D%E6%83%85%E5%86%B5"><span class="nav-text">四、删除 remove——三种情况</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#%E6%83%85%E5%86%B5-1%EF%BC%9A%E8%A2%AB%E5%88%A0%E8%8A%82%E7%82%B9%E6%B2%A1%E6%9C%89%E5%AD%90%E8%8A%82%E7%82%B9%EF%BC%88%E5%8F%B6%E5%AD%90%E8%8A%82%E7%82%B9%EF%BC%89"><span class="nav-text">情况 1：被删节点没有子节点（叶子节点）</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E6%83%85%E5%86%B5-2%EF%BC%9A%E8%A2%AB%E5%88%A0%E8%8A%82%E7%82%B9%E5%8F%AA%E6%9C%89%E4%B8%80%E4%B8%AA%E5%AD%90%E8%8A%82%E7%82%B9"><span class="nav-text">情况 2：被删节点只有一个子节点</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E6%83%85%E5%86%B5-3%EF%BC%9A%E8%A2%AB%E5%88%A0%E8%8A%82%E7%82%B9%E6%9C%89%E4%B8%A4%E4%B8%AA%E5%AD%90%E8%8A%82%E7%82%B9"><span class="nav-text">情况 3：被删节点有两个子节点</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E4%BA%94%E3%80%81%E5%A4%8D%E6%9D%82%E5%BA%A6%E5%88%86%E6%9E%90"><span class="nav-text">五、复杂度分析</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%85%AD%E3%80%81BST-%E7%9A%84%E4%B8%AD%E5%BA%8F%E9%81%8D%E5%8E%86-%E5%8D%87%E5%BA%8F%E6%8E%92%E5%BA%8F"><span class="nav-text">六、BST 的中序遍历 &#x3D; 升序排序</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E4%B8%83%E3%80%81%E9%9D%A2%E8%AF%95%E9%AB%98%E9%A2%91%E9%A2%98"><span class="nav-text">七、面试高频题</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#Q1-%E4%B8%BA%E4%BB%80%E4%B9%88-BST-%E7%9A%84%E6%9F%A5%E6%89%BE%E6%98%AF-O-log-n-%EF%BC%9F"><span class="nav-text">Q1: 为什么 BST 的查找是 O(log n)？</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#Q2-%E5%88%A0%E9%99%A4-BST-%E7%9A%84%E8%8A%82%E7%82%B9%E6%97%B6%EF%BC%8C%E4%B8%BA%E4%BB%80%E4%B9%88%E6%83%85%E5%86%B5-3-%E8%A6%81%E9%80%89%E2%80%9D%E5%8F%B3%E5%AD%90%E6%A0%91%E7%9A%84%E6%9C%80%E5%B0%8F%E5%80%BC%E2%80%9D%EF%BC%9F"><span class="nav-text">Q2: 删除 BST 的节点时，为什么情况 3 要选”右子树的最小值”？</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#Q3-BST-%E4%BC%9A%E9%80%80%E5%8C%96%E5%90%97%EF%BC%9F%E6%80%8E%E4%B9%88%E8%A7%A3%E5%86%B3%EF%BC%9F"><span class="nav-text">Q3: BST 会退化吗？怎么解决？</span></a></li></ol></li></ol></div>
+        </div>
+        <!--/noindex-->
+
+        <div class="site-overview-wrap sidebar-panel">
+          <div class="site-author animated" itemprop="author" itemscope itemtype="http://schema.org/Person">
+    <img class="site-author-image" itemprop="image" alt="陌忆"
+      src="/images/avatar.webp">
+  <p class="site-author-name" itemprop="name">陌忆</p>
+  <div class="site-description" itemprop="description">记录 RAG、Agent、MCP、算法与软件工程实践，按专栏整理可复用的技术笔记。</div>
+</div>
+<div class="site-state-wrap animated">
+  <nav class="site-state">
+      <div class="site-state-item site-state-posts">
+        <a href="/archives/">
+          <span class="site-state-item-count">50</span>
+          <span class="site-state-item-name">日志</span>
+        </a>
+      </div>
+      <div class="site-state-item site-state-categories">
+          <a href="/categories/">
+        <span class="site-state-item-count">10</span>
+        <span class="site-state-item-name">分类</span></a>
+      </div>
+      <div class="site-state-item site-state-tags">
+          <a href="/tags/">
+        <span class="site-state-item-count">172</span>
+        <span class="site-state-item-name">标签</span></a>
+      </div>
+  </nav>
+</div>
+  <div class="links-of-author animated">
+      <span class="links-of-author-item">
+        <a href="https://github.com/moyi-math" title="GitHub → https:&#x2F;&#x2F;github.com&#x2F;moyi-math" rel="noopener me" target="_blank"><i class="fab fa-github fa-fw"></i>GitHub</a>
+      </span>
+  </div>
+  <div class="cc-license animated" itemprop="license">
+    <a href="https://creativecommons.org/licenses/by-nc-sa/4.0/" class="cc-opacity" rel="noopener" target="_blank"><img src="https://cdnjs.cloudflare.com/ajax/libs/creativecommons-vocabulary/2020.11.3/assets/license_badges/small/by_nc_sa.svg" alt="Creative Commons"></a>
+  </div>
+
+        </div>
+      </div>
+    </div>
+
+    
+  </aside>
+
+
+    </div>
+
+    <div class="main-inner post posts-expand">
+
+
+  
+
+
+<div class="post-block">
+  
+  
+
+  <article itemscope itemtype="http://schema.org/Article" class="post-content" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="https://moyi-math.github.io/2026/07/29/Hello%E7%AE%97%E6%B3%95-7.2-%E4%BA%8C%E5%8F%89%E6%90%9C%E7%B4%A2%E6%A0%91%EF%BC%9A%E4%BA%8C%E5%88%86%E6%9F%A5%E6%89%BE%E7%9A%84%E6%A0%91%E5%BD%A2%E5%AE%9E%E7%8E%B0/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.webp">
+      <meta itemprop="name" content="陌忆">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="陌忆的博客">
+      <meta itemprop="description" content="记录 RAG、Agent、MCP、算法与软件工程实践，按专栏整理可复用的技术笔记。">
+    </span>
+
+    <span hidden itemprop="post" itemscope itemtype="http://schema.org/CreativeWork">
+      <meta itemprop="name" content="Hello算法 学习笔记 · 7.2 二叉搜索树：二分查找的树形实现 | 陌忆的博客">
+      <meta itemprop="description" content="二叉搜索树在二叉树的基础上加了一条规则——左&lt;根&lt;右。这条规则让查找变成了二分查找，从 O(n) 降到 O(log n)。插入也是 O(log n)，删除要处理三种情况。理解 BST 是理解平衡树、红黑树、数据库索引的基础。">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          Hello算法 学习笔记 · 7.2 二叉搜索树：二分查找的树形实现
+        </h1>
+
+        <div class="post-meta-container">
+          <div class="post-meta">
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-calendar"></i>
+      </span>
+      <span class="post-meta-item-text">发表于</span>
+
+      <time title="创建时间：2026-07-30 00:00:00" itemprop="dateCreated datePublished" datetime="2026-07-30T00:00:00+08:00">2026-07-30</time>
+    </span>
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-folder"></i>
+      </span>
+      <span class="post-meta-item-text">分类于</span>
+        <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+          <a href="/categories/Hello%E7%AE%97%E6%B3%95%E5%AD%A6%E4%B9%A0%E7%AC%94%E8%AE%B0/" itemprop="url" rel="index"><span itemprop="name">Hello算法学习笔记</span></a>
+        </span>
+    </span>
+
+  
+    <span class="post-meta-break"></span>
+    <span class="post-meta-item" title="本文字数">
+      <span class="post-meta-item-icon">
+        <i class="far fa-file-word"></i>
+      </span>
+      <span class="post-meta-item-text">本文字数：</span>
+      <span>2k</span>
+    </span>
+    <span class="post-meta-item" title="阅读时长">
+      <span class="post-meta-item-icon">
+        <i class="far fa-clock"></i>
+      </span>
+      <span class="post-meta-item-text">阅读时长 &asymp;</span>
+      <span>7 分钟</span>
+    </span>
+</div>
+
+            <div class="post-description">二叉搜索树在二叉树的基础上加了一条规则——左<根<右。这条规则让查找变成了二分查找，从 O(n) 降到 O(log n)。插入也是 O(log n)，删除要处理三种情况。理解 BST 是理解平衡树、红黑树、数据库索引的基础。</div>
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody"><blockquote>
+<p><strong>章节定位:</strong> 上节学了二叉树——一对多的层次结构。但普通二叉树的查找需要遍历整棵树（O(n)）。<strong>二叉搜索树（BST, Binary Search Tree）</strong> 在二叉树的基础上加了一条规则——左 &lt; 根 &lt; 右——就让查找变成了二分查找，从 O(n) 降到 O(log n)。它是平衡树（AVL、红黑树）和数据库索引的认知基础。</p>
+</blockquote>
+<span id="more"></span>
+
+<h2 id="摘要-Abstract"><a href="#摘要-Abstract" class="headerlink" title="摘要(Abstract)"></a>摘要(Abstract)</h2><p><strong>TL;DR:</strong> 二叉搜索树是<strong>节点值有序</strong>的二叉树：对于每个节点，<strong>左子树所有值 &lt; 节点值 &lt; 右子树所有值</strong>。这条规则让 BST 的查找、插入、删除全部变成 O(log n)——每走一步排除一半子树，和数组的二分查找是同一个思想。BST 的插入和查找逻辑相同（找位置，然后操作），删除需要分三种情况处理（无子节点、一个子节点、两个子节点）。如果插入顺序不好，BST 可能退化成链表（O(n)），这就是平衡树出现的原因。</p>
+<p>本文覆盖:</p>
+<ul>
+<li><strong>BST 的规则</strong>: 左 &lt; 根 &lt; 右——整棵树天然有序</li>
+<li><strong>search</strong>: 二分查找的树形实现——每步排除一半</li>
+<li><strong>insert</strong>: 先查找，找到空位就挂上</li>
+<li><strong>remove 三种情况</strong>: 无子节点直接删、一个子节点子顶上、两个子节点找右子树最小替换</li>
+<li><strong>复杂度分析</strong>: 平均 O(log n)，最坏 O(n)</li>
+<li><strong>退化成链表</strong>: 按顺序插入导致 BST 失衡</li>
+<li><strong>面试高频题</strong>: 3 道覆盖 BST 核心知识的面试题</li>
+</ul>
+<p>适合读者: 想理解”为什么 BST 查找快”的学习者；对删除操作需要分情况感到困惑的开发者。</p>
+<hr>
+<h2 id="一、BST-的规则——左-根-右"><a href="#一、BST-的规则——左-根-右" class="headerlink" title="一、BST 的规则——左 &lt; 根 &lt; 右"></a>一、BST 的规则——左 &lt; 根 &lt; 右</h2><p>普通二叉树对节点的值没有约束——放哪里都行。BST 加了一条规则，让整棵树<strong>天然有序</strong>：</p>
+<blockquote>
+<p><strong>对于每个节点：左子树中所有节点的值 &lt; 该节点的值 &lt; 右子树中所有节点的值</strong></p>
+</blockquote>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line">      8</span><br><span class="line">     / \</span><br><span class="line">    4   12</span><br><span class="line">   / \  / \</span><br><span class="line">  2  6 10 14</span><br><span class="line"> / \ /\ /\ /\</span><br><span class="line">1 3 5 7 9 11 13 15</span><br></pre></td></tr></table></figure>
+
+<p>验证：</p>
+<ul>
+<li>节点 <code>8</code>：左边全是比 8 小的（4,2,6,1,3,5,7），右边全是比 8 大的（12,10,14,9,11,13,15）</li>
+<li>节点 <code>4</code>：左边全比 4 小（2,1,3），右边全比 4 大（6,5,7）</li>
+<li>节点 <code>12</code>：左边全比 12 小（10,9,11），右边全比 12 大（14,13,15）</li>
+</ul>
+<p><strong>每条规则递归地成立——左子树本身也是 BST，右子树本身也是 BST。</strong></p>
+<hr>
+<h2 id="二、查找-search——二分查找"><a href="#二、查找-search——二分查找" class="headerlink" title="二、查找 search——二分查找"></a>二、查找 search——二分查找</h2><figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">def</span> <span class="title function_">search</span>(<span class="params">self, num: <span class="built_in">int</span></span>) -&gt; TreeNode | <span class="literal">None</span>:</span><br><span class="line">    cur = <span class="variable language_">self</span>._root</span><br><span class="line">    <span class="keyword">while</span> cur <span class="keyword">is</span> <span class="keyword">not</span> <span class="literal">None</span>:</span><br><span class="line">        <span class="keyword">if</span> cur.val &lt; num:          <span class="comment"># 目标比当前大 → 去右子树</span></span><br><span class="line">            cur = cur.right</span><br><span class="line">        <span class="keyword">elif</span> cur.val &gt; num:        <span class="comment"># 目标比当前小 → 去左子树</span></span><br><span class="line">            cur = cur.left</span><br><span class="line">        <span class="keyword">else</span>:                      <span class="comment"># 相等 → 找到了</span></span><br><span class="line">            <span class="keyword">break</span></span><br><span class="line">    <span class="keyword">return</span> cur</span><br></pre></td></tr></table></figure>
+
+<p>追踪 <code>search(7)</code>：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line">    8  ← cur=8, 7&lt;8 → 走左边</span><br><span class="line">   /</span><br><span class="line">  4  ← cur=4, 7&gt;4 → 走右边</span><br><span class="line"> / \</span><br><span class="line">2   6  ← cur=6, 7&gt;6 → 走右边</span><br><span class="line">   / \</span><br><span class="line">  5   7  ← cur=7, 找到！返回</span><br></pre></td></tr></table></figure>
+
+<p><strong>每走一步，排除掉一半的子树。</strong> 运行时间 &#x3D; 树的<strong>高度</strong>（从根到目标经过的节点数）。</p>
+<p>如上图 15 个节点的满二叉树，高度 &#x3D; 4，所以查找最多 4 步。和数组二分查找完全一样。</p>
+<hr>
+<h2 id="三、插入-insert——先找位置，再挂上"><a href="#三、插入-insert——先找位置，再挂上" class="headerlink" title="三、插入 insert——先找位置，再挂上"></a>三、插入 insert——先找位置，再挂上</h2><figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">def</span> <span class="title function_">insert</span>(<span class="params">self, num: <span class="built_in">int</span></span>):</span><br><span class="line">    <span class="keyword">if</span> <span class="variable language_">self</span>._root <span class="keyword">is</span> <span class="literal">None</span>:</span><br><span class="line">        <span class="variable language_">self</span>._root = TreeNode(num)</span><br><span class="line">        <span class="keyword">return</span></span><br><span class="line">    cur, pre = <span class="variable language_">self</span>._root, <span class="literal">None</span></span><br><span class="line">    <span class="keyword">while</span> cur <span class="keyword">is</span> <span class="keyword">not</span> <span class="literal">None</span>:</span><br><span class="line">        <span class="keyword">if</span> cur.val == num:         <span class="comment"># BST 一般不允许重复</span></span><br><span class="line">            <span class="keyword">return</span></span><br><span class="line">        pre = cur                  <span class="comment"># pre 记住父节点</span></span><br><span class="line">        <span class="keyword">if</span> cur.val &lt; num:</span><br><span class="line">            cur = cur.right</span><br><span class="line">        <span class="keyword">else</span>:</span><br><span class="line">            cur = cur.left</span><br><span class="line">    <span class="comment"># cur 是 None，pre 是它的父节点</span></span><br><span class="line">    node = TreeNode(num)</span><br><span class="line">    <span class="keyword">if</span> pre.val &lt; num:</span><br><span class="line">        pre.right = node           <span class="comment"># 作为右子插入</span></span><br><span class="line">    <span class="keyword">else</span>:</span><br><span class="line">        pre.left = node            <span class="comment"># 作为左子插入</span></span><br></pre></td></tr></table></figure>
+
+<p>追踪 <code>insert(16)</code>：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br></pre></td><td class="code"><pre><span class="line">        14</span><br><span class="line">          \</span><br><span class="line">           15  ← cur, 16&gt;15 → 右</span><br><span class="line">              \</span><br><span class="line">              None  ← cur=None, pre=15</span><br><span class="line">              16 &gt; 15 → 作为 15 的右子插入</span><br><span class="line"></span><br><span class="line">结果：</span><br><span class="line">        14</span><br><span class="line">          \</span><br><span class="line">           15</span><br><span class="line">             \</span><br><span class="line">              16</span><br></pre></td></tr></table></figure>
+
+<div class="note primary"><p><strong>插入和查找的路径完全一样。</strong> 先走一遍查找路径（找空位），到了就挂上去。所以插入也是 O(log n)。</p>
+</div>
+
+<hr>
+<h2 id="四、删除-remove——三种情况"><a href="#四、删除-remove——三种情况" class="headerlink" title="四、删除 remove——三种情况"></a>四、删除 remove——三种情况</h2><p>删除是最复杂的操作，因为删完之后 BST 的规则仍然要成立。</p>
+<h3 id="情况-1：被删节点没有子节点（叶子节点）"><a href="#情况-1：被删节点没有子节点（叶子节点）" class="headerlink" title="情况 1：被删节点没有子节点（叶子节点）"></a>情况 1：被删节点没有子节点（叶子节点）</h3><figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line">删除 1：</span><br><span class="line">  直接扔掉</span><br><span class="line">        ...              ...</span><br><span class="line">          2      →        2</span><br><span class="line">           \               \</span><br><span class="line">            1              None</span><br></pre></td></tr></table></figure>
+
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># 代码本质：父节点的对应指针直接置空</span></span><br><span class="line"><span class="keyword">if</span> pre.left == cur:</span><br><span class="line">    pre.left = <span class="literal">None</span></span><br><span class="line"><span class="keyword">else</span>:</span><br><span class="line">    pre.right = <span class="literal">None</span></span><br></pre></td></tr></table></figure>
+
+<h3 id="情况-2：被删节点只有一个子节点"><a href="#情况-2：被删节点只有一个子节点" class="headerlink" title="情况 2：被删节点只有一个子节点"></a>情况 2：被删节点只有一个子节点</h3><figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line">删除 2（只有右子 3）：</span><br><span class="line">  子节点直接顶上来</span><br><span class="line">       4              4</span><br><span class="line">      /              /</span><br><span class="line">     2      →       3</span><br><span class="line">      \</span><br><span class="line">       3</span><br></pre></td></tr></table></figure>
+
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># 代码本质：父节点的对应指针指向子节点</span></span><br><span class="line">child = cur.left <span class="keyword">or</span> cur.right   <span class="comment"># 非空的那个</span></span><br><span class="line"><span class="keyword">if</span> pre.left == cur:</span><br><span class="line">    pre.left = child</span><br><span class="line"><span class="keyword">else</span>:</span><br><span class="line">    pre.right = child</span><br></pre></td></tr></table></figure>
+
+<h3 id="情况-3：被删节点有两个子节点"><a href="#情况-3：被删节点有两个子节点" class="headerlink" title="情况 3：被删节点有两个子节点"></a>情况 3：被删节点有两个子节点</h3><p>这是最复杂的情况——不能直接删，因为左右子树都需要有人管。</p>
+<p><strong>解法：找右子树中最小的节点，用它替换被删节点。</strong></p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># 找右子树的最左节点（最小值）</span></span><br><span class="line">tmp = cur.right</span><br><span class="line"><span class="keyword">while</span> tmp.left <span class="keyword">is</span> <span class="keyword">not</span> <span class="literal">None</span>:</span><br><span class="line">    tmp = tmp.left</span><br><span class="line"><span class="comment"># 用 tmp 的值替换 cur 的值</span></span><br><span class="line">cur.val = tmp.val</span><br><span class="line"><span class="comment"># 递归删除 tmp（它一定属于情况1或情况2）</span></span><br><span class="line"><span class="variable language_">self</span>.remove(tmp.val)</span><br></pre></td></tr></table></figure>
+
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line">删除节点 4：</span><br><span class="line">        8                   8</span><br><span class="line">       / \                 / \</span><br><span class="line">      4  12      →        5  12</span><br><span class="line">     / \                 / \</span><br><span class="line">    2   6               2   6</span><br><span class="line">       /                   /</span><br><span class="line">      5                   5   ← 这个 5 被递归删除</span><br></pre></td></tr></table></figure>
+
+<p><strong>为什么选右子树的最小值？</strong></p>
+<blockquote>
+<p>右子树的最小值 &#x3D; 比被删节点大的所有节点里最小的那个。</p>
+<p>把它放到被删节点的位置：</p>
+<ul>
+<li>左子树所有值 &lt; 它 ✓（它比左子树所有值都大）</li>
+<li>右子树所有值 &gt; 它 ✓（它是右子树的最小值）</li>
+</ul>
+<p>BST 规则仍然成立。</p>
+</blockquote>
+<div class="note warning"><p><strong>删除的完整流程图：</strong></p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br></pre></td><td class="code"><pre><span class="line">remove(key):</span><br><span class="line">  │</span><br><span class="line">  ├─ 查找 key 的位置</span><br><span class="line">  │</span><br><span class="line">  ├─ 没找到 → 直接返回</span><br><span class="line">  │</span><br><span class="line">  ├─ 找到 → 分情况：</span><br><span class="line">  │   ├─ 无子节点 → 父指针置空</span><br><span class="line">  │   ├─ 一个子节点 → 子节点顶上</span><br><span class="line">  │   └─ 两个子节点 → 找右子树最小值替换，递归删除它</span><br></pre></td></tr></table></figure></div>
+
+<hr>
+<h2 id="五、复杂度分析"><a href="#五、复杂度分析" class="headerlink" title="五、复杂度分析"></a>五、复杂度分析</h2><table>
+<thead>
+<tr>
+<th>操作</th>
+<th>平均</th>
+<th>最坏</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>search</strong></td>
+<td><strong>O(log n)</strong></td>
+<td>O(n)</td>
+<td>每次排除一半子树</td>
+</tr>
+<tr>
+<td><strong>insert</strong></td>
+<td><strong>O(log n)</strong></td>
+<td>O(n)</td>
+<td>先查找，再挂上</td>
+</tr>
+<tr>
+<td><strong>remove</strong></td>
+<td><strong>O(log n)</strong></td>
+<td>O(n)</td>
+<td>先查找，再分三种情况处理</td>
+</tr>
+<tr>
+<td>中序遍历</td>
+<td>O(n)</td>
+<td>O(n)</td>
+<td>遍历所有节点，输出有序序列</td>
+</tr>
+</tbody></table>
+<p><strong>最坏情况 O(n) 什么时候发生？</strong></p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># 按顺序插入 1, 2, 3, 4, 5</span></span><br><span class="line"><span class="keyword">for</span> i <span class="keyword">in</span> <span class="built_in">range</span>(<span class="number">1</span>, <span class="number">6</span>):</span><br><span class="line">    bst.insert(i)</span><br></pre></td></tr></table></figure>
+
+<p>生成的树：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br></pre></td><td class="code"><pre><span class="line">1</span><br><span class="line"> \</span><br><span class="line">  2</span><br><span class="line">   \</span><br><span class="line">    3</span><br><span class="line">     \</span><br><span class="line">      4</span><br><span class="line">       \</span><br><span class="line">        5</span><br></pre></td></tr></table></figure>
+
+<p><strong>BST 退化成链表了。</strong> 查找 5 要走 5 步，不是 log₂5 ≈ 2 步。</p>
+<p>这就是为什么需要<strong>平衡二叉搜索树</strong>（AVL 树、红黑树）——它们会自动调整树的结构，保证高度始终是 O(log n)，无论插入顺序如何。</p>
+<hr>
+<h2 id="六、BST-的中序遍历-升序排序"><a href="#六、BST-的中序遍历-升序排序" class="headerlink" title="六、BST 的中序遍历 &#x3D; 升序排序"></a>六、BST 的中序遍历 &#x3D; 升序排序</h2><p>BST 有一个非常重要的性质：<strong>中序遍历 BST 会得到升序序列。</strong></p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">def</span> <span class="title function_">in_order</span>(<span class="params">root</span>):</span><br><span class="line">    <span class="keyword">if</span> root <span class="keyword">is</span> <span class="literal">None</span>:</span><br><span class="line">        <span class="keyword">return</span></span><br><span class="line">    in_order(root.left)</span><br><span class="line">    res.append(root.val)           <span class="comment"># 访问根的时候，左子树都已访问完</span></span><br><span class="line">    in_order(root.right)</span><br></pre></td></tr></table></figure>
+
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br></pre></td><td class="code"><pre><span class="line">        8</span><br><span class="line">       / \</span><br><span class="line">      4   12</span><br><span class="line">     / \  / \</span><br><span class="line">    2  6 10 14</span><br><span class="line">   / \ /\ /\ /\</span><br><span class="line">  1 3 5 7 9 11 13 15</span><br><span class="line"></span><br><span class="line">中序: [1,2,3,4,5,6,7,8,9,10,11,12,13,14,15]</span><br></pre></td></tr></table></figure>
+
+<p>这是判断一棵树是不是 BST 的经典方法：<strong>中序遍历一次，看结果是不是严格递增的。</strong></p>
+<hr>
+<h2 id="七、面试高频题"><a href="#七、面试高频题" class="headerlink" title="七、面试高频题"></a>七、面试高频题</h2><h3 id="Q1-为什么-BST-的查找是-O-log-n-？"><a href="#Q1-为什么-BST-的查找是-O-log-n-？" class="headerlink" title="Q1: 为什么 BST 的查找是 O(log n)？"></a>Q1: 为什么 BST 的查找是 O(log n)？</h3><p>因为 BST 的规则（左 &lt; 根 &lt; 右）保证每走一步就可以排除掉一半的子树。这和数组二分查找是同一个原理。BST 的高度决定了查找步数，对于满二叉树，高度 ≈ log₂n。</p>
+<h3 id="Q2-删除-BST-的节点时，为什么情况-3-要选”右子树的最小值”？"><a href="#Q2-删除-BST-的节点时，为什么情况-3-要选”右子树的最小值”？" class="headerlink" title="Q2: 删除 BST 的节点时，为什么情况 3 要选”右子树的最小值”？"></a>Q2: 删除 BST 的节点时，为什么情况 3 要选”右子树的最小值”？</h3><p>左子树所有值 &lt; 被删节点 &lt; 右子树所有值。为了保持这个规则：</p>
+<ul>
+<li>新节点的值必须 &gt; 左子树所有值</li>
+<li>新节点的值必须 &lt; 右子树所有值</li>
+</ul>
+<p>右子树的最小值正好满足这两个条件——它是比被删节点大的所有值中最小的那个。</p>
+<h3 id="Q3-BST-会退化吗？怎么解决？"><a href="#Q3-BST-会退化吗？怎么解决？" class="headerlink" title="Q3: BST 会退化吗？怎么解决？"></a>Q3: BST 会退化吗？怎么解决？</h3><p>会。如果按升序（或降序）插入，BST 会退化成链表，查找从 O(log n) 变成 O(n)。解决方法是使用<strong>自平衡二叉搜索树</strong>：AVL 树（严格平衡，每个节点左右子树高度差 ≤ 1）和红黑树（近似平衡，广泛应用于 Java TreeMap、C++ map、Linux 内核调度）。</p>
+<hr>
+<blockquote>
+<p><strong>下一节预告:</strong> 为了解决 BST 退化成链表的问题，<strong>AVL 树</strong>引入了”旋转”机制——每次插入或删除后检查平衡，如果左右子树高度差超过 1，就通过左旋&#x2F;右旋调整。它是第一个真正意义上的自平衡二叉搜索树。</p>
+</blockquote>
+
+    </div>
+
+    
+    
+    
+
+    <footer class="post-footer">
+          
+
+<div class="post-copyright">
+<ul>
+  <li class="post-copyright-author">
+      <strong>本文作者： </strong>陌忆
+  </li>
+  <li class="post-copyright-link">
+      <strong>本文链接：</strong>
+      <a href="https://moyi-math.github.io/2026/07/29/Hello%E7%AE%97%E6%B3%95-7.2-%E4%BA%8C%E5%8F%89%E6%90%9C%E7%B4%A2%E6%A0%91%EF%BC%9A%E4%BA%8C%E5%88%86%E6%9F%A5%E6%89%BE%E7%9A%84%E6%A0%91%E5%BD%A2%E5%AE%9E%E7%8E%B0/" title="Hello算法 学习笔记 · 7.2 二叉搜索树：二分查找的树形实现">https://moyi-math.github.io/2026/07/29/Hello算法-7.2-二叉搜索树：二分查找的树形实现/</a>
+  </li>
+  <li class="post-copyright-license">
+      <strong>版权声明： </strong>本博客所有文章除特别声明外，均采用 <a href="https://creativecommons.org/licenses/by-nc-sa/4.0/" rel="noopener" target="_blank"><i class="fab fa-fw fa-creative-commons"></i>BY-NC-SA</a> 许可协议。转载请注明出处！
+  </li>
+</ul>
+</div>
+
+          <div class="post-tags">
+              <a href="/tags/%E7%AE%97%E6%B3%95/" rel="tag"># 算法</a>
+              <a href="/tags/%E6%95%B0%E6%8D%AE%E7%BB%93%E6%9E%84/" rel="tag"># 数据结构</a>
+              <a href="/tags/Python/" rel="tag"># Python</a>
+              <a href="/tags/O-log-n/" rel="tag"># O(log n)</a>
+              <a href="/tags/%E4%BA%8C%E5%8F%89%E6%A0%91/" rel="tag"># 二叉树</a>
+              <a href="/tags/%E4%BA%8C%E5%8F%89%E6%90%9C%E7%B4%A2%E6%A0%91/" rel="tag"># 二叉搜索树</a>
+              <a href="/tags/BST/" rel="tag"># BST</a>
+              <a href="/tags/%E4%BA%8C%E5%88%86%E6%9F%A5%E6%89%BE/" rel="tag"># 二分查找</a>
+              <a href="/tags/%E5%88%A0%E9%99%A4%E8%8A%82%E7%82%B9/" rel="tag"># 删除节点</a>
+          </div>
+
+        
+
+          <div class="post-nav">
+            <div class="post-nav-item">
+                <a href="/2026/07/29/Coding-Agent-5-%E8%87%AA%E5%8A%A8%E5%8E%8B%E7%BC%A9%E4%B8%8E%E4%B8%8A%E4%B8%8B%E6%96%87%E7%AE%A1%E7%90%86/" rel="prev" title="入门 Coding Agent（五）：当对话撑满时——自动压缩机制与上下文管理">
+                  <i class="fa fa-angle-left"></i> 入门 Coding Agent（五）：当对话撑满时——自动压缩机制与上下文管理
+                </a>
+            </div>
+            <div class="post-nav-item">
+                <a href="/2026/07/29/Hello%E7%AE%97%E6%B3%95-7.1-%E4%BA%8C%E5%8F%89%E6%A0%91%EF%BC%9A%E4%B8%80%E5%AF%B9%E5%A4%9A%E7%9A%84%E5%B1%82%E6%AC%A1%E7%BB%93%E6%9E%84/" rel="next" title="Hello算法 学习笔记 · 7.1 二叉树：一对多的层次结构">
+                  Hello算法 学习笔记 · 7.1 二叉树：一对多的层次结构 <i class="fa fa-angle-right"></i>
+                </a>
+            </div>
+          </div>
+    </footer>
+  </article>
+</div>
+
+
+
+
+
+
+</div>
+  </main>
+
+  <footer class="footer">
+    <div class="footer-inner">
+
+  <div class="copyright">
+    &copy; 
+    <span itemprop="copyrightYear">2026</span>
+    <span class="with-love">
+      <i class="fab fa-osi"></i>
+    </span>
+    <span class="author" itemprop="copyrightHolder">陌忆</span>
+  </div>
+<div class="wordcount">
+  <span class="post-meta-item">
+    <span class="post-meta-item-icon">
+      <i class="fa fa-chart-line"></i>
+    </span>
+    <span title="站点总字数">106k</span>
+  </span>
+  <span class="post-meta-item">
+    <span class="post-meta-item-icon">
+      <i class="fa fa-coffee"></i>
+    </span>
+    <span title="站点阅读时长">6:24</span>
+  </span>
+</div>
+  <div class="powered-by">由 <a href="https://hexo.io/" rel="noopener" target="_blank">Hexo</a> & <a href="https://theme-next.js.org/" rel="noopener" target="_blank">NexT.Gemini</a> 强力驱动
+  </div>
+
+    </div>
+  </footer>
+
+  
+  <div class="toggle sidebar-toggle" role="button">
+    <span class="toggle-line"></span>
+    <span class="toggle-line"></span>
+    <span class="toggle-line"></span>
+  </div>
+  <div class="sidebar-dimmer"></div>
+  <div class="back-to-top" role="button" aria-label="返回顶部">
+    <i class="fa fa-arrow-up fa-lg"></i>
+    <span>0%</span>
+  </div>
+
+<noscript>
+  <div class="noscript-warning">Theme NexT works best with JavaScript enabled</div>
+</noscript>
+<!-- Site running time -->
+<span id="timeDate" aria-live="off"></span>
+<script>
+(function() {
+  var start = new Date("2022-11-17T08:00:00+08:00");
+  function pad(n) { return n < 10 ? "0" + n : "" + n; }
+  function tick() {
+    var diff = Date.now() - start.getTime();
+    if (diff < 0) return;
+    var d = Math.floor(diff / 86400000);
+    var h = Math.floor((diff % 86400000) / 3600000);
+    var m = Math.floor((diff % 3600000) / 60000);
+    var timeDate = document.getElementById("timeDate");
+    if (!timeDate) return;
+    timeDate.textContent =
+      "\u672C\u7AD9\u5DF2\u5B89\u5168\u8FD0\u884C " + d + " \u5929 " + pad(h) + " \u5C0F\u65F6 " + pad(m) + " \u5206";
+  }
+  tick();
+  setInterval(tick, 60000);
+})();
+</script>
+
+</body>
+</html>

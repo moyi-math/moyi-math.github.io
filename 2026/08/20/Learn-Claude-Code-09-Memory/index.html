@@ -1,0 +1,676 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width">
+<meta name="theme-color" content="#222" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#222" media="(prefers-color-scheme: dark)"><meta name="generator" content="Hexo 7.3.0">
+<link rel="preconnect" href="https://cdnjs.cloudflare.com" crossorigin>
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon-next.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32-next.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next.png">
+  <link rel="mask-icon" href="/images/logo.svg" color="#222">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/7.0.0/css/all.min.css" integrity="sha256-VHqXKFhhMxcpubYf9xiWdCiojEbY9NexQ4jh8AxbvcM=" crossorigin="anonymous">
+
+<script class="next-config" data-name="main" type="application/json">{"hostname":"moyi-math.github.io","root":"/","images":"/images","scheme":"Gemini","darkmode":true,"version":"8.28.0","exturl":false,"sidebar":{"position":"left","width_expanded":320,"width_dual_column":240,"display":"post","padding":18,"offset":12},"hljswrap":true,"codeblock":{"theme":{"light":"default","dark":"stackoverflow-dark"},"prism":{"light":"prism","dark":"prism-dark"},"copy_button":{"enable":true,"style":null},"fold":{"enable":false,"height":500},"language":false},"bookmark":{"enable":false,"color":"#222","save":"auto"},"mediumzoom":false,"lazyload":true,"pangu":false,"comments":{"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},"stickytabs":false,"motion":{"enable":false,"async":false,"duration":200,"transition":{"menu_item":"fadeInDown","post_block":"fadeIn","post_header":"fadeInDown","post_body":"fadeInDown","coll_header":"fadeInLeft","sidebar":"fadeInUp"}},"prism":false,"i18n":{"placeholder":"搜索...","empty":"没有找到任何搜索结果：${query}","hits_time":"找到 ${hits} 个搜索结果（用时 ${time} 毫秒）","hits":"找到 ${hits} 个搜索结果"},"path":"/search.json","localsearch":{"enable":true,"top_n_per_article":1,"unescape":false,"preload":false}}</script><script src="/js/config.js" defer></script>
+
+    <meta name="description" content="从有损上下文压缩出发，拆解长期记忆的文件存储、相关召回、自动提取和周期巩固，并讨论冲突、隐私与遗忘机制。">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Learn Claude Code 09：Memory——让重要信息跨越压缩与会话">
+<meta property="og:url" content="https://moyi-math.github.io/2026/08/20/Learn-Claude-Code-09-Memory/index.html">
+<meta property="og:site_name" content="陌忆的博客">
+<meta property="og:description" content="从有损上下文压缩出发，拆解长期记忆的文件存储、相关召回、自动提取和周期巩固，并讨论冲突、隐私与遗忘机制。">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:image" content="https://moyi-math.github.io/images/background.webp">
+<meta property="article:published_time" content="2026-08-20T03:20:00.000Z">
+<meta property="article:modified_time" content="2026-08-20T14:47:37.219Z">
+<meta property="article:author" content="陌忆">
+<meta property="article:tag" content="Agent">
+<meta property="article:tag" content="Claude Code">
+<meta property="article:tag" content="Memory">
+<meta property="article:tag" content="Context Engineering">
+<meta property="article:tag" content="Long-Term Memory">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:image" content="https://moyi-math.github.io/images/background.webp">
+
+
+<link rel="canonical" href="https://moyi-math.github.io/2026/08/20/Learn-Claude-Code-09-Memory/">
+
+
+<script class="next-config" data-name="page" type="application/json">{"sidebar":"","isHome":false,"isPost":true,"lang":"zh-CN","comments":true,"permalink":"https://moyi-math.github.io/2026/08/20/Learn-Claude-Code-09-Memory/","path":"2026/08/20/Learn-Claude-Code-09-Memory/","title":"Learn Claude Code 09：Memory——让重要信息跨越压缩与会话"}</script>
+
+<script class="next-config" data-name="calendar" type="application/json">""</script>
+<title>Learn Claude Code 09：Memory——让重要信息跨越压缩与会话 | 陌忆的博客</title>
+  
+
+
+
+
+
+
+
+
+  
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/animejs/3.2.1/anime.min.js" integrity="sha256-XL2inqUJaslATFnHdJOi9GfQ60on8Wx1C2H8DYiN1xY=" crossorigin="anonymous" defer></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/lozad.js/1.16.0/lozad.min.js" integrity="sha256-mOFREFhqmHeQbXpK2lp4nA3qooVgACfh88fpJftLBbc=" crossorigin="anonymous" defer></script>
+<script src="/js/utils.js" defer></script><script src="/js/sidebar.js" defer></script><script src="/js/next-boot.js" defer></script>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/hexo-generator-searchdb/1.5.0/search.js" integrity="sha256-xFC6PJ82SL9b3WkGjFavNiA9gm5z6UBxWPiu4CYjptg=" crossorigin="anonymous" defer></script>
+<script src="/js/third-party/search/local-search.js" defer></script>
+
+
+
+
+
+
+
+  
+
+
+
+
+  
+
+  <script class="next-config" data-name="enableMath" type="application/json">false</script><link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/katex.min.css" integrity="sha256-UF1fgpAiu3tPJN/uCqEUHNe7pnr+QR0SQDNfgglgtcM=" crossorigin="anonymous">
+
+
+<link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
+
+
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"WebSite","name":"陌忆的博客","url":"https://moyi-math.github.io","description":"记录 RAG、Agent、MCP、算法与软件工程实践，按专栏整理可复用的技术笔记。","inLanguage":"zh-CN","author":{"@type":"Person","name":"陌忆"}}</script>
+
+
+
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"Article","headline":"Learn Claude Code 09：Memory——让重要信息跨越压缩与会话","description":"从有损上下文压缩出发，拆解长期记忆的文件存储、相关召回、自动提取和周期巩固，并讨论冲突、隐私与遗忘机制。","datePublished":"2026-08-20T03:20:00.000Z","dateModified":"2026-08-20T14:47:37.219Z","inLanguage":"zh-CN","mainEntityOfPage":{"@type":"WebPage","@id":"https://moyi-math.github.io/2026/08/20/Learn-Claude-Code-09-Memory/index.html"},"author":{"@type":"Person","name":"陌忆"}}</script>
+<meta name="author" content="陌忆">
+
+
+  <noscript>
+    <link rel="stylesheet" href="/css/noscript.css">
+  </noscript>
+<!-- hexo injector head_end start --><link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/katex.min.css" integrity="sha512-fHwaWebuwA7NSF5Qg/af4UeDx9XqUpYpOGgubo3yWu+b2IQR4UeQwbb42Ti7gVAjNtVoI/I9TEoYeu9omwcC6g==" crossorigin="anonymous" referrerpolicy="no-referrer" /><!-- hexo injector head_end end --><link rel="alternate" href="/atom.xml" title="陌忆的博客" type="application/atom+xml">
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage">
+  <div class="headband"></div>
+
+  <main class="main">
+    <div class="column">
+      <header class="header" itemscope itemtype="http://schema.org/WPHeader"><div class="site-brand-container">
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="切换导航栏" role="button">
+        <span class="toggle-line"></span>
+        <span class="toggle-line"></span>
+        <span class="toggle-line"></span>
+    </div>
+  </div>
+
+  <div class="site-meta">
+
+    <a href="/" class="brand" rel="start">
+      <i class="logo-line"></i>
+      <p class="site-title">陌忆的博客</p>
+      <i class="logo-line"></i>
+    </a>
+      <p class="site-subtitle" itemprop="description">数据库无法得出结论</p>
+  </div>
+
+  <div class="site-nav-right">
+    <div class="toggle popup-trigger" aria-label="搜索" role="button">
+        <i class="fa fa-search fa-fw fa-lg"></i>
+    </div>
+  </div>
+</div>
+
+
+
+<nav class="site-nav">
+  <ul class="main-menu menu"><li class="menu-item menu-item-home"><a href="/" rel="section"><i class="fa fa-home fa-fw"></i>首页</a></li><li class="menu-item menu-item-about"><a href="/about/" rel="section"><i class="fa fa-user fa-fw"></i>关于</a></li><li class="menu-item menu-item-tags"><a href="/tags/" rel="section"><i class="fa fa-tags fa-fw"></i>标签</a></li><li class="menu-item menu-item-categories"><a href="/categories/" rel="section"><i class="fa fa-th fa-fw"></i>分类</a></li><li class="menu-item menu-item-archives"><a href="/archives/" rel="section"><i class="fa fa-archive fa-fw"></i>归档</a></li>
+      <li class="menu-item menu-item-search">
+        <a role="button" class="popup-trigger"><i class="fa fa-search fa-fw"></i>搜索
+        </a>
+      </li>
+  </ul>
+</nav>
+
+
+
+  <div class="search-pop-overlay">
+    <div class="popup search-popup">
+      <div class="search-header">
+        <span class="search-icon">
+          <i class="fa fa-search"></i>
+        </span>
+        <div class="search-input-container">
+          <input autocomplete="off" autocapitalize="off" maxlength="80"
+                placeholder="搜索..." spellcheck="false"
+                type="search" class="search-input">
+        </div>
+        <span class="popup-btn-close" role="button">
+          <i class="fa fa-times-circle"></i>
+        </span>
+      </div>
+      <div class="search-result-container">
+        <div class="search-result-icon">
+          <i class="fa fa-spinner fa-pulse fa-5x"></i>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</header>
+        
+  
+  <aside class="sidebar">
+
+    <div class="sidebar-inner sidebar-nav-active sidebar-toc-active">
+      <ul class="sidebar-nav">
+        <li class="sidebar-nav-toc">
+          文章目录
+        </li>
+        <li class="sidebar-nav-overview">
+          站点概览
+        </li>
+      </ul>
+
+      <div class="sidebar-panel-container">
+        <!--noindex-->
+        <div class="post-toc-wrap sidebar-panel">
+            <div class="post-toc animated"><ol class="nav"><li class="nav-item nav-level-2"><a class="nav-link" href="#%E4%B8%80%E3%80%81%E5%8E%8B%E7%BC%A9%E8%A7%A3%E5%86%B3%E7%A9%BA%E9%97%B4%EF%BC%8C%E5%8D%B4%E4%B8%8D%E8%83%BD%E4%BF%9D%E8%AF%81%E7%BB%86%E8%8A%82"><span class="nav-text">一、压缩解决空间，却不能保证细节</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E4%BA%8C%E3%80%81%E8%AE%B0%E5%BF%86%E7%B3%BB%E7%BB%9F%E4%B8%8D%E6%98%AF%E2%80%9C%E6%8A%8A%E6%89%80%E6%9C%89%E8%81%8A%E5%A4%A9%E5%AD%98%E4%B8%8B%E6%9D%A5%E2%80%9D"><span class="nav-text">二、记忆系统不是“把所有聊天存下来”</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E4%B8%89%E3%80%81%E5%9B%9B%E7%B1%BB%E8%AE%B0%E5%BF%86%E5%9B%9E%E7%AD%94%E4%B8%8D%E5%90%8C%E9%97%AE%E9%A2%98"><span class="nav-text">三、四类记忆回答不同问题</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%9B%9B%E3%80%81%E6%9C%80%E5%B0%8F%E5%AD%98%E5%82%A8%EF%BC%9AMarkdown-%E6%96%87%E4%BB%B6%E5%8A%A0%E7%B4%A2%E5%BC%95"><span class="nav-text">四、最小存储：Markdown 文件加索引</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E4%BA%94%E3%80%81%E5%86%99%E5%85%A5%E6%97%B6%E5%85%88%E8%A7%84%E8%8C%83%E5%8C%96%EF%BC%8C%E5%86%8D%E5%8E%9F%E5%AD%90%E6%9B%B4%E6%96%B0%E7%B4%A2%E5%BC%95"><span class="nav-text">五、写入时先规范化，再原子更新索引</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%85%AD%E3%80%81%E5%8F%AC%E5%9B%9E%E9%87%87%E7%94%A8%E2%80%9C%E4%BE%BF%E5%AE%9C%E7%9B%AE%E5%BD%95-%E7%B2%BE%E7%A1%AE%E9%80%89%E6%8B%A9%E2%80%9D"><span class="nav-text">六、召回采用“便宜目录 + 精确选择”</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E4%B8%83%E3%80%81%E5%8F%AC%E5%9B%9E%E9%9C%80%E8%A6%81%E5%8F%8C%E9%87%8D%E9%A2%84%E7%AE%97"><span class="nav-text">七、召回需要双重预算</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%85%AB%E3%80%81%E4%BB%80%E4%B9%88%E6%97%B6%E5%80%99%E5%86%99%E5%85%A5%E6%96%B0%E8%AE%B0%E5%BF%86"><span class="nav-text">八、什么时候写入新记忆</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E4%B9%9D%E3%80%81%E4%BB%80%E4%B9%88%E4%B8%8D%E5%BA%94%E8%AF%A5%E8%87%AA%E5%8A%A8%E8%AE%B0%E4%BD%8F"><span class="nav-text">九、什么不应该自动记住</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%8D%81%E3%80%81%E9%87%8D%E5%A4%8D%E3%80%81%E5%86%B2%E7%AA%81%E4%B8%8E%E8%BF%87%E6%9C%9F%E6%80%8E%E6%A0%B7%E5%A4%84%E7%90%86"><span class="nav-text">十、重复、冲突与过期怎样处理</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%8D%81%E4%B8%80%E3%80%81%E4%BD%8E%E9%A2%91%E5%B7%A9%E5%9B%BA%EF%BC%9A%E8%AE%A9%E8%AE%B0%E5%BF%86%E5%BA%93%E4%BF%9D%E6%8C%81%E5%8F%AF%E7%94%A8"><span class="nav-text">十一、低频巩固：让记忆库保持可用</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%8D%81%E4%BA%8C%E3%80%81User-Memory-%E4%B8%8E-Session-Memory"><span class="nav-text">十二、User Memory 与 Session Memory</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%8D%81%E4%B8%89%E3%80%81%E5%BC%82%E6%AD%A5%E9%A2%84%E5%8F%96%E4%B8%8E%E6%8F%90%E5%8F%96%E4%B8%8D%E8%A6%81%E6%8B%96%E6%85%A2%E4%B8%BB%E6%B5%81%E7%A8%8B"><span class="nav-text">十三、异步预取与提取不要拖慢主流程</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%8D%81%E5%9B%9B%E3%80%81%E5%A6%82%E4%BD%95%E9%AA%8C%E8%AF%81%E4%B8%80%E4%B8%AA-Memory-%E7%B3%BB%E7%BB%9F"><span class="nav-text">十四、如何验证一个 Memory 系统</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%8D%81%E4%BA%94%E3%80%81%E8%BF%99%E4%B8%80%E7%AF%87%E7%9C%9F%E6%AD%A3%E9%9C%80%E8%A6%81%E8%AE%B0%E4%BD%8F%E4%BB%80%E4%B9%88"><span class="nav-text">十五、这一篇真正需要记住什么</span></a></li></ol></div>
+        </div>
+        <!--/noindex-->
+
+        <div class="site-overview-wrap sidebar-panel">
+          <div class="site-author animated" itemprop="author" itemscope itemtype="http://schema.org/Person">
+    <img class="site-author-image" itemprop="image" alt="陌忆"
+      src="/images/avatar.webp">
+  <p class="site-author-name" itemprop="name">陌忆</p>
+  <div class="site-description" itemprop="description">记录 RAG、Agent、MCP、算法与软件工程实践，按专栏整理可复用的技术笔记。</div>
+</div>
+<div class="site-state-wrap animated">
+  <nav class="site-state">
+      <div class="site-state-item site-state-posts">
+        <a href="/archives/">
+          <span class="site-state-item-count">50</span>
+          <span class="site-state-item-name">日志</span>
+        </a>
+      </div>
+      <div class="site-state-item site-state-categories">
+          <a href="/categories/">
+        <span class="site-state-item-count">10</span>
+        <span class="site-state-item-name">分类</span></a>
+      </div>
+      <div class="site-state-item site-state-tags">
+          <a href="/tags/">
+        <span class="site-state-item-count">172</span>
+        <span class="site-state-item-name">标签</span></a>
+      </div>
+  </nav>
+</div>
+  <div class="links-of-author animated">
+      <span class="links-of-author-item">
+        <a href="https://github.com/moyi-math" title="GitHub → https:&#x2F;&#x2F;github.com&#x2F;moyi-math" rel="noopener me" target="_blank"><i class="fab fa-github fa-fw"></i>GitHub</a>
+      </span>
+  </div>
+  <div class="cc-license animated" itemprop="license">
+    <a href="https://creativecommons.org/licenses/by-nc-sa/4.0/" class="cc-opacity" rel="noopener" target="_blank"><img src="https://cdnjs.cloudflare.com/ajax/libs/creativecommons-vocabulary/2020.11.3/assets/license_badges/small/by_nc_sa.svg" alt="Creative Commons"></a>
+  </div>
+
+        </div>
+      </div>
+    </div>
+
+    
+  </aside>
+
+
+    </div>
+
+    <div class="main-inner post posts-expand">
+
+
+  
+
+
+<div class="post-block">
+  
+  
+
+  <article itemscope itemtype="http://schema.org/Article" class="post-content" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="https://moyi-math.github.io/2026/08/20/Learn-Claude-Code-09-Memory/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.webp">
+      <meta itemprop="name" content="陌忆">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="陌忆的博客">
+      <meta itemprop="description" content="记录 RAG、Agent、MCP、算法与软件工程实践，按专栏整理可复用的技术笔记。">
+    </span>
+
+    <span hidden itemprop="post" itemscope itemtype="http://schema.org/CreativeWork">
+      <meta itemprop="name" content="Learn Claude Code 09：Memory——让重要信息跨越压缩与会话 | 陌忆的博客">
+      <meta itemprop="description" content="从有损上下文压缩出发，拆解长期记忆的文件存储、相关召回、自动提取和周期巩固，并讨论冲突、隐私与遗忘机制。">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          Learn Claude Code 09：Memory——让重要信息跨越压缩与会话
+        </h1>
+
+        <div class="post-meta-container">
+          <div class="post-meta">
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-calendar"></i>
+      </span>
+      <span class="post-meta-item-text">发表于</span>
+      
+
+      <time title="创建时间：2026-08-20 11:20:00 / 修改时间：22:47:37" itemprop="dateCreated datePublished" datetime="2026-08-20T11:20:00+08:00">2026-08-20</time>
+    </span>
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-folder"></i>
+      </span>
+      <span class="post-meta-item-text">分类于</span>
+        <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+          <a href="/categories/Learn-Claude-Code/" itemprop="url" rel="index"><span itemprop="name">Learn Claude Code</span></a>
+        </span>
+    </span>
+
+  
+    <span class="post-meta-break"></span>
+    <span class="post-meta-item" title="本文字数">
+      <span class="post-meta-item-icon">
+        <i class="far fa-file-word"></i>
+      </span>
+      <span class="post-meta-item-text">本文字数：</span>
+      <span>3.3k</span>
+    </span>
+    <span class="post-meta-item" title="阅读时长">
+      <span class="post-meta-item-icon">
+        <i class="far fa-clock"></i>
+      </span>
+      <span class="post-meta-item-text">阅读时长 &asymp;</span>
+      <span>12 分钟</span>
+    </span>
+</div>
+
+            <div class="post-description">从有损上下文压缩出发，拆解长期记忆的文件存储、相关召回、自动提取和周期巩固，并讨论冲突、隐私与遗忘机制。</div>
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody"><span id="more"></span>
+
+<blockquote>
+<p><strong>系列定位：</strong> Context Compact 能让当前会话继续运行，但摘要是有损的，而且会话结束后连摘要也会消失。本文增加一层独立于消息历史的持久化 Memory，让稳定偏好、项目事实和反复验证过的经验能够跨压缩、跨会话被重新召回。</p>
+</blockquote>
+<h2 id="一、压缩解决空间，却不能保证细节"><a href="#一、压缩解决空间，却不能保证细节" class="headerlink" title="一、压缩解决空间，却不能保证细节"></a>一、压缩解决空间，却不能保证细节</h2><p>用户明确说过：</p>
+<blockquote>
+<p>这个项目的缩进必须使用 Tab，不要替换成空格。</p>
+</blockquote>
+<p>经过几次上下文压缩后，它可能被摘要成“用户有代码风格偏好”。大方向还在，真正需要执行的细节却丢了。新开一个会话后，连这句模糊摘要也不存在。</p>
+<p>原因在于 LLM 本身没有持久状态：</p>
+<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">当前上下文：精确，但容量有限</span><br><span class="line">压缩摘要：更小，但有损</span><br><span class="line">新会话：默认没有旧上下文</span><br></pre></td></tr></table></figure>
+
+<p>Memory 的作用，是在这三者之外维护一个可持久化、可检索、可更新的信息层。它不替代上下文窗口，而是在需要时把少量相关事实重新带回窗口。</p>
+<h2 id="二、记忆系统不是“把所有聊天存下来”"><a href="#二、记忆系统不是“把所有聊天存下来”" class="headerlink" title="二、记忆系统不是“把所有聊天存下来”"></a>二、记忆系统不是“把所有聊天存下来”</h2><p>原始对话归档与 Agent Memory 的目标不同：</p>
+<table>
+<thead>
+<tr>
+<th>机制</th>
+<th>保存什么</th>
+<th>主要用途</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Transcript</td>
+<td>完整历史，尽量不改写</td>
+<td>审计、回放、人工排查</td>
+</tr>
+<tr>
+<td>Compact Summary</td>
+<td>当前任务继续所需的短状态</td>
+<td>同一会话续接</td>
+</tr>
+<tr>
+<td>Long-Term Memory</td>
+<td>跨会话仍有价值的精选信息</td>
+<td>个性化与经验复用</td>
+</tr>
+</tbody></table>
+<p>如果把每一句对话都写进 Memory，召回时会充满噪声，隐私风险和维护成本也会持续增长。记忆系统的难点从来不是“如何保存文本”，而是四个判断：</p>
+<ol>
+<li>什么值得记；</li>
+<li>当前任务需要想起什么；</li>
+<li>新信息与旧记忆冲突时怎么办；</li>
+<li>什么时候合并、更新或删除。</li>
+</ol>
+<h2 id="三、四类记忆回答不同问题"><a href="#三、四类记忆回答不同问题" class="headerlink" title="三、四类记忆回答不同问题"></a>三、四类记忆回答不同问题</h2><p>一个实用的分类可以包含：</p>
+<table>
+<thead>
+<tr>
+<th>类型</th>
+<th>回答的问题</th>
+<th>示例</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>user</code></td>
+<td>用户是谁、稳定偏好是什么</td>
+<td>“Python 字符串优先使用单引号”</td>
+</tr>
+<tr>
+<td><code>feedback</code></td>
+<td>Agent 应怎样工作</td>
+<td>“不要 Mock 数据库集成测试”</td>
+</tr>
+<tr>
+<td><code>project</code></td>
+<td>项目为什么这样设计</td>
+<td>“认证重构由合规审计推动”</td>
+</tr>
+<tr>
+<td><code>reference</code></td>
+<td>重要信息在哪里</td>
+<td>“数据管线故障记录在 Linear INGEST 项目”</td>
+</tr>
+</tbody></table>
+<p>类型帮助召回和治理，但不要与其他状态混淆：</p>
+<ul>
+<li>Todo &#x2F; Plan 描述当前工作步骤；</li>
+<li>Task System 负责任务依赖、所有权和进度；</li>
+<li>Session Memory 服务同一会话的压缩续接；</li>
+<li>Long-Term Memory 保存未来会话仍可能有用的知识。</li>
+</ul>
+<p>“修复第 3 个测试”不该写入长期记忆；“该项目测试必须连接真实 PostgreSQL”则可能值得保留。</p>
+<h2 id="四、最小存储：Markdown-文件加索引"><a href="#四、最小存储：Markdown-文件加索引" class="headerlink" title="四、最小存储：Markdown 文件加索引"></a>四、最小存储：Markdown 文件加索引</h2><p>每条记忆可以是一个带 Front Matter 的 Markdown 文件：</p>
+<figure class="highlight markdown"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br></pre></td><td class="code"><pre><span class="line">---</span><br><span class="line">name: python-indentation-tabs</span><br><span class="line">description: Python files in this project must use tabs for indentation</span><br><span class="line">type: project</span><br><span class="line">updated<span class="emphasis">_at: 2026-08-20T11:20:00+08:00</span></span><br><span class="line"><span class="emphasis">source: explicit-user-instruction</span></span><br><span class="line"><span class="emphasis">---</span></span><br><span class="line"><span class="emphasis"></span></span><br><span class="line"><span class="emphasis">Use tabs, not spaces, when writing or editing Python files.</span></span><br><span class="line"><span class="emphasis"></span></span><br><span class="line"><span class="emphasis">Why: this repository enforces tabs in its formatter configuration.</span></span><br><span class="line"><span class="emphasis">How to apply: inspect existing files and preserve tab indentation.</span></span><br></pre></td></tr></table></figure>
+
+<p>目录中再维护一份轻量索引：</p>
+<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line">.memory/</span><br><span class="line">├── MEMORY.md</span><br><span class="line">├── python-indentation-tabs.md</span><br><span class="line">├── database-test-policy.md</span><br><span class="line">└── auth-rewrite-background.md</span><br></pre></td></tr></table></figure>
+
+<p><code>MEMORY.md</code> 只列名称和描述：</p>
+<figure class="highlight markdown"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line"><span class="bullet">-</span> [<span class="string">python-indentation-tabs</span>](<span class="link">python-indentation-tabs.md</span>) — Python files must use tabs</span><br><span class="line"><span class="bullet">-</span> [<span class="string">database-test-policy</span>](<span class="link">database-test-policy.md</span>) — Integration tests use real PostgreSQL</span><br></pre></td></tr></table></figure>
+
+<p>这个结构延续了 Skills 的渐进式披露：索引体积小，可以常驻；完整记忆只在当前任务相关时加载。</p>
+<h2 id="五、写入时先规范化，再原子更新索引"><a href="#五、写入时先规范化，再原子更新索引" class="headerlink" title="五、写入时先规范化，再原子更新索引"></a>五、写入时先规范化，再原子更新索引</h2><p>文件名不能直接使用模型生成的名称，需要生成安全 Slug 并限制最终路径：</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">import</span> re</span><br><span class="line"><span class="keyword">from</span> pathlib <span class="keyword">import</span> Path</span><br><span class="line"></span><br><span class="line">MEMORY_DIR = Path(<span class="string">&quot;.memory&quot;</span>).resolve()</span><br><span class="line"></span><br><span class="line"></span><br><span class="line"><span class="keyword">def</span> <span class="title function_">safe_slug</span>(<span class="params">name: <span class="built_in">str</span></span>) -&gt; <span class="built_in">str</span>:</span><br><span class="line">    slug = re.sub(<span class="string">r&quot;[^a-z0-9-]+&quot;</span>, <span class="string">&quot;-&quot;</span>, name.lower()).strip(<span class="string">&quot;-&quot;</span>)</span><br><span class="line">    <span class="keyword">if</span> <span class="keyword">not</span> slug:</span><br><span class="line">        <span class="keyword">raise</span> ValueError(<span class="string">&quot;Memory name cannot produce an empty slug&quot;</span>)</span><br><span class="line">    <span class="keyword">return</span> slug[:<span class="number">80</span>]</span><br><span class="line"></span><br><span class="line"></span><br><span class="line"><span class="keyword">def</span> <span class="title function_">memory_path</span>(<span class="params">name: <span class="built_in">str</span></span>) -&gt; Path:</span><br><span class="line">    target = (MEMORY_DIR / <span class="string">f&quot;<span class="subst">&#123;safe_slug(name)&#125;</span>.md&quot;</span>).resolve()</span><br><span class="line">    <span class="keyword">if</span> target.parent != MEMORY_DIR:</span><br><span class="line">        <span class="keyword">raise</span> ValueError(<span class="string">&quot;Memory path escapes memory directory&quot;</span>)</span><br><span class="line">    <span class="keyword">return</span> target</span><br></pre></td></tr></table></figure>
+
+<p>写入流程最好是：</p>
+<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line">校验类型和字段</span><br><span class="line">    ↓</span><br><span class="line">判断同名 / 同义记忆是否已存在</span><br><span class="line">    ↓</span><br><span class="line">写入临时文件并原子替换目标</span><br><span class="line">    ↓</span><br><span class="line">在锁内重建 MEMORY.md</span><br></pre></td></tr></table></figure>
+
+<p>如果多个 Agent 或进程可能同时写入，仅靠“写完后重建索引”会丢更新。应使用文件锁、版本号或事务存储；索引可以重建，但记忆文件本身的并发覆盖必须避免。</p>
+<h2 id="六、召回采用“便宜目录-精确选择”"><a href="#六、召回采用“便宜目录-精确选择”" class="headerlink" title="六、召回采用“便宜目录 + 精确选择”"></a>六、召回采用“便宜目录 + 精确选择”</h2><p>每轮把所有记忆全文塞进 Prompt，会让 Memory 再次变成上下文负担。更合理的召回流程是：</p>
+<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br></pre></td><td class="code"><pre><span class="line">当前问题 + 最近对话</span><br><span class="line">        ↓</span><br><span class="line">扫描记忆目录的 name / description</span><br><span class="line">        ↓</span><br><span class="line">相关性选择器挑选最多 N 条</span><br><span class="line">        ↓</span><br><span class="line">读取被选中的完整 Markdown</span><br><span class="line">        ↓</span><br><span class="line">按总预算注入当前上下文</span><br></pre></td></tr></table></figure>
+
+<p>选择器可以是一次轻量 LLM side-query：</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">def</span> <span class="title function_">select_relevant_memories</span>(<span class="params"></span></span><br><span class="line"><span class="params">    recent_context: <span class="built_in">str</span>,</span></span><br><span class="line"><span class="params">    catalog: <span class="built_in">list</span>[<span class="built_in">dict</span>],</span></span><br><span class="line"><span class="params">    max_items: <span class="built_in">int</span> = <span class="number">5</span>,</span></span><br><span class="line"><span class="params"></span>) -&gt; <span class="built_in">list</span>[<span class="built_in">str</span>]:</span><br><span class="line">    prompt = build_selection_prompt(recent_context, catalog, max_items)</span><br><span class="line">    response = call_small_selection_request(prompt)</span><br><span class="line">    filenames = parse_selected_filenames(response)</span><br><span class="line"></span><br><span class="line">    allowed = &#123;item[<span class="string">&quot;filename&quot;</span>] <span class="keyword">for</span> item <span class="keyword">in</span> catalog&#125;</span><br><span class="line">    <span class="keyword">return</span> [name <span class="keyword">for</span> name <span class="keyword">in</span> filenames <span class="keyword">if</span> name <span class="keyword">in</span> allowed][:max_items]</span><br></pre></td></tr></table></figure>
+
+<p>这里要再次使用白名单：模型只能选择扫描结果中的文件名，不能借召回响应读取任意路径。</p>
+<p>Side-query 失败时可以降级为关键词匹配，但降级应偏保守。错过一条记忆通常只降低便利性，错误召回一条过期或敏感信息则可能改变行为。</p>
+<h2 id="七、召回需要双重预算"><a href="#七、召回需要双重预算" class="headerlink" title="七、召回需要双重预算"></a>七、召回需要双重预算</h2><p>限制“最多 5 条”仍不够，因为一条记忆可能非常大。应同时设置：</p>
+<ul>
+<li>单文件最大行数或字符数；</li>
+<li>单会话记忆注入总预算；</li>
+<li>单轮最大召回数量；</li>
+<li>索引本身的最大规模。</li>
+</ul>
+<p>例如：</p>
+<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line">最多召回：5 条</span><br><span class="line">单条上限：4 KB 或 200 行</span><br><span class="line">单会话总量：60 KB</span><br><span class="line">索引上限：25 KB</span><br></pre></td></tr></table></figure>
+
+<p>被截断的记忆必须显式标记，否则模型会把残缺内容当成完整规则。超出预算时，优先保留直接相关、最近更新且可信来源更高的条目。</p>
+<h2 id="八、什么时候写入新记忆"><a href="#八、什么时候写入新记忆" class="headerlink" title="八、什么时候写入新记忆"></a>八、什么时候写入新记忆</h2><p>用户明确说“记住这个”是最强信号，但稳定偏好也常出现在普通反馈里：</p>
+<blockquote>
+<p>以后别为这种测试 Mock 数据库，我们需要验证真实 SQL。</p>
+</blockquote>
+<p>可在一个 Agent Turn 正常结束后触发提取器，因为此时工具链已经结束，主线程不会与记忆写入交错：</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">if</span> <span class="keyword">not</span> tool_calls:</span><br><span class="line">    snapshot = copy_before_compaction(messages)</span><br><span class="line">    schedule_memory_extraction(snapshot)</span><br><span class="line">    <span class="keyword">return</span> final_text</span><br></pre></td></tr></table></figure>
+
+<p>从压缩前快照提取很重要：如果先生成有损摘要，再从摘要提取，细节可能已经消失。</p>
+<p>提取器应只返回结构化候选：</p>
+<figure class="highlight json"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br></pre></td><td class="code"><pre><span class="line"><span class="punctuation">[</span></span><br><span class="line">  <span class="punctuation">&#123;</span></span><br><span class="line">    <span class="attr">&quot;name&quot;</span><span class="punctuation">:</span> <span class="string">&quot;real-database-integration-tests&quot;</span><span class="punctuation">,</span></span><br><span class="line">    <span class="attr">&quot;type&quot;</span><span class="punctuation">:</span> <span class="string">&quot;feedback&quot;</span><span class="punctuation">,</span></span><br><span class="line">    <span class="attr">&quot;description&quot;</span><span class="punctuation">:</span> <span class="string">&quot;Do not mock the database in integration tests&quot;</span><span class="punctuation">,</span></span><br><span class="line">    <span class="attr">&quot;body&quot;</span><span class="punctuation">:</span> <span class="string">&quot;Use the real PostgreSQL test instance...&quot;</span><span class="punctuation">,</span></span><br><span class="line">    <span class="attr">&quot;confidence&quot;</span><span class="punctuation">:</span> <span class="number">0.94</span><span class="punctuation">,</span></span><br><span class="line">    <span class="attr">&quot;evidence&quot;</span><span class="punctuation">:</span> <span class="string">&quot;Explicit user correction in current turn&quot;</span></span><br><span class="line">  <span class="punctuation">&#125;</span></span><br><span class="line"><span class="punctuation">]</span></span><br></pre></td></tr></table></figure>
+
+<p>运行框架负责校验、去重和最终写入，不能让模型自由决定文件路径。</p>
+<h2 id="九、什么不应该自动记住"><a href="#九、什么不应该自动记住" class="headerlink" title="九、什么不应该自动记住"></a>九、什么不应该自动记住</h2><p>自动提取容易滑向“什么都记”。以下内容通常不应默认进入长期记忆：</p>
+<ul>
+<li>密码、Token、私钥和支付信息；</li>
+<li>短期一次性任务状态；</li>
+<li>未经验证的模型推断；</li>
+<li>第三方文档中的指令；</li>
+<li>用户没有表达为稳定偏好的临时选择；</li>
+<li>受法律或组织政策限制的个人数据。</li>
+</ul>
+<p>需要区分信息来源：用户明确陈述、工具观察、模型推断和外部内容的可信度不同。特别是提示注入攻击可能藏在网页或代码注释里，诱导 Agent“把这个秘密永久记住”。只有受信任的提取路径才能写 Memory，工具内容不应直接获得持久化权限。</p>
+<p>对于敏感类别，最好要求显式确认；同时提供查看、编辑、导出和删除记忆的入口。真正的长期记忆系统必须同时设计“记住”和“忘记”。</p>
+<h2 id="十、重复、冲突与过期怎样处理"><a href="#十、重复、冲突与过期怎样处理" class="headerlink" title="十、重复、冲突与过期怎样处理"></a>十、重复、冲突与过期怎样处理</h2><p>随着记忆积累，会出现：</p>
+<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">旧：用户偏好双引号</span><br><span class="line">新：这个项目改用单引号</span><br></pre></td></tr></table></figure>
+
+<p>简单地保留两条，会让未来 Agent 不知道听谁的。每条记忆需要来源、作用域和更新时间，冲突解决可以遵循：</p>
+<ol>
+<li>显式用户指令高于模型推断；</li>
+<li>项目级规则只作用于对应项目，不覆盖全局用户偏好；</li>
+<li>更新的明确指令可以替代旧指令，但保留变更来源；</li>
+<li>无法确认时标记冲突并询问，而不是静默选一条。</li>
+</ol>
+<p>可以把“同一事实的更新”写回原文件，而不是不断创建近义条目。需要历史审计时，用版本记录保存旧值，活跃索引只展示当前有效版本。</p>
+<h2 id="十一、低频巩固：让记忆库保持可用"><a href="#十一、低频巩固：让记忆库保持可用" class="headerlink" title="十一、低频巩固：让记忆库保持可用"></a>十一、低频巩固：让记忆库保持可用</h2><p>记忆文件持续增长后，需要周期性执行巩固：</p>
+<ul>
+<li>合并同义条目；</li>
+<li>解决或标记冲突；</li>
+<li>淘汰过时引用；</li>
+<li>缩短过长正文；</li>
+<li>重建索引；</li>
+<li>保留近期重要信号。</li>
+</ul>
+<p>巩固比单次写入昂贵，也可能大范围改写文件，因此不应每轮执行。可以设置多层门控：</p>
+<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line">距离上次巩固超过时间阈值？</span><br><span class="line">        ↓ 是</span><br><span class="line">是否积累了足够多的新会话或文件变化？</span><br><span class="line">        ↓ 是</span><br><span class="line">当前没有其他进程持有巩固锁？</span><br><span class="line">        ↓ 是</span><br><span class="line">启动受限的后台 Agent 执行整理</span><br></pre></td></tr></table></figure>
+
+<p>锁要有过期机制，防止进程崩溃后永远阻塞。巩固过程应先写新版本，再原子切换；若失败，旧记忆库仍然可用。</p>
+<h2 id="十二、User-Memory-与-Session-Memory"><a href="#十二、User-Memory-与-Session-Memory" class="headerlink" title="十二、User Memory 与 Session Memory"></a>十二、User Memory 与 Session Memory</h2><p>长期用户&#x2F;项目记忆和会话记忆解决不同时间尺度的问题：</p>
+<table>
+<thead>
+<tr>
+<th>维度</th>
+<th>Long-Term Memory</th>
+<th>Session Memory</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>生命周期</td>
+<td>跨会话</td>
+<td>当前会话</td>
+</tr>
+<tr>
+<td>内容</td>
+<td>稳定偏好、项目知识、长期反馈</td>
+<td>当前目标、进展、最近发现</td>
+</tr>
+<tr>
+<td>加载方式</td>
+<td>目录检索后按需注入</td>
+<td>上下文压缩时直接参与续接</td>
+</tr>
+<tr>
+<td>更新频率</td>
+<td>低，精选</td>
+<td>高，随当前任务变化</td>
+</tr>
+<tr>
+<td>遗忘策略</td>
+<td>显式删除、过期或巩固</td>
+<td>会话结束后清理</td>
+</tr>
+</tbody></table>
+<p>当 Session Memory 足够完整时，自动压缩可以先用它构建轻量摘要，减少额外 LLM 调用。Long-Term Memory 则不应该记录每轮进度，否则会把临时状态带到未来无关会话。</p>
+<h2 id="十三、异步预取与提取不要拖慢主流程"><a href="#十三、异步预取与提取不要拖慢主流程" class="headerlink" title="十三、异步预取与提取不要拖慢主流程"></a>十三、异步预取与提取不要拖慢主流程</h2><p>相关记忆选择和回合结束后的提取都会增加模型调用。如果全部同步执行，用户会在每次输入前后等待额外延迟。</p>
+<p>可采用异步策略：</p>
+<ul>
+<li>用户 Turn 开始时启动 Memory Prefetch；</li>
+<li>主 Agent 做不依赖记忆的准备工作；</li>
+<li>在真正需要组装下一次模型请求前收集结果；</li>
+<li>Turn 结束后以受限后台任务提取记忆；</li>
+<li>重叠任务设置去重与取消，避免同一 Turn 重复写入。</li>
+</ul>
+<p>异步不代表可以忽略一致性。若主 Agent 已经显式写入某条记忆，后台提取器应识别重叠并跳过，防止创建重复文件。</p>
+<h2 id="十四、如何验证一个-Memory-系统"><a href="#十四、如何验证一个-Memory-系统" class="headerlink" title="十四、如何验证一个 Memory 系统"></a>十四、如何验证一个 Memory 系统</h2><p>除了“第二个会话还能回答偏好”，还应测试：</p>
+<ol>
+<li><strong>召回精度：</strong> 相关任务能找到记忆，无关任务不会加载；</li>
+<li><strong>冲突处理：</strong> 新明确指令能更新旧值，不会同时生效；</li>
+<li><strong>作用域：</strong> 项目规则不会泄漏到另一个项目；</li>
+<li><strong>隐私：</strong> 敏感信息不会被自动提取，删除后索引与文件都消失；</li>
+<li><strong>并发：</strong> 多进程写入不会丢文件或损坏索引；</li>
+<li><strong>降级：</strong> 选择器失败时主任务仍可继续；</li>
+<li><strong>预算：</strong> 大记忆库不会无限扩大 Prompt；</li>
+<li><strong>可审计性：</strong> 能解释记忆来自哪次明确输入或验证结果。</li>
+</ol>
+<p>Memory 的质量不能只用“记住了多少”衡量。更重要的指标是：在正确时机召回正确事实，同时少打扰、少误导、可纠正。</p>
+<h2 id="十五、这一篇真正需要记住什么"><a href="#十五、这一篇真正需要记住什么" class="headerlink" title="十五、这一篇真正需要记住什么"></a>十五、这一篇真正需要记住什么</h2><ol>
+<li><strong>Memory 是独立于消息历史的持久层。</strong> 它让精选信息跨越压缩和新会话。</li>
+<li><strong>不要保存全部对话。</strong> Transcript、会话摘要和长期记忆承担不同职责。</li>
+<li><strong>完整系统包含存储、召回、提取和巩固。</strong> 少任何一环都会随时间退化。</li>
+<li><strong>索引常驻，正文按需加载。</strong> 同时限制条数、单文件和会话总预算。</li>
+<li><strong>写入需要证据、作用域与可信来源。</strong> 模型推断和外部内容不能轻易变成长期事实。</li>
+<li><strong>冲突不能静默解决。</strong> 结合来源、更新时间和作用域更新，必要时询问用户。</li>
+<li><strong>记忆必须允许遗忘。</strong> 查看、编辑、删除、过期和隐私治理是核心能力。</li>
+<li><strong>长期记忆不等于会话记忆。</strong> 一个负责未来复用，一个负责当前任务压缩续接。</li>
+</ol>
+<p>工具、Skill、压缩和 Memory 都已具备，但如果 System Prompt 仍是一段不断拼接的字符串，新增任何能力都可能破坏整体结构。下一篇将进入 System Prompt 的运行时组装：按角色、环境、工具和项目生成稳定而可测试的指令层。</p>
+
+    </div>
+
+    
+    
+    
+
+    <footer class="post-footer">
+          
+
+<div class="post-copyright">
+<ul>
+  <li class="post-copyright-author">
+      <strong>本文作者： </strong>陌忆
+  </li>
+  <li class="post-copyright-link">
+      <strong>本文链接：</strong>
+      <a href="https://moyi-math.github.io/2026/08/20/Learn-Claude-Code-09-Memory/" title="Learn Claude Code 09：Memory——让重要信息跨越压缩与会话">https://moyi-math.github.io/2026/08/20/Learn-Claude-Code-09-Memory/</a>
+  </li>
+  <li class="post-copyright-license">
+      <strong>版权声明： </strong>本博客所有文章除特别声明外，均采用 <a href="https://creativecommons.org/licenses/by-nc-sa/4.0/" rel="noopener" target="_blank"><i class="fab fa-fw fa-creative-commons"></i>BY-NC-SA</a> 许可协议。转载请注明出处！
+  </li>
+</ul>
+</div>
+
+          <div class="post-tags">
+              <a href="/tags/Agent/" rel="tag"># Agent</a>
+              <a href="/tags/Claude-Code/" rel="tag"># Claude Code</a>
+              <a href="/tags/Memory/" rel="tag"># Memory</a>
+              <a href="/tags/Context-Engineering/" rel="tag"># Context Engineering</a>
+              <a href="/tags/Long-Term-Memory/" rel="tag"># Long-Term Memory</a>
+          </div>
+
+        
+
+          <div class="post-nav">
+            <div class="post-nav-item">
+                <a href="/2026/08/20/Learn-Claude-Code-08-Context-Compact/" rel="prev" title="Learn Claude Code 08：Context Compact——给长期运行的 Agent 腾出空间">
+                  <i class="fa fa-angle-left"></i> Learn Claude Code 08：Context Compact——给长期运行的 Agent 腾出空间
+                </a>
+            </div>
+            <div class="post-nav-item">
+                <a href="/2026/08/20/PostgreSQL-1-%E5%A4%9A%E8%BF%9B%E7%A8%8B%E3%80%81%E5%8F%8C%E9%87%8D%E7%BC%93%E5%AD%98%E4%B8%8EDirect-I-O/" rel="next" title="PostgreSQL 的“离谱”设计：多进程、双重缓存与 Direct I&#x2F;O">
+                  PostgreSQL 的“离谱”设计：多进程、双重缓存与 Direct I/O <i class="fa fa-angle-right"></i>
+                </a>
+            </div>
+          </div>
+    </footer>
+  </article>
+</div>
+
+
+
+
+
+
+</div>
+  </main>
+
+  <footer class="footer">
+    <div class="footer-inner">
+
+  <div class="copyright">
+    &copy; 
+    <span itemprop="copyrightYear">2026</span>
+    <span class="with-love">
+      <i class="fab fa-osi"></i>
+    </span>
+    <span class="author" itemprop="copyrightHolder">陌忆</span>
+  </div>
+<div class="wordcount">
+  <span class="post-meta-item">
+    <span class="post-meta-item-icon">
+      <i class="fa fa-chart-line"></i>
+    </span>
+    <span title="站点总字数">106k</span>
+  </span>
+  <span class="post-meta-item">
+    <span class="post-meta-item-icon">
+      <i class="fa fa-coffee"></i>
+    </span>
+    <span title="站点阅读时长">6:24</span>
+  </span>
+</div>
+  <div class="powered-by">由 <a href="https://hexo.io/" rel="noopener" target="_blank">Hexo</a> & <a href="https://theme-next.js.org/" rel="noopener" target="_blank">NexT.Gemini</a> 强力驱动
+  </div>
+
+    </div>
+  </footer>
+
+  
+  <div class="toggle sidebar-toggle" role="button">
+    <span class="toggle-line"></span>
+    <span class="toggle-line"></span>
+    <span class="toggle-line"></span>
+  </div>
+  <div class="sidebar-dimmer"></div>
+  <div class="back-to-top" role="button" aria-label="返回顶部">
+    <i class="fa fa-arrow-up fa-lg"></i>
+    <span>0%</span>
+  </div>
+
+<noscript>
+  <div class="noscript-warning">Theme NexT works best with JavaScript enabled</div>
+</noscript>
+<!-- Site running time -->
+<span id="timeDate" aria-live="off"></span>
+<script>
+(function() {
+  var start = new Date("2022-11-17T08:00:00+08:00");
+  function pad(n) { return n < 10 ? "0" + n : "" + n; }
+  function tick() {
+    var diff = Date.now() - start.getTime();
+    if (diff < 0) return;
+    var d = Math.floor(diff / 86400000);
+    var h = Math.floor((diff % 86400000) / 3600000);
+    var m = Math.floor((diff % 3600000) / 60000);
+    var timeDate = document.getElementById("timeDate");
+    if (!timeDate) return;
+    timeDate.textContent =
+      "\u672C\u7AD9\u5DF2\u5B89\u5168\u8FD0\u884C " + d + " \u5929 " + pad(h) + " \u5C0F\u65F6 " + pad(m) + " \u5206";
+  }
+  tick();
+  setInterval(tick, 60000);
+})();
+</script>
+
+</body>
+</html>

@@ -1,0 +1,512 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width">
+<meta name="theme-color" content="#222" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#222" media="(prefers-color-scheme: dark)"><meta name="generator" content="Hexo 7.3.0">
+<link rel="preconnect" href="https://cdnjs.cloudflare.com" crossorigin>
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon-next.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32-next.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next.png">
+  <link rel="mask-icon" href="/images/logo.svg" color="#222">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/7.0.0/css/all.min.css" integrity="sha256-VHqXKFhhMxcpubYf9xiWdCiojEbY9NexQ4jh8AxbvcM=" crossorigin="anonymous">
+
+<script class="next-config" data-name="main" type="application/json">{"hostname":"moyi-math.github.io","root":"/","images":"/images","scheme":"Gemini","darkmode":true,"version":"8.28.0","exturl":false,"sidebar":{"position":"left","width_expanded":320,"width_dual_column":240,"display":"post","padding":18,"offset":12},"hljswrap":true,"codeblock":{"theme":{"light":"default","dark":"stackoverflow-dark"},"prism":{"light":"prism","dark":"prism-dark"},"copy_button":{"enable":true,"style":null},"fold":{"enable":false,"height":500},"language":false},"bookmark":{"enable":false,"color":"#222","save":"auto"},"mediumzoom":false,"lazyload":true,"pangu":false,"comments":{"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},"stickytabs":false,"motion":{"enable":false,"async":false,"duration":200,"transition":{"menu_item":"fadeInDown","post_block":"fadeIn","post_header":"fadeInDown","post_body":"fadeInDown","coll_header":"fadeInLeft","sidebar":"fadeInUp"}},"prism":false,"i18n":{"placeholder":"搜索...","empty":"没有找到任何搜索结果：${query}","hits_time":"找到 ${hits} 个搜索结果（用时 ${time} 毫秒）","hits":"找到 ${hits} 个搜索结果"},"path":"/search.json","localsearch":{"enable":true,"top_n_per_article":1,"unescape":false,"preload":false}}</script><script src="/js/config.js" defer></script>
+
+    <meta name="description" content="以 Agent、Model、Environment 三个角色说明 Coding Agent 的职责边界、消息流和可替换性。">
+<meta property="og:type" content="article">
+<meta property="og:title" content="入门 Coding Agent（二）：三体架构——Agent、Model、Environment 各司其职">
+<meta property="og:url" content="https://moyi-math.github.io/2026/07/25/Coding-Agent-2-%E4%B8%89%E4%BD%93%E6%9E%B6%E6%9E%84/index.html">
+<meta property="og:site_name" content="陌忆的博客">
+<meta property="og:description" content="以 Agent、Model、Environment 三个角色说明 Coding Agent 的职责边界、消息流和可替换性。">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:image" content="https://moyi-math.github.io/images/background.webp">
+<meta property="article:published_time" content="2026-07-25T15:10:00.000Z">
+<meta property="article:modified_time" content="2026-08-20T14:47:37.218Z">
+<meta property="article:author" content="陌忆">
+<meta property="article:tag" content="Agent">
+<meta property="article:tag" content="LLM">
+<meta property="article:tag" content="Coding Agent">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:image" content="https://moyi-math.github.io/images/background.webp">
+
+
+<link rel="canonical" href="https://moyi-math.github.io/2026/07/25/Coding-Agent-2-%E4%B8%89%E4%BD%93%E6%9E%B6%E6%9E%84/">
+
+
+<script class="next-config" data-name="page" type="application/json">{"sidebar":"","isHome":false,"isPost":true,"lang":"zh-CN","comments":true,"permalink":"https://moyi-math.github.io/2026/07/25/Coding-Agent-2-%E4%B8%89%E4%BD%93%E6%9E%B6%E6%9E%84/","path":"2026/07/25/Coding-Agent-2-三体架构/","title":"入门 Coding Agent（二）：三体架构——Agent、Model、Environment 各司其职"}</script>
+
+<script class="next-config" data-name="calendar" type="application/json">""</script>
+<title>入门 Coding Agent（二）：三体架构——Agent、Model、Environment 各司其职 | 陌忆的博客</title>
+  
+
+
+
+
+
+
+
+
+  
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/animejs/3.2.1/anime.min.js" integrity="sha256-XL2inqUJaslATFnHdJOi9GfQ60on8Wx1C2H8DYiN1xY=" crossorigin="anonymous" defer></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/lozad.js/1.16.0/lozad.min.js" integrity="sha256-mOFREFhqmHeQbXpK2lp4nA3qooVgACfh88fpJftLBbc=" crossorigin="anonymous" defer></script>
+<script src="/js/utils.js" defer></script><script src="/js/sidebar.js" defer></script><script src="/js/next-boot.js" defer></script>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/hexo-generator-searchdb/1.5.0/search.js" integrity="sha256-xFC6PJ82SL9b3WkGjFavNiA9gm5z6UBxWPiu4CYjptg=" crossorigin="anonymous" defer></script>
+<script src="/js/third-party/search/local-search.js" defer></script>
+
+
+
+
+
+
+
+  
+
+
+
+
+  
+
+  <script class="next-config" data-name="enableMath" type="application/json">false</script><link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/katex.min.css" integrity="sha256-UF1fgpAiu3tPJN/uCqEUHNe7pnr+QR0SQDNfgglgtcM=" crossorigin="anonymous">
+
+
+<link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
+
+
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"WebSite","name":"陌忆的博客","url":"https://moyi-math.github.io","description":"记录 RAG、Agent、MCP、算法与软件工程实践，按专栏整理可复用的技术笔记。","inLanguage":"zh-CN","author":{"@type":"Person","name":"陌忆"}}</script>
+
+
+
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"Article","headline":"入门 Coding Agent（二）：三体架构——Agent、Model、Environment 各司其职","description":"以 Agent、Model、Environment 三个角色说明 Coding Agent 的职责边界、消息流和可替换性。","datePublished":"2026-07-25T15:10:00.000Z","dateModified":"2026-08-20T14:47:37.218Z","inLanguage":"zh-CN","mainEntityOfPage":{"@type":"WebPage","@id":"https://moyi-math.github.io/2026/07/25/Coding-Agent-2-%E4%B8%89%E4%BD%93%E6%9E%B6%E6%9E%84/index.html"},"author":{"@type":"Person","name":"陌忆"}}</script>
+<meta name="author" content="陌忆">
+
+
+  <noscript>
+    <link rel="stylesheet" href="/css/noscript.css">
+  </noscript>
+<!-- hexo injector head_end start --><link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/katex.min.css" integrity="sha512-fHwaWebuwA7NSF5Qg/af4UeDx9XqUpYpOGgubo3yWu+b2IQR4UeQwbb42Ti7gVAjNtVoI/I9TEoYeu9omwcC6g==" crossorigin="anonymous" referrerpolicy="no-referrer" /><!-- hexo injector head_end end --><link rel="alternate" href="/atom.xml" title="陌忆的博客" type="application/atom+xml">
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage">
+  <div class="headband"></div>
+
+  <main class="main">
+    <div class="column">
+      <header class="header" itemscope itemtype="http://schema.org/WPHeader"><div class="site-brand-container">
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="切换导航栏" role="button">
+        <span class="toggle-line"></span>
+        <span class="toggle-line"></span>
+        <span class="toggle-line"></span>
+    </div>
+  </div>
+
+  <div class="site-meta">
+
+    <a href="/" class="brand" rel="start">
+      <i class="logo-line"></i>
+      <p class="site-title">陌忆的博客</p>
+      <i class="logo-line"></i>
+    </a>
+      <p class="site-subtitle" itemprop="description">数据库无法得出结论</p>
+  </div>
+
+  <div class="site-nav-right">
+    <div class="toggle popup-trigger" aria-label="搜索" role="button">
+        <i class="fa fa-search fa-fw fa-lg"></i>
+    </div>
+  </div>
+</div>
+
+
+
+<nav class="site-nav">
+  <ul class="main-menu menu"><li class="menu-item menu-item-home"><a href="/" rel="section"><i class="fa fa-home fa-fw"></i>首页</a></li><li class="menu-item menu-item-about"><a href="/about/" rel="section"><i class="fa fa-user fa-fw"></i>关于</a></li><li class="menu-item menu-item-tags"><a href="/tags/" rel="section"><i class="fa fa-tags fa-fw"></i>标签</a></li><li class="menu-item menu-item-categories"><a href="/categories/" rel="section"><i class="fa fa-th fa-fw"></i>分类</a></li><li class="menu-item menu-item-archives"><a href="/archives/" rel="section"><i class="fa fa-archive fa-fw"></i>归档</a></li>
+      <li class="menu-item menu-item-search">
+        <a role="button" class="popup-trigger"><i class="fa fa-search fa-fw"></i>搜索
+        </a>
+      </li>
+  </ul>
+</nav>
+
+
+
+  <div class="search-pop-overlay">
+    <div class="popup search-popup">
+      <div class="search-header">
+        <span class="search-icon">
+          <i class="fa fa-search"></i>
+        </span>
+        <div class="search-input-container">
+          <input autocomplete="off" autocapitalize="off" maxlength="80"
+                placeholder="搜索..." spellcheck="false"
+                type="search" class="search-input">
+        </div>
+        <span class="popup-btn-close" role="button">
+          <i class="fa fa-times-circle"></i>
+        </span>
+      </div>
+      <div class="search-result-container">
+        <div class="search-result-icon">
+          <i class="fa fa-spinner fa-pulse fa-5x"></i>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</header>
+        
+  
+  <aside class="sidebar">
+
+    <div class="sidebar-inner sidebar-nav-active sidebar-toc-active">
+      <ul class="sidebar-nav">
+        <li class="sidebar-nav-toc">
+          文章目录
+        </li>
+        <li class="sidebar-nav-overview">
+          站点概览
+        </li>
+      </ul>
+
+      <div class="sidebar-panel-container">
+        <!--noindex-->
+        <div class="post-toc-wrap sidebar-panel">
+            <div class="post-toc animated"><ol class="nav"><li class="nav-item nav-level-2"><a class="nav-link" href="#%E4%B8%80%E3%80%81%E4%B8%BA%E4%BB%80%E4%B9%88%E9%9C%80%E8%A6%81%E4%B8%89%E4%B8%AA%E8%A7%92%E8%89%B2%EF%BC%9F"><span class="nav-text">一、为什么需要三个角色？</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E4%BA%8C%E3%80%81%E4%B8%89%E4%B8%AA%E8%A7%92%E8%89%B2%E7%9A%84%E5%88%86%E5%B7%A5"><span class="nav-text">二、三个角色的分工</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#1-Agent%EF%BC%88%E5%86%B3%E7%AD%96%E5%BE%AA%E7%8E%AF%E7%9A%84%E7%BC%96%E6%8E%92%E8%80%85%EF%BC%89"><span class="nav-text">1. Agent（决策循环的编排者）</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#2-Model%EF%BC%88LLM-%E7%9A%84%E7%BF%BB%E8%AF%91%E5%AE%98%EF%BC%89"><span class="nav-text">2. Model（LLM 的翻译官）</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#3-Environment%EF%BC%88%E5%91%BD%E4%BB%A4%E7%9A%84%E6%89%A7%E8%A1%8C%E8%80%85%EF%BC%89"><span class="nav-text">3. Environment（命令的执行者）</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E4%B8%89%E3%80%81%E4%B8%89%E4%B8%AA%E8%A7%92%E8%89%B2%E6%98%AF%E6%80%8E%E4%B9%88%E8%BF%9E%E8%B5%B7%E6%9D%A5%E7%9A%84%EF%BC%9F"><span class="nav-text">三、三个角色是怎么连起来的？</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%9B%9B%E3%80%81%E8%BF%99%E7%A7%8D%E8%AE%BE%E8%AE%A1%E7%9A%84%E5%A5%BD%E5%A4%84"><span class="nav-text">四、这种设计的好处</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E4%BA%94%E3%80%81%E5%B0%8F%E7%BB%93"><span class="nav-text">五、小结</span></a></li></ol></div>
+        </div>
+        <!--/noindex-->
+
+        <div class="site-overview-wrap sidebar-panel">
+          <div class="site-author animated" itemprop="author" itemscope itemtype="http://schema.org/Person">
+    <img class="site-author-image" itemprop="image" alt="陌忆"
+      src="/images/avatar.webp">
+  <p class="site-author-name" itemprop="name">陌忆</p>
+  <div class="site-description" itemprop="description">记录 RAG、Agent、MCP、算法与软件工程实践，按专栏整理可复用的技术笔记。</div>
+</div>
+<div class="site-state-wrap animated">
+  <nav class="site-state">
+      <div class="site-state-item site-state-posts">
+        <a href="/archives/">
+          <span class="site-state-item-count">50</span>
+          <span class="site-state-item-name">日志</span>
+        </a>
+      </div>
+      <div class="site-state-item site-state-categories">
+          <a href="/categories/">
+        <span class="site-state-item-count">10</span>
+        <span class="site-state-item-name">分类</span></a>
+      </div>
+      <div class="site-state-item site-state-tags">
+          <a href="/tags/">
+        <span class="site-state-item-count">172</span>
+        <span class="site-state-item-name">标签</span></a>
+      </div>
+  </nav>
+</div>
+  <div class="links-of-author animated">
+      <span class="links-of-author-item">
+        <a href="https://github.com/moyi-math" title="GitHub → https:&#x2F;&#x2F;github.com&#x2F;moyi-math" rel="noopener me" target="_blank"><i class="fab fa-github fa-fw"></i>GitHub</a>
+      </span>
+  </div>
+  <div class="cc-license animated" itemprop="license">
+    <a href="https://creativecommons.org/licenses/by-nc-sa/4.0/" class="cc-opacity" rel="noopener" target="_blank"><img src="https://cdnjs.cloudflare.com/ajax/libs/creativecommons-vocabulary/2020.11.3/assets/license_badges/small/by_nc_sa.svg" alt="Creative Commons"></a>
+  </div>
+
+        </div>
+      </div>
+    </div>
+
+    
+  </aside>
+
+
+    </div>
+
+    <div class="main-inner post posts-expand">
+
+
+  
+
+
+<div class="post-block">
+  
+  
+
+  <article itemscope itemtype="http://schema.org/Article" class="post-content" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="https://moyi-math.github.io/2026/07/25/Coding-Agent-2-%E4%B8%89%E4%BD%93%E6%9E%B6%E6%9E%84/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.webp">
+      <meta itemprop="name" content="陌忆">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="陌忆的博客">
+      <meta itemprop="description" content="记录 RAG、Agent、MCP、算法与软件工程实践，按专栏整理可复用的技术笔记。">
+    </span>
+
+    <span hidden itemprop="post" itemscope itemtype="http://schema.org/CreativeWork">
+      <meta itemprop="name" content="入门 Coding Agent（二）：三体架构——Agent、Model、Environment 各司其职 | 陌忆的博客">
+      <meta itemprop="description" content="以 Agent、Model、Environment 三个角色说明 Coding Agent 的职责边界、消息流和可替换性。">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          入门 Coding Agent（二）：三体架构——Agent、Model、Environment 各司其职
+        </h1>
+
+        <div class="post-meta-container">
+          <div class="post-meta">
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-calendar"></i>
+      </span>
+      <span class="post-meta-item-text">发表于</span>
+
+      <time title="创建时间：2026-07-25 23:10:00" itemprop="dateCreated datePublished" datetime="2026-07-25T23:10:00+08:00">2026-07-25</time>
+    </span>
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-calendar-check"></i>
+      </span>
+      <span class="post-meta-item-text">更新于</span>
+      <time title="修改时间：2026-08-20 22:47:37" itemprop="dateModified" datetime="2026-08-20T22:47:37+08:00">2026-08-20</time>
+    </span>
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-folder"></i>
+      </span>
+      <span class="post-meta-item-text">分类于</span>
+        <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+          <a href="/categories/Coding-Agent-%E5%8E%9F%E7%90%86/" itemprop="url" rel="index"><span itemprop="name">Coding Agent 原理</span></a>
+        </span>
+    </span>
+
+  
+    <span class="post-meta-break"></span>
+    <span class="post-meta-item" title="本文字数">
+      <span class="post-meta-item-icon">
+        <i class="far fa-file-word"></i>
+      </span>
+      <span class="post-meta-item-text">本文字数：</span>
+      <span>875</span>
+    </span>
+    <span class="post-meta-item" title="阅读时长">
+      <span class="post-meta-item-icon">
+        <i class="far fa-clock"></i>
+      </span>
+      <span class="post-meta-item-text">阅读时长 &asymp;</span>
+      <span>3 分钟</span>
+    </span>
+</div>
+
+            <div class="post-description">以 Agent、Model、Environment 三个角色说明 Coding Agent 的职责边界、消息流和可替换性。</div>
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody"><h2 id="一、为什么需要三个角色？"><a href="#一、为什么需要三个角色？" class="headerlink" title="一、为什么需要三个角色？"></a>一、为什么需要三个角色？</h2><p>上一篇我们讲了 Agent 的核心循环：推理 → 执行 → 观察 → 再推理。</p>
+<p>这个循环涉及三种完全不同的能力：</p>
+<ul>
+<li><strong>推理</strong>：调用 LLM，理解上下文，做出决策</li>
+<li><strong>执行</strong>：在真实环境中跑命令、改文件</li>
+<li><strong>编排</strong>：把前两者串起来，管理消息列表，处理异常</li>
+</ul>
+<p>这三种能力差异太大，混在一起会导致代码臃肿、难以替换。所以 Coding Agent 的架构通常拆成三个独立的角色，各司其职。</p>
+<h2 id="二、三个角色的分工"><a href="#二、三个角色的分工" class="headerlink" title="二、三个角色的分工"></a>二、三个角色的分工</h2><h3 id="1-Agent（决策循环的编排者）"><a href="#1-Agent（决策循环的编排者）" class="headerlink" title="1. Agent（决策循环的编排者）"></a>1. Agent（决策循环的编排者）</h3><p>Agent 是整个循环的”导演”。它不自己做推理，也不自己执行命令——它负责把其他两个角色串起来。</p>
+<p>具体来说，Agent 做这些事：</p>
+<ul>
+<li>构造初始消息（system prompt + 用户任务）</li>
+<li>进入 while 循环，每一步调 Model 做推理</li>
+<li>拿到 LLM 返回的 actions 后，交给 Environment 执行</li>
+<li>把执行结果追加到消息列表</li>
+<li>处理各种异常（格式错误、超时、超限）</li>
+<li>检测退出信号，结束循环</li>
+</ul>
+<h3 id="2-Model（LLM-的翻译官）"><a href="#2-Model（LLM-的翻译官）" class="headerlink" title="2. Model（LLM 的翻译官）"></a>2. Model（LLM 的翻译官）</h3><p>Model 是 Agent 和 LLM 之间的<strong>适配层</strong>。它解决一个核心问题：Agent 的数据格式和 LLM API 的数据格式不一样。</p>
+<p>Agent 的消息列表长这样：</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">&#123;<span class="string">&quot;role&quot;</span>: <span class="string">&quot;user&quot;</span>, <span class="string">&quot;content&quot;</span>: <span class="string">&quot;修复这个bug&quot;</span>, <span class="string">&quot;extra&quot;</span>: &#123;&#125;&#125;</span><br></pre></td></tr></table></figure>
+
+<p>而 LLM API 需要的格式是：</p>
+<figure class="highlight json"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line"><span class="punctuation">&#123;</span><span class="attr">&quot;role&quot;</span><span class="punctuation">:</span> <span class="string">&quot;user&quot;</span><span class="punctuation">,</span> <span class="attr">&quot;content&quot;</span><span class="punctuation">:</span> <span class="string">&quot;修复这个bug&quot;</span><span class="punctuation">&#125;</span></span><br></pre></td></tr></table></figure>
+
+<p>Model 做的事情就是<strong>双向翻译</strong>：</p>
+<p><strong>Agent → LLM 方向</strong>：去掉消息里的 extra 等 Agent 专用字段，设置缓存控制标记，然后调用 LLM API。</p>
+<p><strong>LLM → Agent 方向</strong>：LLM 返回的是 tool_calls（函数调用），Model 把它解析成 Agent 能理解的 action dict：</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># LLM 返回的 tool_call</span></span><br><span class="line">&#123;<span class="string">&quot;function&quot;</span>: <span class="string">&quot;bash&quot;</span>, <span class="string">&quot;args&quot;</span>: &#123;<span class="string">&quot;command&quot;</span>: <span class="string">&quot;ls src/&quot;</span>&#125;&#125;</span><br><span class="line"></span><br><span class="line"><span class="comment"># Model 解析成 action</span></span><br><span class="line">&#123;<span class="string">&quot;command&quot;</span>: <span class="string">&quot;ls src/&quot;</span>&#125;</span><br></pre></td></tr></table></figure>
+
+<p>然后当 Environment 执行完返回结果后，Model 又把这些结果重新包装成 LLM 能理解的 tool result 格式，追加到消息列表里。</p>
+<h3 id="3-Environment（命令的执行者）"><a href="#3-Environment（命令的执行者）" class="headerlink" title="3. Environment（命令的执行者）"></a>3. Environment（命令的执行者）</h3><p>Environment 是三个角色中最简单的。它只做一件事：<strong>接收一个 action，执行它，返回结果</strong>。</p>
+<p>在本地环境下，执行逻辑就是：</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">def</span> <span class="title function_">execute</span>(<span class="params">self, action</span>):</span><br><span class="line">    command = action[<span class="string">&quot;command&quot;</span>]</span><br><span class="line">    result = subprocess.run(command, shell=<span class="literal">True</span>, ...)</span><br><span class="line">    <span class="keyword">return</span> &#123;<span class="string">&quot;output&quot;</span>: result.stdout, <span class="string">&quot;returncode&quot;</span>: result.returncode&#125;</span><br></pre></td></tr></table></figure>
+
+<p>相当于给 LLM 接上了一个 shell。</p>
+<h2 id="三、三个角色是怎么连起来的？"><a href="#三、三个角色是怎么连起来的？" class="headerlink" title="三、三个角色是怎么连起来的？"></a>三、三个角色是怎么连起来的？</h2><figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br></pre></td><td class="code"><pre><span class="line">┌─────────────────────────────────────────────────────┐</span><br><span class="line">│                    Agent 循环                        │</span><br><span class="line">│                                                      │</span><br><span class="line">│  while True:                                         │</span><br><span class="line">│    message = Model.query(messages)   ← 调 LLM       │</span><br><span class="line">│    for action in message.actions:                    │</span><br><span class="line">│      output = Environment.execute(action)  ← 执行   │</span><br><span class="line">│    messages.append(output)              ← 观察      │</span><br><span class="line">│    if should_exit: break                            │</span><br><span class="line">└─────────────────────────────────────────────────────┘</span><br><span class="line">         ↑                        ↑</span><br><span class="line">         │                        │</span><br><span class="line">    Model 负责翻译           Environment 负责执行</span><br><span class="line">    (LLM 适配器)              (Shell/Docker/...)</span><br></pre></td></tr></table></figure>
+
+<h2 id="四、这种设计的好处"><a href="#四、这种设计的好处" class="headerlink" title="四、这种设计的好处"></a>四、这种设计的好处</h2><p><strong>可替换性</strong>是这种架构的核心优势。三个角色都有明确定义的接口（在 Python 中通常用 Protocol 或抽象类表示），你可以替换任意一个而不影响其他两个：</p>
+<ul>
+<li><strong>换 Model</strong>：今天用 OpenAI，明天换 Anthropic，后天换本地模型。只要实现同一个接口就行</li>
+<li><strong>换 Environment</strong>：本地开发用 LocalEnvironment，跑 benchmark 用 DockerEnvironment，部署用 RemoteEnvironment</li>
+<li><strong>换 Agent</strong>：要交互式确认的用 InteractiveAgent，要全自动的用 DefaultAgent</li>
+</ul>
+<p>每个角色都足够简单——Model 只管翻译，Environment 只管执行，Agent 只管循环。组合在一起就能完成复杂任务。</p>
+<h2 id="五、小结"><a href="#五、小结" class="headerlink" title="五、小结"></a>五、小结</h2><table>
+<thead>
+<tr>
+<th>角色</th>
+<th>职责</th>
+<th>核心方法</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Agent</td>
+<td>编排推理→执行→观察的循环</td>
+<td><code>run(task)</code>, <code>step()</code>, <code>query()</code></td>
+</tr>
+<tr>
+<td>Model</td>
+<td>在 Agent 和 LLM 之间做双向翻译</td>
+<td><code>query(messages)</code>, <code>format_message()</code>, <code>format_observation_messages()</code></td>
+</tr>
+<tr>
+<td>Environment</td>
+<td>执行 action（通常是 shell 命令）并返回结果</td>
+<td><code>execute(action)</code></td>
+</tr>
+</tbody></table>
+<p>下一篇我们会讨论一个关键的设计问题：<strong>当 LLM 不可靠时，Agent 如何保护自己？</strong></p>
+
+    </div>
+
+    
+    
+    
+
+    <footer class="post-footer">
+          
+
+<div class="post-copyright">
+<ul>
+  <li class="post-copyright-author">
+      <strong>本文作者： </strong>陌忆
+  </li>
+  <li class="post-copyright-link">
+      <strong>本文链接：</strong>
+      <a href="https://moyi-math.github.io/2026/07/25/Coding-Agent-2-%E4%B8%89%E4%BD%93%E6%9E%B6%E6%9E%84/" title="入门 Coding Agent（二）：三体架构——Agent、Model、Environment 各司其职">https://moyi-math.github.io/2026/07/25/Coding-Agent-2-三体架构/</a>
+  </li>
+  <li class="post-copyright-license">
+      <strong>版权声明： </strong>本博客所有文章除特别声明外，均采用 <a href="https://creativecommons.org/licenses/by-nc-sa/4.0/" rel="noopener" target="_blank"><i class="fab fa-fw fa-creative-commons"></i>BY-NC-SA</a> 许可协议。转载请注明出处！
+  </li>
+</ul>
+</div>
+
+          <div class="post-tags">
+              <a href="/tags/Agent/" rel="tag"># Agent</a>
+              <a href="/tags/LLM/" rel="tag"># LLM</a>
+              <a href="/tags/Coding-Agent/" rel="tag"># Coding Agent</a>
+          </div>
+
+        
+
+          <div class="post-nav">
+            <div class="post-nav-item">
+                <a href="/2026/07/25/Coding-Agent-1-%E6%A0%B8%E5%BF%83%E5%BE%AA%E7%8E%AF/" rel="prev" title="入门 Coding Agent（一）：从 Prompt 到循环——Agent 的核心工作原理">
+                  <i class="fa fa-angle-left"></i> 入门 Coding Agent（一）：从 Prompt 到循环——Agent 的核心工作原理
+                </a>
+            </div>
+            <div class="post-nav-item">
+                <a href="/2026/07/25/Coding-Agent-3-%E4%BF%9D%E9%99%A9%E4%B8%9D%E8%AE%BE%E8%AE%A1/" rel="next" title="入门 Coding Agent（三）：当 LLM 不可靠时——Agent 的保险丝设计">
+                  入门 Coding Agent（三）：当 LLM 不可靠时——Agent 的保险丝设计 <i class="fa fa-angle-right"></i>
+                </a>
+            </div>
+          </div>
+    </footer>
+  </article>
+</div>
+
+
+
+
+
+
+</div>
+  </main>
+
+  <footer class="footer">
+    <div class="footer-inner">
+
+  <div class="copyright">
+    &copy; 
+    <span itemprop="copyrightYear">2026</span>
+    <span class="with-love">
+      <i class="fab fa-osi"></i>
+    </span>
+    <span class="author" itemprop="copyrightHolder">陌忆</span>
+  </div>
+<div class="wordcount">
+  <span class="post-meta-item">
+    <span class="post-meta-item-icon">
+      <i class="fa fa-chart-line"></i>
+    </span>
+    <span title="站点总字数">106k</span>
+  </span>
+  <span class="post-meta-item">
+    <span class="post-meta-item-icon">
+      <i class="fa fa-coffee"></i>
+    </span>
+    <span title="站点阅读时长">6:24</span>
+  </span>
+</div>
+  <div class="powered-by">由 <a href="https://hexo.io/" rel="noopener" target="_blank">Hexo</a> & <a href="https://theme-next.js.org/" rel="noopener" target="_blank">NexT.Gemini</a> 强力驱动
+  </div>
+
+    </div>
+  </footer>
+
+  
+  <div class="toggle sidebar-toggle" role="button">
+    <span class="toggle-line"></span>
+    <span class="toggle-line"></span>
+    <span class="toggle-line"></span>
+  </div>
+  <div class="sidebar-dimmer"></div>
+  <div class="back-to-top" role="button" aria-label="返回顶部">
+    <i class="fa fa-arrow-up fa-lg"></i>
+    <span>0%</span>
+  </div>
+
+<noscript>
+  <div class="noscript-warning">Theme NexT works best with JavaScript enabled</div>
+</noscript>
+<!-- Site running time -->
+<span id="timeDate" aria-live="off"></span>
+<script>
+(function() {
+  var start = new Date("2022-11-17T08:00:00+08:00");
+  function pad(n) { return n < 10 ? "0" + n : "" + n; }
+  function tick() {
+    var diff = Date.now() - start.getTime();
+    if (diff < 0) return;
+    var d = Math.floor(diff / 86400000);
+    var h = Math.floor((diff % 86400000) / 3600000);
+    var m = Math.floor((diff % 3600000) / 60000);
+    var timeDate = document.getElementById("timeDate");
+    if (!timeDate) return;
+    timeDate.textContent =
+      "\u672C\u7AD9\u5DF2\u5B89\u5168\u8FD0\u884C " + d + " \u5929 " + pad(h) + " \u5C0F\u65F6 " + pad(m) + " \u5206";
+  }
+  tick();
+  setInterval(tick, 60000);
+})();
+</script>
+
+</body>
+</html>

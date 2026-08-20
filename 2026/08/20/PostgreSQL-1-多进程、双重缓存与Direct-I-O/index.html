@@ -1,0 +1,621 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width">
+<meta name="theme-color" content="#222" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#222" media="(prefers-color-scheme: dark)"><meta name="generator" content="Hexo 7.3.0">
+<link rel="preconnect" href="https://cdnjs.cloudflare.com" crossorigin>
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon-next.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32-next.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next.png">
+  <link rel="mask-icon" href="/images/logo.svg" color="#222">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/7.0.0/css/all.min.css" integrity="sha256-VHqXKFhhMxcpubYf9xiWdCiojEbY9NexQ4jh8AxbvcM=" crossorigin="anonymous">
+
+<script class="next-config" data-name="main" type="application/json">{"hostname":"moyi-math.github.io","root":"/","images":"/images","scheme":"Gemini","darkmode":true,"version":"8.28.0","exturl":false,"sidebar":{"position":"left","width_expanded":320,"width_dual_column":240,"display":"post","padding":18,"offset":12},"hljswrap":true,"codeblock":{"theme":{"light":"default","dark":"stackoverflow-dark"},"prism":{"light":"prism","dark":"prism-dark"},"copy_button":{"enable":true,"style":null},"fold":{"enable":false,"height":500},"language":false},"bookmark":{"enable":false,"color":"#222","save":"auto"},"mediumzoom":false,"lazyload":true,"pangu":false,"comments":{"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},"stickytabs":false,"motion":{"enable":false,"async":false,"duration":200,"transition":{"menu_item":"fadeInDown","post_block":"fadeIn","post_header":"fadeInDown","post_body":"fadeInDown","coll_header":"fadeInLeft","sidebar":"fadeInUp"}},"prism":false,"i18n":{"placeholder":"搜索...","empty":"没有找到任何搜索结果：${query}","hits_time":"找到 ${hits} 个搜索结果（用时 ${time} 毫秒）","hits":"找到 ${hits} 个搜索结果"},"path":"/search.json","localsearch":{"enable":true,"top_n_per_article":1,"unescape":false,"preload":false}}</script><script src="/js/config.js" defer></script>
+
+    <meta name="description" content="从每连接一进程、shared_buffers 与 OS Page Cache、Direct I&#x2F;O 三条路径，拆解 PostgreSQL 的历史设计究竟贵在哪里、什么时候会成为问题，以及 PostgreSQL 18 的 AIO 改变了什么。">
+<meta property="og:type" content="article">
+<meta property="og:title" content="PostgreSQL 的“离谱”设计：多进程、双重缓存与 Direct I&#x2F;O">
+<meta property="og:url" content="https://moyi-math.github.io/2026/08/20/PostgreSQL-1-%E5%A4%9A%E8%BF%9B%E7%A8%8B%E3%80%81%E5%8F%8C%E9%87%8D%E7%BC%93%E5%AD%98%E4%B8%8EDirect-I-O/index.html">
+<meta property="og:site_name" content="陌忆的博客">
+<meta property="og:description" content="从每连接一进程、shared_buffers 与 OS Page Cache、Direct I&#x2F;O 三条路径，拆解 PostgreSQL 的历史设计究竟贵在哪里、什么时候会成为问题，以及 PostgreSQL 18 的 AIO 改变了什么。">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:image" content="https://moyi-math.github.io/images/background.webp">
+<meta property="article:published_time" content="2026-08-20T12:00:00.000Z">
+<meta property="article:modified_time" content="2026-08-20T14:47:37.221Z">
+<meta property="article:author" content="陌忆">
+<meta property="article:tag" content="PostgreSQL">
+<meta property="article:tag" content="数据库">
+<meta property="article:tag" content="多进程">
+<meta property="article:tag" content="shared_buffers">
+<meta property="article:tag" content="Direct I&#x2F;O">
+<meta property="article:tag" content="AIO">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:image" content="https://moyi-math.github.io/images/background.webp">
+
+
+<link rel="canonical" href="https://moyi-math.github.io/2026/08/20/PostgreSQL-1-%E5%A4%9A%E8%BF%9B%E7%A8%8B%E3%80%81%E5%8F%8C%E9%87%8D%E7%BC%93%E5%AD%98%E4%B8%8EDirect-I-O/">
+
+
+<script class="next-config" data-name="page" type="application/json">{"sidebar":"","isHome":false,"isPost":true,"lang":"zh-CN","comments":true,"permalink":"https://moyi-math.github.io/2026/08/20/PostgreSQL-1-%E5%A4%9A%E8%BF%9B%E7%A8%8B%E3%80%81%E5%8F%8C%E9%87%8D%E7%BC%93%E5%AD%98%E4%B8%8EDirect-I-O/","path":"2026/08/20/PostgreSQL-1-多进程、双重缓存与Direct-I-O/","title":"PostgreSQL 的“离谱”设计：多进程、双重缓存与 Direct I/O"}</script>
+
+<script class="next-config" data-name="calendar" type="application/json">""</script>
+<title>PostgreSQL 的“离谱”设计：多进程、双重缓存与 Direct I/O | 陌忆的博客</title>
+  
+
+
+
+
+
+
+
+
+  
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/animejs/3.2.1/anime.min.js" integrity="sha256-XL2inqUJaslATFnHdJOi9GfQ60on8Wx1C2H8DYiN1xY=" crossorigin="anonymous" defer></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/lozad.js/1.16.0/lozad.min.js" integrity="sha256-mOFREFhqmHeQbXpK2lp4nA3qooVgACfh88fpJftLBbc=" crossorigin="anonymous" defer></script>
+<script src="/js/utils.js" defer></script><script src="/js/sidebar.js" defer></script><script src="/js/next-boot.js" defer></script>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/hexo-generator-searchdb/1.5.0/search.js" integrity="sha256-xFC6PJ82SL9b3WkGjFavNiA9gm5z6UBxWPiu4CYjptg=" crossorigin="anonymous" defer></script>
+<script src="/js/third-party/search/local-search.js" defer></script>
+
+
+
+
+
+
+
+  
+
+
+
+
+  
+
+  <script class="next-config" data-name="enableMath" type="application/json">false</script><link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/katex.min.css" integrity="sha256-UF1fgpAiu3tPJN/uCqEUHNe7pnr+QR0SQDNfgglgtcM=" crossorigin="anonymous">
+
+
+<link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
+
+
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"WebSite","name":"陌忆的博客","url":"https://moyi-math.github.io","description":"记录 RAG、Agent、MCP、算法与软件工程实践，按专栏整理可复用的技术笔记。","inLanguage":"zh-CN","author":{"@type":"Person","name":"陌忆"}}</script>
+
+
+
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"Article","headline":"PostgreSQL 的“离谱”设计：多进程、双重缓存与 Direct I/O","description":"从每连接一进程、shared_buffers 与 OS Page Cache、Direct I/O 三条路径，拆解 PostgreSQL 的历史设计究竟贵在哪里、什么时候会成为问题，以及 PostgreSQL 18 的 AIO 改变了什么。","datePublished":"2026-08-20T12:00:00.000Z","dateModified":"2026-08-20T14:47:37.221Z","inLanguage":"zh-CN","mainEntityOfPage":{"@type":"WebPage","@id":"https://moyi-math.github.io/2026/08/20/PostgreSQL-1-%E5%A4%9A%E8%BF%9B%E7%A8%8B%E3%80%81%E5%8F%8C%E9%87%8D%E7%BC%93%E5%AD%98%E4%B8%8EDirect-I-O/index.html"},"author":{"@type":"Person","name":"陌忆"}}</script>
+<meta name="author" content="陌忆">
+
+
+  <noscript>
+    <link rel="stylesheet" href="/css/noscript.css">
+  </noscript>
+<!-- hexo injector head_end start --><link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/katex.min.css" integrity="sha512-fHwaWebuwA7NSF5Qg/af4UeDx9XqUpYpOGgubo3yWu+b2IQR4UeQwbb42Ti7gVAjNtVoI/I9TEoYeu9omwcC6g==" crossorigin="anonymous" referrerpolicy="no-referrer" /><!-- hexo injector head_end end --><link rel="alternate" href="/atom.xml" title="陌忆的博客" type="application/atom+xml">
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage">
+  <div class="headband"></div>
+
+  <main class="main">
+    <div class="column">
+      <header class="header" itemscope itemtype="http://schema.org/WPHeader"><div class="site-brand-container">
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="切换导航栏" role="button">
+        <span class="toggle-line"></span>
+        <span class="toggle-line"></span>
+        <span class="toggle-line"></span>
+    </div>
+  </div>
+
+  <div class="site-meta">
+
+    <a href="/" class="brand" rel="start">
+      <i class="logo-line"></i>
+      <p class="site-title">陌忆的博客</p>
+      <i class="logo-line"></i>
+    </a>
+      <p class="site-subtitle" itemprop="description">数据库无法得出结论</p>
+  </div>
+
+  <div class="site-nav-right">
+    <div class="toggle popup-trigger" aria-label="搜索" role="button">
+        <i class="fa fa-search fa-fw fa-lg"></i>
+    </div>
+  </div>
+</div>
+
+
+
+<nav class="site-nav">
+  <ul class="main-menu menu"><li class="menu-item menu-item-home"><a href="/" rel="section"><i class="fa fa-home fa-fw"></i>首页</a></li><li class="menu-item menu-item-about"><a href="/about/" rel="section"><i class="fa fa-user fa-fw"></i>关于</a></li><li class="menu-item menu-item-tags"><a href="/tags/" rel="section"><i class="fa fa-tags fa-fw"></i>标签</a></li><li class="menu-item menu-item-categories"><a href="/categories/" rel="section"><i class="fa fa-th fa-fw"></i>分类</a></li><li class="menu-item menu-item-archives"><a href="/archives/" rel="section"><i class="fa fa-archive fa-fw"></i>归档</a></li>
+      <li class="menu-item menu-item-search">
+        <a role="button" class="popup-trigger"><i class="fa fa-search fa-fw"></i>搜索
+        </a>
+      </li>
+  </ul>
+</nav>
+
+
+
+  <div class="search-pop-overlay">
+    <div class="popup search-popup">
+      <div class="search-header">
+        <span class="search-icon">
+          <i class="fa fa-search"></i>
+        </span>
+        <div class="search-input-container">
+          <input autocomplete="off" autocapitalize="off" maxlength="80"
+                placeholder="搜索..." spellcheck="false"
+                type="search" class="search-input">
+        </div>
+        <span class="popup-btn-close" role="button">
+          <i class="fa fa-times-circle"></i>
+        </span>
+      </div>
+      <div class="search-result-container">
+        <div class="search-result-icon">
+          <i class="fa fa-spinner fa-pulse fa-5x"></i>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</header>
+        
+  
+  <aside class="sidebar">
+
+    <div class="sidebar-inner sidebar-nav-active sidebar-toc-active">
+      <ul class="sidebar-nav">
+        <li class="sidebar-nav-toc">
+          文章目录
+        </li>
+        <li class="sidebar-nav-overview">
+          站点概览
+        </li>
+      </ul>
+
+      <div class="sidebar-panel-container">
+        <!--noindex-->
+        <div class="post-toc-wrap sidebar-panel">
+            <div class="post-toc animated"><ol class="nav"><li class="nav-item nav-level-2"><a class="nav-link" href="#%E4%B8%80%E3%80%81%E5%85%88%E8%AF%B4%E7%BB%93%E8%AE%BA"><span class="nav-text">一、先说结论</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E4%BA%8C%E3%80%81%E6%AF%8F%E6%9D%A1%E8%BF%9E%E6%8E%A5%E4%B8%80%E4%B8%AA%E8%BF%9B%E7%A8%8B%EF%BC%8C%E5%85%B7%E4%BD%93%E8%B4%B5%E5%9C%A8%E5%93%AA%E9%87%8C"><span class="nav-text">二、每条连接一个进程，具体贵在哪里</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#1-%E4%BE%8B%E5%AD%90%EF%BC%9A%E4%B8%80%E4%B8%87%E4%B8%AA%E8%BF%9E%E6%8E%A5%EF%BC%8C%E5%8F%AA%E6%9C%89%E4%BA%94%E5%8D%81%E4%B8%AA%E6%AD%A3%E5%9C%A8%E6%9F%A5%E8%AF%A2"><span class="nav-text">1. 例子：一万个连接，只有五十个正在查询</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#2-%E6%88%90%E6%9C%AC%E4%B8%80%EF%BC%9A%E8%BF%9E%E6%8E%A5%E5%88%9B%E5%BB%BA%E4%B8%8E%E9%94%80%E6%AF%81"><span class="nav-text">2. 成本一：连接创建与销毁</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#3-%E6%88%90%E6%9C%AC%E4%BA%8C%EF%BC%9A%E7%A7%81%E6%9C%89%E5%86%85%E5%AD%98%EF%BC%8C%E8%80%8C%E4%B8%8D%E6%98%AF%E5%A4%8D%E5%88%B6%E6%95%B4%E4%B8%AA-shared-buffers"><span class="nav-text">3. 成本二：私有内存，而不是复制整个 shared_buffers</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#4-%E6%88%90%E6%9C%AC%E4%B8%89%EF%BC%9A%E7%AA%81%E5%8F%91%E5%B9%B6%E5%8F%91%E4%B8%8E%E4%B8%8A%E4%B8%8B%E6%96%87%E5%88%87%E6%8D%A2"><span class="nav-text">4. 成本三：突发并发与上下文切换</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#5-%E6%88%90%E6%9C%AC%E5%9B%9B%EF%BC%9A%E8%B7%A8%E8%BF%9B%E7%A8%8B%E5%85%B1%E4%BA%AB%E7%8A%B6%E6%80%81"><span class="nav-text">5. 成本四：跨进程共享状态</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#6-%E5%B7%A5%E7%A8%8B%E4%B8%8A%E5%A6%82%E4%BD%95%E5%A4%84%E7%90%86"><span class="nav-text">6. 工程上如何处理</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E4%B8%89%E3%80%81%E5%8F%8C%E9%87%8D%E7%BC%93%E5%AD%98%EF%BC%9A%E4%B8%80%E4%BB%BD%E6%95%B0%E6%8D%AE%E4%B8%BA%E4%BB%80%E4%B9%88%E5%8F%AF%E8%83%BD%E5%87%BA%E7%8E%B0%E4%B8%A4%E6%AC%A1"><span class="nav-text">三、双重缓存：一份数据为什么可能出现两次</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#1-%E4%B8%80%E4%B8%AA-128-GB-%E5%86%85%E5%AD%98%E7%9A%84%E4%BE%8B%E5%AD%90"><span class="nav-text">1. 一个 128 GB 内存的例子</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#2-%E4%B8%A4%E5%B1%82%E7%BC%93%E5%AD%98%E4%B8%8D%E5%85%A8%E6%98%AF%E6%B5%AA%E8%B4%B9"><span class="nav-text">2. 两层缓存不全是浪费</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#3-%E4%B8%8E-InnoDB-%E7%9A%84%E5%AF%B9%E6%AF%94"><span class="nav-text">3. 与 InnoDB 的对比</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%9B%9B%E3%80%81Direct-I-O-%E4%B8%8E-AIO-%E4%B8%8D%E6%98%AF%E4%B8%80%E5%9B%9E%E4%BA%8B"><span class="nav-text">四、Direct I&#x2F;O 与 AIO 不是一回事</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#1-%E8%A7%86%E9%A2%91%E4%B8%AD%E7%9A%84-PostgreSQL-16-%E7%8A%B6%E6%80%81"><span class="nav-text">1. 视频中的 PostgreSQL 16 状态</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#2-PostgreSQL-18-%E6%96%B0%E5%A2%9E%E7%9A%84%E6%98%AF-AIO-%E5%AD%90%E7%B3%BB%E7%BB%9F"><span class="nav-text">2. PostgreSQL 18 新增的是 AIO 子系统</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#3-%E4%B8%BA%E4%BB%80%E4%B9%88%E4%B8%80%E4%B8%AA-5-8-%E7%9A%84%E5%AE%9E%E9%AA%8C%E4%B8%8D%E8%83%BD%E8%AF%81%E6%98%8E%E7%BB%93%E8%AE%BA"><span class="nav-text">3. 为什么一个 +5.8% 的实验不能证明结论</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E4%BA%94%E3%80%81VACUUM%E3%80%81%E8%A1%A8%E8%86%A8%E8%83%80%E5%92%8C-XID-%E5%9B%9E%E7%BB%95%E6%98%AF%E5%8F%A6%E4%B8%80%E7%BB%84%E9%97%AE%E9%A2%98"><span class="nav-text">五、VACUUM、表膨胀和 XID 回绕是另一组问题</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%85%AD%E3%80%81%E5%A6%82%E4%BD%95%E5%88%A4%E6%96%AD%E8%87%AA%E5%B7%B1%E7%9A%84%E7%B3%BB%E7%BB%9F%E6%98%AF%E5%90%A6%E7%9C%9F%E7%9A%84%E5%8F%97%E5%BD%B1%E5%93%8D"><span class="nav-text">六、如何判断自己的系统是否真的受影响</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#1-%E5%85%88%E7%9C%8B%E8%BF%9E%E6%8E%A5%EF%BC%8C%E8%80%8C%E4%B8%8D%E6%98%AF%E5%85%88%E6%94%B9%E5%8F%82%E6%95%B0"><span class="nav-text">1. 先看连接，而不是先改参数</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#2-%E4%B8%8D%E8%A6%81%E7%94%A8-RSS-%E7%B2%97%E6%9A%B4%E7%9B%B8%E4%B9%98"><span class="nav-text">2. 不要用 RSS 粗暴相乘</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#3-%E6%A0%A1%E9%AA%8C%E7%BC%93%E5%AD%98%E5%92%8C-I-O-%E5%81%87%E8%AE%BE"><span class="nav-text">3. 校验缓存和 I&#x2F;O 假设</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#4-%E8%B0%83%E4%BC%98%E9%A1%BA%E5%BA%8F"><span class="nav-text">4. 调优顺序</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E4%B8%83%E3%80%81%E9%87%8D%E6%96%B0%E8%AF%84%E4%BB%B7%E8%BF%99%E4%BA%9B%E2%80%9C%E7%A6%BB%E8%B0%B1%E8%AE%BE%E8%AE%A1%E2%80%9D"><span class="nav-text">七、重新评价这些“离谱设计”</span></a></li></ol></div>
+        </div>
+        <!--/noindex-->
+
+        <div class="site-overview-wrap sidebar-panel">
+          <div class="site-author animated" itemprop="author" itemscope itemtype="http://schema.org/Person">
+    <img class="site-author-image" itemprop="image" alt="陌忆"
+      src="/images/avatar.webp">
+  <p class="site-author-name" itemprop="name">陌忆</p>
+  <div class="site-description" itemprop="description">记录 RAG、Agent、MCP、算法与软件工程实践，按专栏整理可复用的技术笔记。</div>
+</div>
+<div class="site-state-wrap animated">
+  <nav class="site-state">
+      <div class="site-state-item site-state-posts">
+        <a href="/archives/">
+          <span class="site-state-item-count">50</span>
+          <span class="site-state-item-name">日志</span>
+        </a>
+      </div>
+      <div class="site-state-item site-state-categories">
+          <a href="/categories/">
+        <span class="site-state-item-count">10</span>
+        <span class="site-state-item-name">分类</span></a>
+      </div>
+      <div class="site-state-item site-state-tags">
+          <a href="/tags/">
+        <span class="site-state-item-count">172</span>
+        <span class="site-state-item-name">标签</span></a>
+      </div>
+  </nav>
+</div>
+  <div class="links-of-author animated">
+      <span class="links-of-author-item">
+        <a href="https://github.com/moyi-math" title="GitHub → https:&#x2F;&#x2F;github.com&#x2F;moyi-math" rel="noopener me" target="_blank"><i class="fab fa-github fa-fw"></i>GitHub</a>
+      </span>
+  </div>
+  <div class="cc-license animated" itemprop="license">
+    <a href="https://creativecommons.org/licenses/by-nc-sa/4.0/" class="cc-opacity" rel="noopener" target="_blank"><img src="https://cdnjs.cloudflare.com/ajax/libs/creativecommons-vocabulary/2020.11.3/assets/license_badges/small/by_nc_sa.svg" alt="Creative Commons"></a>
+  </div>
+
+        </div>
+      </div>
+    </div>
+
+    
+  </aside>
+
+
+    </div>
+
+    <div class="main-inner post posts-expand">
+
+
+  
+
+
+<div class="post-block">
+  
+  
+
+  <article itemscope itemtype="http://schema.org/Article" class="post-content" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="https://moyi-math.github.io/2026/08/20/PostgreSQL-1-%E5%A4%9A%E8%BF%9B%E7%A8%8B%E3%80%81%E5%8F%8C%E9%87%8D%E7%BC%93%E5%AD%98%E4%B8%8EDirect-I-O/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.webp">
+      <meta itemprop="name" content="陌忆">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="陌忆的博客">
+      <meta itemprop="description" content="记录 RAG、Agent、MCP、算法与软件工程实践，按专栏整理可复用的技术笔记。">
+    </span>
+
+    <span hidden itemprop="post" itemscope itemtype="http://schema.org/CreativeWork">
+      <meta itemprop="name" content="PostgreSQL 的“离谱”设计：多进程、双重缓存与 Direct I&#x2F;O | 陌忆的博客">
+      <meta itemprop="description" content="从每连接一进程、shared_buffers 与 OS Page Cache、Direct I&#x2F;O 三条路径，拆解 PostgreSQL 的历史设计究竟贵在哪里、什么时候会成为问题，以及 PostgreSQL 18 的 AIO 改变了什么。">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          PostgreSQL 的“离谱”设计：多进程、双重缓存与 Direct I/O
+        </h1>
+
+        <div class="post-meta-container">
+          <div class="post-meta">
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-calendar"></i>
+      </span>
+      <span class="post-meta-item-text">发表于</span>
+      
+
+      <time title="创建时间：2026-08-20 20:00:00 / 修改时间：22:47:37" itemprop="dateCreated datePublished" datetime="2026-08-20T20:00:00+08:00">2026-08-20</time>
+    </span>
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-folder"></i>
+      </span>
+      <span class="post-meta-item-text">分类于</span>
+        <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+          <a href="/categories/PostgreSQL-%E5%8E%9F%E7%90%86/" itemprop="url" rel="index"><span itemprop="name">PostgreSQL 原理</span></a>
+        </span>
+    </span>
+
+  
+    <span class="post-meta-break"></span>
+    <span class="post-meta-item" title="本文字数">
+      <span class="post-meta-item-icon">
+        <i class="far fa-file-word"></i>
+      </span>
+      <span class="post-meta-item-text">本文字数：</span>
+      <span>3.9k</span>
+    </span>
+    <span class="post-meta-item" title="阅读时长">
+      <span class="post-meta-item-icon">
+        <i class="far fa-clock"></i>
+      </span>
+      <span class="post-meta-item-text">阅读时长 &asymp;</span>
+      <span>14 分钟</span>
+    </span>
+</div>
+
+            <div class="post-description">从每连接一进程、shared_buffers 与 OS Page Cache、Direct I/O 三条路径，拆解 PostgreSQL 的历史设计究竟贵在哪里、什么时候会成为问题，以及 PostgreSQL 18 的 AIO 改变了什么。</div>
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody"><blockquote>
+<p>一条连接为什么要配一个进程？同一数据页为什么可能缓存两次？PostgreSQL 18 有了 AIO，是否就等于解决了 Direct I&#x2F;O？</p>
+</blockquote>
+<span id="more"></span>
+
+<p>围绕 PostgreSQL 的架构取舍，常见三个很有冲击力的观点：每连接一进程模型太重，<code>shared_buffers</code> 与操作系统页缓存会形成双重缓存，MVCC 还带来了 <code>VACUUM</code>、表膨胀和 XID 回绕等维护成本。</p>
+<p>这些现象大体存在，但“存在成本”和“设计错误”不是一回事。本文不复述视频的情绪化结论，而是把问题拆成可验证的机制：成本从哪里产生，什么场景会放大它，哪些反例能限制结论，以及今天的 PostgreSQL 已经演进到哪里。</p>
+<p>本文涉及版本变化的部分以 <strong>PostgreSQL 18</strong> 文档为准，核对时间为 2026 年 8 月。</p>
+<h2 id="一、先说结论"><a href="#一、先说结论" class="headerlink" title="一、先说结论"></a>一、先说结论</h2><ol>
+<li>PostgreSQL 当前仍采用<strong>每条客户端连接对应一个 backend 进程</strong>的模型。大量直连、连接频繁创建或并发突然升高时，进程私有内存、初始化和调度成本会被放大。</li>
+<li><code>fork()</code> 不会把整个数据库缓存复制一份。<code>shared_buffers</code> 本来就是共享内存，普通内存也有 Copy-on-Write；真正需要关注的是进程元数据、页表、私有会话内存和高并发调度。</li>
+<li>PostgreSQL 默认的缓冲 I&#x2F;O 可能让同一数据页同时存在于 <code>shared_buffers</code> 与 OS Page Cache。它会造成内存重叠，但 OS 缓存也提供预读、回写和二次命中的价值，不能把两层缓存全部视为浪费。</li>
+<li>PostgreSQL 18 引入了新的<strong>异步 I&#x2F;O（Asynchronous I&#x2F;O, AIO）</strong>子系统，但 AIO 与 Direct I&#x2F;O 是两个不同维度。当前 <code>debug_io_direct</code> 仍是开发测试选项，官方明确说明它可能降低性能。</li>
+<li>多进程、双重缓存和 MVCC 维护成本是三组不同问题。把它们都归结为“PostgreSQL 架构落后”，无法指导实际调优。</li>
+</ol>
+<p>下面逐个展开。</p>
+<h2 id="二、每条连接一个进程，具体贵在哪里"><a href="#二、每条连接一个进程，具体贵在哪里" class="headerlink" title="二、每条连接一个进程，具体贵在哪里"></a>二、每条连接一个进程，具体贵在哪里</h2><p>PostgreSQL 的主进程监听连接。客户端接入后，服务器创建一个新的 backend 进程；从解析 SQL、生成执行计划到执行和返回结果，都由这个 backend 代表该会话完成。</p>
+<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line">客户端 A ── backend 进程 A</span><br><span class="line">客户端 B ── backend 进程 B</span><br><span class="line">客户端 C ── backend 进程 C</span><br><span class="line">    ...</span><br><span class="line">客户端 N ── backend 进程 N</span><br></pre></td></tr></table></figure>
+
+<p>这个模型最容易在“连接数远大于同时执行的查询数”时暴露成本。</p>
+<h3 id="1-例子：一万个连接，只有五十个正在查询"><a href="#1-例子：一万个连接，只有五十个正在查询" class="headerlink" title="1. 例子：一万个连接，只有五十个正在查询"></a>1. 例子：一万个连接，只有五十个正在查询</h3><p>假设一台 32 核数据库服务器面对 10,000 个应用连接，但任意时刻通常只有 50 个连接在执行 SQL，其余都处于 <code>idle</code>。</p>
+<p>PostgreSQL 看到的是：</p>
+<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">10,000 个客户端连接</span><br><span class="line">→ 约 10,000 个 backend 进程</span><br><span class="line">→ 其中 50 个工作，9,950 个睡眠</span><br></pre></td></tr></table></figure>
+
+<p>Reactor 加固定工作池的服务通常可以这样组织：</p>
+<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">10,000 个套接字</span><br><span class="line">→ 少量事件循环监控就绪事件</span><br><span class="line">→ 例如 64 个工作线程执行实际任务</span><br></pre></td></tr></table></figure>
+
+<p>区别不在于“进程一定比线程慢”，而在于 PostgreSQL 把<strong>会话连接</strong>与<strong>可调度执行单元</strong>绑定在了一起；事件循环和工作池可以把两者解耦。</p>
+<h3 id="2-成本一：连接创建与销毁"><a href="#2-成本一：连接创建与销毁" class="headerlink" title="2. 成本一：连接创建与销毁"></a>2. 成本一：连接创建与销毁</h3><p>如果应用没有连接池，每个请求都这样访问数据库：</p>
+<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line">建立连接</span><br><span class="line">→ 创建 backend</span><br><span class="line">→ 认证并初始化会话</span><br><span class="line">→ 执行一条 SELECT</span><br><span class="line">→ 断开连接并回收 backend</span><br></pre></td></tr></table></figure>
+
+<p>对于只需几毫秒甚至更短的简单查询，TCP、TLS、认证、进程创建和会话初始化可能占据显著比例。连接越短命，这部分固定成本越不划算。</p>
+<p>这也是为什么“数据库能执行多少条简单 SQL”与“数据库能建立多少条新连接”必须分开测试。前者测执行路径，后者还测连接生命周期。</p>
+<h3 id="3-成本二：私有内存，而不是复制整个-shared-buffers"><a href="#3-成本二：私有内存，而不是复制整个-shared-buffers" class="headerlink" title="3. 成本二：私有内存，而不是复制整个 shared_buffers"></a>3. 成本二：私有内存，而不是复制整个 shared_buffers</h3><p>Linux 的 <code>fork()</code> 使用 Copy-on-Write，不会在创建进程时立刻复制所有物理页。PostgreSQL 的 <code>shared_buffers</code>、WAL 缓冲区、锁表等本来就是多个进程共同映射的共享内存。</p>
+<p>但每个 backend 仍有自己的：</p>
+<ul>
+<li>进程描述符、页表、栈和文件描述符；</li>
+<li>会话状态与内存上下文；</li>
+<li>查询解析、规划和执行期间申请的私有内存；</li>
+<li>排序、哈希、聚合等算子受 <code>work_mem</code> 影响的内存。</li>
+</ul>
+<p>因此，不能拿 <code>top</code> 中某个 backend 的 RSS 直接乘以连接数——RSS 会把共享映射重复计算。更合理的方式是观察 private memory 或 PSS。假设实测每个空闲 backend 平均产生 3 MB 私有内存，那么：</p>
+<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">10,000 × 3 MB ≈ 30 GB</span><br></pre></td></tr></table></figure>
+
+<p>这里的 3 MB 只是演示计算方式，不能当成 PostgreSQL 的固定值。扩展、认证方式、会话状态和执行过的查询都会改变结果。</p>
+<h3 id="4-成本三：突发并发与上下文切换"><a href="#4-成本三：突发并发与上下文切换" class="headerlink" title="4. 成本三：突发并发与上下文切换"></a>4. 成本三：突发并发与上下文切换</h3><p>空闲 backend 在睡眠时不会持续消耗 CPU。问题发生在大量进程同时被唤醒时：</p>
+<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line">1,000 条查询同时到达</span><br><span class="line">→ 1,000 个 backend 进入 runnable 状态</span><br><span class="line">→ 竞争 32 个 CPU 核心</span><br><span class="line">→ 调度器不断保存和恢复执行上下文</span><br></pre></td></tr></table></figure>
+
+<p>固定工作池可以只放 64 个任务执行，其余排队，从而主动限制并发。PostgreSQL 的原生模型则更依赖应用连接池、<code>max_connections</code> 和外部连接池控制入口。</p>
+<p>这里也有两个边界：</p>
+<ul>
+<li>Linux 把进程和线程都作为调度任务处理，二者的切换成本并非数量级差异；</li>
+<li>如果 1,000 条查询都是真正的 CPU 重活，换成线程也不会让计算量消失。工作池的价值是控制拥塞，而不是创造算力。</li>
+</ul>
+<h3 id="5-成本四：跨进程共享状态"><a href="#5-成本四：跨进程共享状态" class="headerlink" title="5. 成本四：跨进程共享状态"></a>5. 成本四：跨进程共享状态</h3><p>两个 backend 同时修改一张表时，必须共同访问：</p>
+<ul>
+<li><code>shared_buffers</code> 中的数据页；</li>
+<li>WAL 缓冲区；</li>
+<li>锁表和活跃事务数组；</li>
+<li>各类共享统计与控制结构。</li>
+</ul>
+<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">backend A ─┐</span><br><span class="line">           ├─ 共享内存：数据页、WAL、锁、事务状态</span><br><span class="line">backend B ─┘</span><br></pre></td></tr></table></figure>
+
+<p>独立进程不能随意共享普通堆指针，因此 PostgreSQL 需要预先设计共享内存布局，并通过信号量、轻量锁、latch 和信号等机制同步。这提高了内部实现复杂度。</p>
+<p>不过线程模型也必须为数据页、锁表和事务状态做并发控制。线程的共享更直接，但一次越界写或内存破坏也更容易拖垮整个服务进程；多进程则提供了更清晰的地址空间和故障边界。</p>
+<h3 id="6-工程上如何处理"><a href="#6-工程上如何处理" class="headerlink" title="6. 工程上如何处理"></a>6. 工程上如何处理</h3><p>如果业务有大量客户端连接，不要让它们全部直接变成 PostgreSQL backend：</p>
+<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">10,000 个应用连接</span><br><span class="line">→ PgBouncer / 应用连接池</span><br><span class="line">→ 100～300 个数据库连接</span><br></pre></td></tr></table></figure>
+
+<p>连接池不能无限开大。一个常见事故是：20 个微服务实例，每个实例默认开 50 个连接，最终数据库突然收到 1,000 个 backend；扩容应用反而把数据库压垮。</p>
+<p>真正需要先回答的是：<strong>业务需要多少并发查询，而不是能创建多少连接。</strong></p>
+<h2 id="三、双重缓存：一份数据为什么可能出现两次"><a href="#三、双重缓存：一份数据为什么可能出现两次" class="headerlink" title="三、双重缓存：一份数据为什么可能出现两次"></a>三、双重缓存：一份数据为什么可能出现两次</h2><p>PostgreSQL 的一次普通读取可以经过这条路径：</p>
+<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line">SQL</span><br><span class="line">→ PostgreSQL shared_buffers</span><br><span class="line">→ read()/pread()</span><br><span class="line">→ Linux Page Cache</span><br><span class="line">→ SSD/HDD</span><br></pre></td></tr></table></figure>
+
+<p>当页面不在 <code>shared_buffers</code> 中，PostgreSQL 通过文件系统读取它。内核可能先把页面放进 OS Page Cache，再把内容复制到 PostgreSQL 的共享缓冲区。于是同一逻辑数据页可能同时存在于：</p>
+<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">PostgreSQL shared_buffers</span><br><span class="line">+</span><br><span class="line">OS Page Cache</span><br></pre></td></tr></table></figure>
+
+<p>这就是视频所说的 <strong>double buffering</strong>。</p>
+<h3 id="1-一个-128-GB-内存的例子"><a href="#1-一个-128-GB-内存的例子" class="headerlink" title="1. 一个 128 GB 内存的例子"></a>1. 一个 128 GB 内存的例子</h3><p>假设专用数据库服务器有 128 GB 内存：</p>
+<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">shared_buffers = 32 GB</span><br><span class="line">backend 私有内存、work_mem、维护任务 = 动态增长</span><br><span class="line">OS Page Cache 与系统内存 = 使用剩余空间</span><br></pre></td></tr></table></figure>
+
+<p>如果把 <code>shared_buffers</code> 直接设成 100 GB，留给操作系统、连接私有内存、排序哈希和后台任务的空间会明显收紧。查询并发升高时，剩余内存可能不足，最终触发 swap 或 OOM，代价远大于多缓存一点数据。</p>
+<p>PostgreSQL 18 官方文档仍把系统内存的 <strong>25%</strong> 作为专用数据库服务器的合理起点，并指出由于 PostgreSQL 依赖操作系统缓存，超过约 40% 往往未必更好。这是起点，不是适用于所有负载的定律。</p>
+<h3 id="2-两层缓存不全是浪费"><a href="#2-两层缓存不全是浪费" class="headerlink" title="2. 两层缓存不全是浪费"></a>2. 两层缓存不全是浪费</h3><p>如果同一热页长期同时占据两层缓存，确实会降低有效缓存容量。但 OS Page Cache 也不是毫无价值：</p>
+<ul>
+<li>PostgreSQL 刚从 <code>shared_buffers</code> 淘汰的页面，可能仍在 OS 缓存中，再次读取时不必访问磁盘；</li>
+<li>内核提供文件预读、脏页回写和统一的内存回收；</li>
+<li>PostgreSQL 无需为所有文件系统和设备重新实现一套完整缓存管理。</li>
+</ul>
+<p>因此，问题不是“为什么不把 OS Page Cache 全关掉”，而是：<strong>数据库是否能比通用内核更准确地管理自己的访问模式，以及为这种控制权要付出多少复杂度。</strong></p>
+<h3 id="3-与-InnoDB-的对比"><a href="#3-与-InnoDB-的对比" class="headerlink" title="3. 与 InnoDB 的对比"></a>3. 与 InnoDB 的对比</h3><p>MySQL&#x2F;InnoDB 在常见 Unix-like 配置中可以使用 <code>O_DIRECT</code>：</p>
+<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line">SQL</span><br><span class="line">→ InnoDB Buffer Pool</span><br><span class="line">→ pread(O_DIRECT)</span><br><span class="line">→ SSD/HDD</span><br></pre></td></tr></table></figure>
+
+<p>这样数据文件 I&#x2F;O 可以绕过 OS Page Cache，把主要缓存决策交给 Buffer Pool，减少同一数据页在两层缓存中的重叠。</p>
+<p>但这并不意味着 <code>O_DIRECT</code> 在所有设备和负载上都更快。对齐要求、I&#x2F;O 合并、预读、队列深度和存储设备特征都会影响结果；InnoDB 的实际路径也取决于平台与配置。比较两个数据库时，不能把“MySQL”简单等同于“永远绕过页缓存”。</p>
+<h2 id="四、Direct-I-O-与-AIO-不是一回事"><a href="#四、Direct-I-O-与-AIO-不是一回事" class="headerlink" title="四、Direct I&#x2F;O 与 AIO 不是一回事"></a>四、Direct I&#x2F;O 与 AIO 不是一回事</h2><p>这两个概念经常被混在一起：</p>
+<table>
+<thead>
+<tr>
+<th>概念</th>
+<th>回答的问题</th>
+<th>典型作用</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Direct I&#x2F;O</td>
+<td>数据是否绕过 OS Page Cache</td>
+<td>减少双重缓存，让数据库掌控缓存</td>
+</tr>
+<tr>
+<td>AIO</td>
+<td>发出 I&#x2F;O 后是否必须原地等待</td>
+<td>同时排队多个请求，提高设备并行度</td>
+</tr>
+</tbody></table>
+<p>可以有缓冲式 AIO，也可以有 Direct I&#x2F;O 加 AIO。一个解决缓存路径，一个解决等待和并发提交。</p>
+<h3 id="1-视频中的-PostgreSQL-16-状态"><a href="#1-视频中的-PostgreSQL-16-状态" class="headerlink" title="1. 视频中的 PostgreSQL 16 状态"></a>1. 视频中的 PostgreSQL 16 状态</h3><p>视频提到 PostgreSQL 16 的 <code>debug_io_direct = data</code>。这个参数能够让内核尽量减少对关系数据或 WAL 的缓存，但它位于 Developer Options，官方说明它需要特定调试构建，并且当前会降低性能，只用于开发测试。</p>
+<h3 id="2-PostgreSQL-18-新增的是-AIO-子系统"><a href="#2-PostgreSQL-18-新增的是-AIO-子系统" class="headerlink" title="2. PostgreSQL 18 新增的是 AIO 子系统"></a>2. PostgreSQL 18 新增的是 AIO 子系统</h3><p>PostgreSQL 18 引入了核心 AIO 基础设施，可以让 backend 同时排队多个读取请求。顺序扫描、位图堆扫描和 <code>VACUUM</code> 等路径可以从中受益。</p>
+<p>相关配置包括：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">io_method = worker   # 默认：由 I/O worker 进程执行</span><br><span class="line"># io_method = io_uring  # 构建并运行环境支持时可选</span><br><span class="line"># io_method = sync      # 退回同步执行</span><br></pre></td></tr></table></figure>
+
+<p>这说明 PostgreSQL 的 I&#x2F;O 架构正在变化，但不能据此写成“PostgreSQL 18 已默认通过 Direct I&#x2F;O 消除了双重缓存”。截至 PostgreSQL 18，<code>debug_io_direct</code> 文档仍把 Direct I&#x2F;O 标为可能降低性能的开发测试能力。</p>
+<h3 id="3-为什么一个-5-8-的实验不能证明结论"><a href="#3-为什么一个-5-8-的实验不能证明结论" class="headerlink" title="3. 为什么一个 +5.8% 的实验不能证明结论"></a>3. 为什么一个 +5.8% 的实验不能证明结论</h3><p>视频引用过一项历史实验：补丁尝试在数据进入 <code>shared_buffers</code> 后，通过 <code>posix_fadvise(POSIX_FADV_DONTNEED)</code> 释放 OS 中的重复缓存；某组 DBT-2 结果从 3589 提升到 3799，约为 5.8%。</p>
+<p>这个结果适合作为“重复缓存可能存在成本”的证据，但不能直接推出“生产环境都能提升 5.8%”：</p>
+<ul>
+<li>它来自特定硬件、内核、数据规模和 DBT-2 负载；</li>
+<li>丢弃页缓存可能破坏内核预读，或误删仍然有价值的热页；</li>
+<li><code>posix_fadvise</code> 是提示，不同内核和文件系统实现可能不同；</li>
+<li>补丁作者也提醒提升可能落在误差范围，方案最终没有成为通用默认路径。</li>
+</ul>
+<p>基准测试回答的是“在这组条件下发生了什么”，不是“所有环境下必然发生什么”。</p>
+<h2 id="五、VACUUM、表膨胀和-XID-回绕是另一组问题"><a href="#五、VACUUM、表膨胀和-XID-回绕是另一组问题" class="headerlink" title="五、VACUUM、表膨胀和 XID 回绕是另一组问题"></a>五、VACUUM、表膨胀和 XID 回绕是另一组问题</h2><p>视频最后提到 PostgreSQL MVCC 的三类维护成本：</p>
+<ol>
+<li><code>UPDATE</code> 和 <code>DELETE</code> 产生的旧行版本不会立即物理删除，需要 <code>VACUUM</code> 回收；</li>
+<li>旧版本和索引项清理不及时，会产生表或索引膨胀；</li>
+<li>事务 ID 是有限空间，需要 freeze 机制避免 XID 回绕风险。</li>
+</ol>
+<p>这些问题真实存在，但它们不是多进程或双重缓存直接导致的。它们来自 PostgreSQL 的 MVCC 元组版本与可见性设计。</p>
+<p>因此，评估时应拆成三张账：</p>
+<table>
+<thead>
+<tr>
+<th>问题</th>
+<th>主要观察对象</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>连接进程过多</td>
+<td>backend 数、连接建立速率、PSS、CPU 调度</td>
+</tr>
+<tr>
+<td>缓存与 I&#x2F;O</td>
+<td><code>shared_buffers</code> 命中、OS 缓存、<code>pg_stat_io</code>、存储延迟</td>
+</tr>
+<tr>
+<td>MVCC 维护</td>
+<td>dead tuples、autovacuum、表&#x2F;索引膨胀、freeze 年龄</td>
+</tr>
+</tbody></table>
+<p>把三类指标混在一起，只会得到“数据库好像很慢”，却不知道该减少连接、调整缓存，还是修复 autovacuum。</p>
+<h2 id="六、如何判断自己的系统是否真的受影响"><a href="#六、如何判断自己的系统是否真的受影响" class="headerlink" title="六、如何判断自己的系统是否真的受影响"></a>六、如何判断自己的系统是否真的受影响</h2><h3 id="1-先看连接，而不是先改参数"><a href="#1-先看连接，而不是先改参数" class="headerlink" title="1. 先看连接，而不是先改参数"></a>1. 先看连接，而不是先改参数</h3><figure class="highlight sql"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">SELECT</span> state, <span class="built_in">count</span>(<span class="operator">*</span>)</span><br><span class="line"><span class="keyword">FROM</span> pg_stat_activity</span><br><span class="line"><span class="keyword">GROUP</span> <span class="keyword">BY</span> state</span><br><span class="line"><span class="keyword">ORDER</span> <span class="keyword">BY</span> <span class="built_in">count</span>(<span class="operator">*</span>) <span class="keyword">DESC</span>;</span><br><span class="line"></span><br><span class="line"><span class="keyword">SHOW</span> max_connections;</span><br></pre></td></tr></table></figure>
+
+<p>如果大量连接长期 <code>idle</code>，先检查应用连接池和连接池总量。如果 backend 数量并不高，多进程模型通常不是当前瓶颈。</p>
+<h3 id="2-不要用-RSS-粗暴相乘"><a href="#2-不要用-RSS-粗暴相乘" class="headerlink" title="2. 不要用 RSS 粗暴相乘"></a>2. 不要用 RSS 粗暴相乘</h3><p>在 Linux 上应尽量区分共享内存与私有内存，观察 PSS&#x2F;private memory，并在连接数阶梯上测试：</p>
+<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">100 连接 → 记录内存</span><br><span class="line">500 连接 → 记录内存</span><br><span class="line">1000 连接 → 记录内存</span><br></pre></td></tr></table></figure>
+
+<p>用增量估算“每增加一条连接，系统实际多消耗多少内存”，比截取单个进程的 RSS 更可靠。</p>
+<h3 id="3-校验缓存和-I-O-假设"><a href="#3-校验缓存和-I-O-假设" class="headerlink" title="3. 校验缓存和 I&#x2F;O 假设"></a>3. 校验缓存和 I&#x2F;O 假设</h3><figure class="highlight sql"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">SHOW</span> shared_buffers;</span><br><span class="line"><span class="keyword">SHOW</span> work_mem;</span><br><span class="line"><span class="keyword">SHOW</span> effective_io_concurrency;</span><br><span class="line"><span class="keyword">SHOW</span> io_method;  <span class="comment">-- PostgreSQL 18</span></span><br></pre></td></tr></table></figure>
+
+<p>结合以下工具观察读取来自缓存还是存储：</p>
+<figure class="highlight sql"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">EXPLAIN (ANALYZE, BUFFERS, WAL)</span><br><span class="line"><span class="keyword">SELECT</span> <span class="operator">*</span> <span class="keyword">FROM</span> pg_stat_io;</span><br></pre></td></tr></table></figure>
+
+<p>真正的验证应保持数据集、并发度、预热方式和查询集合一致，比较吞吐、P95&#x2F;P99 延迟、CPU、I&#x2F;O 等待与内存，而不是只看平均 QPS。</p>
+<h3 id="4-调优顺序"><a href="#4-调优顺序" class="headerlink" title="4. 调优顺序"></a>4. 调优顺序</h3><p>一个更稳妥的排查顺序是：</p>
+<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line">限制连接总量</span><br><span class="line">→ 确认查询和索引没有明显问题</span><br><span class="line">→ 观察内存、缓存与 I/O</span><br><span class="line">→ 做可重复的基准测试</span><br><span class="line">→ 最后才调整 shared_buffers、I/O 与并发参数</span><br></pre></td></tr></table></figure>
+
+<p>绕过页缓存、启用新 I&#x2F;O 路径或大幅修改 <code>shared_buffers</code> 都不应仅凭经验公式直接上线。</p>
+<h2 id="七、重新评价这些“离谱设计”"><a href="#七、重新评价这些“离谱设计”" class="headerlink" title="七、重新评价这些“离谱设计”"></a>七、重新评价这些“离谱设计”</h2><p>PostgreSQL 的多进程模型来自历史，但今天仍有清晰的工程收益：地址空间隔离、故障边界、扩展模型和长期兼容性。代价是在海量连接和突发并发下，需要更严格地控制 backend 数量。</p>
+<p><code>shared_buffers</code> 与 OS Page Cache 的双重缓存可能浪费内存，但也借用了成熟的内核预读、回写和缓存回收。Direct I&#x2F;O 能获得更多控制权，同时也把对齐、队列和缓存策略的复杂度交还给数据库。</p>
+<p>所以更准确的结论不是“PostgreSQL 设计落后”，而是：</p>
+<blockquote>
+<p>PostgreSQL 选择了隔离性、通用性和长期兼容；当连接规模、内存压力或 I&#x2F;O 模式越过边界时，这些选择的成本就会显现。工程任务不是站队，而是找到边界并用指标验证。</p>
+</blockquote>
+
+    </div>
+
+    
+    
+    
+
+    <footer class="post-footer">
+          
+
+<div class="post-copyright">
+<ul>
+  <li class="post-copyright-author">
+      <strong>本文作者： </strong>陌忆
+  </li>
+  <li class="post-copyright-link">
+      <strong>本文链接：</strong>
+      <a href="https://moyi-math.github.io/2026/08/20/PostgreSQL-1-%E5%A4%9A%E8%BF%9B%E7%A8%8B%E3%80%81%E5%8F%8C%E9%87%8D%E7%BC%93%E5%AD%98%E4%B8%8EDirect-I-O/" title="PostgreSQL 的“离谱”设计：多进程、双重缓存与 Direct I&#x2F;O">https://moyi-math.github.io/2026/08/20/PostgreSQL-1-多进程、双重缓存与Direct-I-O/</a>
+  </li>
+  <li class="post-copyright-license">
+      <strong>版权声明： </strong>本博客所有文章除特别声明外，均采用 <a href="https://creativecommons.org/licenses/by-nc-sa/4.0/" rel="noopener" target="_blank"><i class="fab fa-fw fa-creative-commons"></i>BY-NC-SA</a> 许可协议。转载请注明出处！
+  </li>
+</ul>
+</div>
+
+          <div class="post-tags">
+              <a href="/tags/PostgreSQL/" rel="tag"># PostgreSQL</a>
+              <a href="/tags/%E6%95%B0%E6%8D%AE%E5%BA%93/" rel="tag"># 数据库</a>
+              <a href="/tags/%E5%A4%9A%E8%BF%9B%E7%A8%8B/" rel="tag"># 多进程</a>
+              <a href="/tags/shared-buffers/" rel="tag"># shared_buffers</a>
+              <a href="/tags/Direct-I-O/" rel="tag"># Direct I/O</a>
+              <a href="/tags/AIO/" rel="tag"># AIO</a>
+          </div>
+
+        
+
+          <div class="post-nav">
+            <div class="post-nav-item">
+                <a href="/2026/08/20/Learn-Claude-Code-09-Memory/" rel="prev" title="Learn Claude Code 09：Memory——让重要信息跨越压缩与会话">
+                  <i class="fa fa-angle-left"></i> Learn Claude Code 09：Memory——让重要信息跨越压缩与会话
+                </a>
+            </div>
+            <div class="post-nav-item">
+            </div>
+          </div>
+    </footer>
+  </article>
+</div>
+
+
+
+
+
+
+</div>
+  </main>
+
+  <footer class="footer">
+    <div class="footer-inner">
+
+  <div class="copyright">
+    &copy; 
+    <span itemprop="copyrightYear">2026</span>
+    <span class="with-love">
+      <i class="fab fa-osi"></i>
+    </span>
+    <span class="author" itemprop="copyrightHolder">陌忆</span>
+  </div>
+<div class="wordcount">
+  <span class="post-meta-item">
+    <span class="post-meta-item-icon">
+      <i class="fa fa-chart-line"></i>
+    </span>
+    <span title="站点总字数">106k</span>
+  </span>
+  <span class="post-meta-item">
+    <span class="post-meta-item-icon">
+      <i class="fa fa-coffee"></i>
+    </span>
+    <span title="站点阅读时长">6:24</span>
+  </span>
+</div>
+  <div class="powered-by">由 <a href="https://hexo.io/" rel="noopener" target="_blank">Hexo</a> & <a href="https://theme-next.js.org/" rel="noopener" target="_blank">NexT.Gemini</a> 强力驱动
+  </div>
+
+    </div>
+  </footer>
+
+  
+  <div class="toggle sidebar-toggle" role="button">
+    <span class="toggle-line"></span>
+    <span class="toggle-line"></span>
+    <span class="toggle-line"></span>
+  </div>
+  <div class="sidebar-dimmer"></div>
+  <div class="back-to-top" role="button" aria-label="返回顶部">
+    <i class="fa fa-arrow-up fa-lg"></i>
+    <span>0%</span>
+  </div>
+
+<noscript>
+  <div class="noscript-warning">Theme NexT works best with JavaScript enabled</div>
+</noscript>
+<!-- Site running time -->
+<span id="timeDate" aria-live="off"></span>
+<script>
+(function() {
+  var start = new Date("2022-11-17T08:00:00+08:00");
+  function pad(n) { return n < 10 ? "0" + n : "" + n; }
+  function tick() {
+    var diff = Date.now() - start.getTime();
+    if (diff < 0) return;
+    var d = Math.floor(diff / 86400000);
+    var h = Math.floor((diff % 86400000) / 3600000);
+    var m = Math.floor((diff % 3600000) / 60000);
+    var timeDate = document.getElementById("timeDate");
+    if (!timeDate) return;
+    timeDate.textContent =
+      "\u672C\u7AD9\u5DF2\u5B89\u5168\u8FD0\u884C " + d + " \u5929 " + pad(h) + " \u5C0F\u65F6 " + pad(m) + " \u5206";
+  }
+  tick();
+  setInterval(tick, 60000);
+})();
+</script>
+
+</body>
+</html>

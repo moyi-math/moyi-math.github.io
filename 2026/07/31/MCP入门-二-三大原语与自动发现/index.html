@@ -1,0 +1,642 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width">
+<meta name="theme-color" content="#222" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#222" media="(prefers-color-scheme: dark)"><meta name="generator" content="Hexo 7.3.0">
+<link rel="preconnect" href="https://cdnjs.cloudflare.com" crossorigin>
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon-next.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32-next.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next.png">
+  <link rel="mask-icon" href="/images/logo.svg" color="#222">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/7.0.0/css/all.min.css" integrity="sha256-VHqXKFhhMxcpubYf9xiWdCiojEbY9NexQ4jh8AxbvcM=" crossorigin="anonymous">
+
+<script class="next-config" data-name="main" type="application/json">{"hostname":"moyi-math.github.io","root":"/","images":"/images","scheme":"Gemini","darkmode":true,"version":"8.28.0","exturl":false,"sidebar":{"position":"left","width_expanded":320,"width_dual_column":240,"display":"post","padding":18,"offset":12},"hljswrap":true,"codeblock":{"theme":{"light":"default","dark":"stackoverflow-dark"},"prism":{"light":"prism","dark":"prism-dark"},"copy_button":{"enable":true,"style":null},"fold":{"enable":false,"height":500},"language":false},"bookmark":{"enable":false,"color":"#222","save":"auto"},"mediumzoom":false,"lazyload":true,"pangu":false,"comments":{"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},"stickytabs":false,"motion":{"enable":false,"async":false,"duration":200,"transition":{"menu_item":"fadeInDown","post_block":"fadeIn","post_header":"fadeInDown","post_body":"fadeInDown","coll_header":"fadeInLeft","sidebar":"fadeInUp"}},"prism":false,"i18n":{"placeholder":"搜索...","empty":"没有找到任何搜索结果：${query}","hits_time":"找到 ${hits} 个搜索结果（用时 ${time} 毫秒）","hits":"找到 ${hits} 个搜索结果"},"path":"/search.json","localsearch":{"enable":true,"top_n_per_article":1,"unescape":false,"preload":false}}</script><script src="/js/config.js" defer></script>
+
+    <meta name="description" content="Resource、Tool、Prompt 是 MCP 的三大原语。本文通过和 FastAPI 逐层类比，帮你用一个下午彻底理解它们的关系、自动发现机制和传输层设计。">
+<meta property="og:type" content="article">
+<meta property="og:title" content="MCP 入门（二）：三大原语与自动发现——从 FastAPI 类比理解 MCP 通信">
+<meta property="og:url" content="https://moyi-math.github.io/2026/07/31/MCP%E5%85%A5%E9%97%A8-%E4%BA%8C-%E4%B8%89%E5%A4%A7%E5%8E%9F%E8%AF%AD%E4%B8%8E%E8%87%AA%E5%8A%A8%E5%8F%91%E7%8E%B0/index.html">
+<meta property="og:site_name" content="陌忆的博客">
+<meta property="og:description" content="Resource、Tool、Prompt 是 MCP 的三大原语。本文通过和 FastAPI 逐层类比，帮你用一个下午彻底理解它们的关系、自动发现机制和传输层设计。">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:image" content="https://moyi-math.github.io/images/background.webp">
+<meta property="article:published_time" content="2026-07-31T11:30:00.000Z">
+<meta property="article:modified_time" content="2026-07-31T11:30:00.000Z">
+<meta property="article:author" content="陌忆">
+<meta property="article:tag" content="Python">
+<meta property="article:tag" content="MCP">
+<meta property="article:tag" content="Model Context Protocol">
+<meta property="article:tag" content="Resource">
+<meta property="article:tag" content="Tool">
+<meta property="article:tag" content="Prompt">
+<meta property="article:tag" content="FastAPI">
+<meta property="article:tag" content="JSON-RPC">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:image" content="https://moyi-math.github.io/images/background.webp">
+
+
+<link rel="canonical" href="https://moyi-math.github.io/2026/07/31/MCP%E5%85%A5%E9%97%A8-%E4%BA%8C-%E4%B8%89%E5%A4%A7%E5%8E%9F%E8%AF%AD%E4%B8%8E%E8%87%AA%E5%8A%A8%E5%8F%91%E7%8E%B0/">
+
+
+<script class="next-config" data-name="page" type="application/json">{"sidebar":"","isHome":false,"isPost":true,"lang":"zh-CN","comments":true,"permalink":"https://moyi-math.github.io/2026/07/31/MCP%E5%85%A5%E9%97%A8-%E4%BA%8C-%E4%B8%89%E5%A4%A7%E5%8E%9F%E8%AF%AD%E4%B8%8E%E8%87%AA%E5%8A%A8%E5%8F%91%E7%8E%B0/","path":"2026/07/31/MCP入门-二-三大原语与自动发现/","title":"MCP 入门（二）：三大原语与自动发现——从 FastAPI 类比理解 MCP 通信"}</script>
+
+<script class="next-config" data-name="calendar" type="application/json">""</script>
+<title>MCP 入门（二）：三大原语与自动发现——从 FastAPI 类比理解 MCP 通信 | 陌忆的博客</title>
+  
+
+
+
+
+
+
+
+
+  
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/animejs/3.2.1/anime.min.js" integrity="sha256-XL2inqUJaslATFnHdJOi9GfQ60on8Wx1C2H8DYiN1xY=" crossorigin="anonymous" defer></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/lozad.js/1.16.0/lozad.min.js" integrity="sha256-mOFREFhqmHeQbXpK2lp4nA3qooVgACfh88fpJftLBbc=" crossorigin="anonymous" defer></script>
+<script src="/js/utils.js" defer></script><script src="/js/sidebar.js" defer></script><script src="/js/next-boot.js" defer></script>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/hexo-generator-searchdb/1.5.0/search.js" integrity="sha256-xFC6PJ82SL9b3WkGjFavNiA9gm5z6UBxWPiu4CYjptg=" crossorigin="anonymous" defer></script>
+<script src="/js/third-party/search/local-search.js" defer></script>
+
+
+
+
+
+
+
+  
+
+
+
+
+  
+
+  <script class="next-config" data-name="enableMath" type="application/json">false</script><link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/katex.min.css" integrity="sha256-UF1fgpAiu3tPJN/uCqEUHNe7pnr+QR0SQDNfgglgtcM=" crossorigin="anonymous">
+
+
+<link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
+
+
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"WebSite","name":"陌忆的博客","url":"https://moyi-math.github.io","description":"记录 RAG、Agent、MCP、算法与软件工程实践，按专栏整理可复用的技术笔记。","inLanguage":"zh-CN","author":{"@type":"Person","name":"陌忆"}}</script>
+
+
+
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"Article","headline":"MCP 入门（二）：三大原语与自动发现——从 FastAPI 类比理解 MCP 通信","description":"Resource、Tool、Prompt 是 MCP 的三大原语。本文通过和 FastAPI 逐层类比，帮你用一个下午彻底理解它们的关系、自动发现机制和传输层设计。","datePublished":"2026-07-31T11:30:00.000Z","dateModified":"2026-07-31T11:30:00.000Z","inLanguage":"zh-CN","mainEntityOfPage":{"@type":"WebPage","@id":"https://moyi-math.github.io/2026/07/31/MCP%E5%85%A5%E9%97%A8-%E4%BA%8C-%E4%B8%89%E5%A4%A7%E5%8E%9F%E8%AF%AD%E4%B8%8E%E8%87%AA%E5%8A%A8%E5%8F%91%E7%8E%B0/index.html"},"author":{"@type":"Person","name":"陌忆"}}</script>
+<meta name="author" content="陌忆">
+
+
+  <noscript>
+    <link rel="stylesheet" href="/css/noscript.css">
+  </noscript>
+<!-- hexo injector head_end start --><link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/katex.min.css" integrity="sha512-fHwaWebuwA7NSF5Qg/af4UeDx9XqUpYpOGgubo3yWu+b2IQR4UeQwbb42Ti7gVAjNtVoI/I9TEoYeu9omwcC6g==" crossorigin="anonymous" referrerpolicy="no-referrer" /><!-- hexo injector head_end end --><link rel="alternate" href="/atom.xml" title="陌忆的博客" type="application/atom+xml">
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage">
+  <div class="headband"></div>
+
+  <main class="main">
+    <div class="column">
+      <header class="header" itemscope itemtype="http://schema.org/WPHeader"><div class="site-brand-container">
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="切换导航栏" role="button">
+        <span class="toggle-line"></span>
+        <span class="toggle-line"></span>
+        <span class="toggle-line"></span>
+    </div>
+  </div>
+
+  <div class="site-meta">
+
+    <a href="/" class="brand" rel="start">
+      <i class="logo-line"></i>
+      <p class="site-title">陌忆的博客</p>
+      <i class="logo-line"></i>
+    </a>
+      <p class="site-subtitle" itemprop="description">数据库无法得出结论</p>
+  </div>
+
+  <div class="site-nav-right">
+    <div class="toggle popup-trigger" aria-label="搜索" role="button">
+        <i class="fa fa-search fa-fw fa-lg"></i>
+    </div>
+  </div>
+</div>
+
+
+
+<nav class="site-nav">
+  <ul class="main-menu menu"><li class="menu-item menu-item-home"><a href="/" rel="section"><i class="fa fa-home fa-fw"></i>首页</a></li><li class="menu-item menu-item-about"><a href="/about/" rel="section"><i class="fa fa-user fa-fw"></i>关于</a></li><li class="menu-item menu-item-tags"><a href="/tags/" rel="section"><i class="fa fa-tags fa-fw"></i>标签</a></li><li class="menu-item menu-item-categories"><a href="/categories/" rel="section"><i class="fa fa-th fa-fw"></i>分类</a></li><li class="menu-item menu-item-archives"><a href="/archives/" rel="section"><i class="fa fa-archive fa-fw"></i>归档</a></li>
+      <li class="menu-item menu-item-search">
+        <a role="button" class="popup-trigger"><i class="fa fa-search fa-fw"></i>搜索
+        </a>
+      </li>
+  </ul>
+</nav>
+
+
+
+  <div class="search-pop-overlay">
+    <div class="popup search-popup">
+      <div class="search-header">
+        <span class="search-icon">
+          <i class="fa fa-search"></i>
+        </span>
+        <div class="search-input-container">
+          <input autocomplete="off" autocapitalize="off" maxlength="80"
+                placeholder="搜索..." spellcheck="false"
+                type="search" class="search-input">
+        </div>
+        <span class="popup-btn-close" role="button">
+          <i class="fa fa-times-circle"></i>
+        </span>
+      </div>
+      <div class="search-result-container">
+        <div class="search-result-icon">
+          <i class="fa fa-spinner fa-pulse fa-5x"></i>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</header>
+        
+  
+  <aside class="sidebar">
+
+    <div class="sidebar-inner sidebar-nav-active sidebar-toc-active">
+      <ul class="sidebar-nav">
+        <li class="sidebar-nav-toc">
+          文章目录
+        </li>
+        <li class="sidebar-nav-overview">
+          站点概览
+        </li>
+      </ul>
+
+      <div class="sidebar-panel-container">
+        <!--noindex-->
+        <div class="post-toc-wrap sidebar-panel">
+            <div class="post-toc animated"><ol class="nav"><li class="nav-item nav-level-2"><a class="nav-link" href="#%E4%B8%80%E3%80%81%E5%A6%82%E6%9E%9C%E4%BD%A0%E4%BC%9A%E7%94%A8-FastAPI%EF%BC%8C%E4%BD%A0%E5%B7%B2%E7%BB%8F%E4%BC%9A%E4%BA%86%E4%B8%80%E5%8D%8A"><span class="nav-text">一、如果你会用 FastAPI，你已经会了一半</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E4%BA%8C%E3%80%81%E4%B8%89%E5%A4%A7%E5%8E%9F%E8%AF%AD%EF%BC%88Server-Primitives%EF%BC%89"><span class="nav-text">二、三大原语（Server Primitives）</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#1-Tool%EF%BC%88%E5%B7%A5%E5%85%B7%EF%BC%89%E2%80%94%E2%80%94%E5%81%9A%E4%BA%8B%E6%83%85"><span class="nav-text">1. Tool（工具）——做事情</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#2-Resource%EF%BC%88%E8%B5%84%E6%BA%90%EF%BC%89%E2%80%94%E2%80%94%E8%AF%BB%E6%95%B0%E6%8D%AE"><span class="nav-text">2. Resource（资源）——读数据</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#3-Prompt%EF%BC%88%E6%8F%90%E7%A4%BA%E8%AF%8D%E6%A8%A1%E6%9D%BF%EF%BC%89%E2%80%94%E2%80%94%E6%95%99-AI-%E6%80%8E%E4%B9%88%E5%A4%84%E7%90%86"><span class="nav-text">3. Prompt（提示词模板）——教 AI 怎么处理</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E4%B8%89%E8%80%85%E5%85%B3%E7%B3%BB"><span class="nav-text">三者关系</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E4%B8%89%E3%80%81%E8%87%AA%E5%8A%A8%E5%8F%91%E7%8E%B0%EF%BC%88Auto-discovery%EF%BC%89"><span class="nav-text">三、自动发现（Auto-discovery）</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%9B%9B%E3%80%81%E4%BC%A0%E8%BE%93%E5%B1%82%EF%BC%9A%E6%9C%AC%E5%9C%B0-vs-%E8%BF%9C%E7%A8%8B"><span class="nav-text">四、传输层：本地 vs 远程</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#STDIO%EF%BC%88%E6%9C%AC%E5%9C%B0%E6%A8%A1%E5%BC%8F%EF%BC%89"><span class="nav-text">STDIO（本地模式）</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#Streamable-HTTP%EF%BC%88%E8%BF%9C%E7%A8%8B%E6%A8%A1%E5%BC%8F%EF%BC%89"><span class="nav-text">Streamable HTTP（远程模式）</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E4%BA%94%E3%80%81%E6%B6%88%E6%81%AF%E6%A0%BC%E5%BC%8F%EF%BC%9AJSON-RPC-2-0"><span class="nav-text">五、消息格式：JSON-RPC 2.0</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%85%AD%E3%80%81%E4%BF%A1%E6%81%AF%E6%B5%81%E5%85%A8%E6%99%AF"><span class="nav-text">六、信息流全景</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E4%B8%83%E3%80%81%E5%AE%89%E5%85%A8%E6%A8%A1%E5%9E%8B%EF%BC%88%E7%AE%80%E8%BF%B0%EF%BC%89"><span class="nav-text">七、安全模型（简述）</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%85%AB%E3%80%81%E6%80%BB%E7%BB%93"><span class="nav-text">八、总结</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E4%B9%9D%E3%80%81%E5%8A%A8%E6%89%8B%E8%AF%95%E8%AF%95"><span class="nav-text">九、动手试试</span></a></li></ol></div>
+        </div>
+        <!--/noindex-->
+
+        <div class="site-overview-wrap sidebar-panel">
+          <div class="site-author animated" itemprop="author" itemscope itemtype="http://schema.org/Person">
+    <img class="site-author-image" itemprop="image" alt="陌忆"
+      src="/images/avatar.webp">
+  <p class="site-author-name" itemprop="name">陌忆</p>
+  <div class="site-description" itemprop="description">记录 RAG、Agent、MCP、算法与软件工程实践，按专栏整理可复用的技术笔记。</div>
+</div>
+<div class="site-state-wrap animated">
+  <nav class="site-state">
+      <div class="site-state-item site-state-posts">
+        <a href="/archives/">
+          <span class="site-state-item-count">50</span>
+          <span class="site-state-item-name">日志</span>
+        </a>
+      </div>
+      <div class="site-state-item site-state-categories">
+          <a href="/categories/">
+        <span class="site-state-item-count">10</span>
+        <span class="site-state-item-name">分类</span></a>
+      </div>
+      <div class="site-state-item site-state-tags">
+          <a href="/tags/">
+        <span class="site-state-item-count">172</span>
+        <span class="site-state-item-name">标签</span></a>
+      </div>
+  </nav>
+</div>
+  <div class="links-of-author animated">
+      <span class="links-of-author-item">
+        <a href="https://github.com/moyi-math" title="GitHub → https:&#x2F;&#x2F;github.com&#x2F;moyi-math" rel="noopener me" target="_blank"><i class="fab fa-github fa-fw"></i>GitHub</a>
+      </span>
+  </div>
+  <div class="cc-license animated" itemprop="license">
+    <a href="https://creativecommons.org/licenses/by-nc-sa/4.0/" class="cc-opacity" rel="noopener" target="_blank"><img src="https://cdnjs.cloudflare.com/ajax/libs/creativecommons-vocabulary/2020.11.3/assets/license_badges/small/by_nc_sa.svg" alt="Creative Commons"></a>
+  </div>
+
+        </div>
+      </div>
+    </div>
+
+    
+  </aside>
+
+
+    </div>
+
+    <div class="main-inner post posts-expand">
+
+
+  
+
+
+<div class="post-block">
+  
+  
+
+  <article itemscope itemtype="http://schema.org/Article" class="post-content" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="https://moyi-math.github.io/2026/07/31/MCP%E5%85%A5%E9%97%A8-%E4%BA%8C-%E4%B8%89%E5%A4%A7%E5%8E%9F%E8%AF%AD%E4%B8%8E%E8%87%AA%E5%8A%A8%E5%8F%91%E7%8E%B0/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.webp">
+      <meta itemprop="name" content="陌忆">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="陌忆的博客">
+      <meta itemprop="description" content="记录 RAG、Agent、MCP、算法与软件工程实践，按专栏整理可复用的技术笔记。">
+    </span>
+
+    <span hidden itemprop="post" itemscope itemtype="http://schema.org/CreativeWork">
+      <meta itemprop="name" content="MCP 入门（二）：三大原语与自动发现——从 FastAPI 类比理解 MCP 通信 | 陌忆的博客">
+      <meta itemprop="description" content="Resource、Tool、Prompt 是 MCP 的三大原语。本文通过和 FastAPI 逐层类比，帮你用一个下午彻底理解它们的关系、自动发现机制和传输层设计。">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          MCP 入门（二）：三大原语与自动发现——从 FastAPI 类比理解 MCP 通信
+        </h1>
+
+        <div class="post-meta-container">
+          <div class="post-meta">
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-calendar"></i>
+      </span>
+      <span class="post-meta-item-text">发表于</span>
+
+      <time title="创建时间：2026-07-31 19:30:00" itemprop="dateCreated datePublished" datetime="2026-07-31T19:30:00+08:00">2026-07-31</time>
+    </span>
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-folder"></i>
+      </span>
+      <span class="post-meta-item-text">分类于</span>
+        <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+          <a href="/categories/MCP-%E5%AD%A6%E4%B9%A0%E7%AC%94%E8%AE%B0/" itemprop="url" rel="index"><span itemprop="name">MCP 学习笔记</span></a>
+        </span>
+    </span>
+
+  
+    <span class="post-meta-break"></span>
+    <span class="post-meta-item" title="本文字数">
+      <span class="post-meta-item-icon">
+        <i class="far fa-file-word"></i>
+      </span>
+      <span class="post-meta-item-text">本文字数：</span>
+      <span>1.7k</span>
+    </span>
+    <span class="post-meta-item" title="阅读时长">
+      <span class="post-meta-item-icon">
+        <i class="far fa-clock"></i>
+      </span>
+      <span class="post-meta-item-text">阅读时长 &asymp;</span>
+      <span>6 分钟</span>
+    </span>
+</div>
+
+            <div class="post-description">Resource、Tool、Prompt 是 MCP 的三大原语。本文通过和 FastAPI 逐层类比，帮你用一个下午彻底理解它们的关系、自动发现机制和传输层设计。</div>
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody"><h2 id="一、如果你会用-FastAPI，你已经会了一半"><a href="#一、如果你会用-FastAPI，你已经会了一半" class="headerlink" title="一、如果你会用 FastAPI，你已经会了一半"></a>一、如果你会用 FastAPI，你已经会了一半</h2><p>在上一篇我们看到了一个最简单的 MCP Server：</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">@mcp.tool()</span></span><br><span class="line"><span class="keyword">def</span> <span class="title function_">add</span>(<span class="params">a: <span class="built_in">int</span>, b: <span class="built_in">int</span></span>) -&gt; <span class="built_in">int</span>: ...</span><br><span class="line"></span><br><span class="line"><span class="meta">@mcp.resource(<span class="params"><span class="string">&quot;greeting://&#123;name&#125;&quot;</span></span>)</span></span><br><span class="line"><span class="keyword">def</span> <span class="title function_">get_greeting</span>(<span class="params">name: <span class="built_in">str</span></span>) -&gt; <span class="built_in">str</span>: ...</span><br></pre></td></tr></table></figure>
+
+<p>如果你是 Python 后端开发者，看到 <code>@xxx.tool()</code> 这种装饰器模式，应该立刻联想到 <strong>FastAPI</strong>：</p>
+<table>
+<thead>
+<tr>
+<th>FastAPI</th>
+<th>MCP</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>@app.get(&quot;/items/&#123;id&#125;&quot;)</code></td>
+<td><code>@mcp.resource(&quot;items://&#123;id&#125;&quot;)</code></td>
+</tr>
+<tr>
+<td><code>@app.post(&quot;/add&quot;)</code></td>
+<td><code>@mcp.tool()</code></td>
+</tr>
+<tr>
+<td>自动生成 OpenAPI <code>/docs</code></td>
+<td>自动暴露 <code>tools/list</code> 和 <code>resources/list</code></td>
+</tr>
+<tr>
+<td>客户端是浏览器&#x2F;curl</td>
+<td>客户端是 AI 模型</td>
+</tr>
+</tbody></table>
+<p>思维飞跃只有一句话：</p>
+<blockquote>
+<p><strong>MCP 就是”给 AI 用的 API 协议”。</strong></p>
+</blockquote>
+<h2 id="二、三大原语（Server-Primitives）"><a href="#二、三大原语（Server-Primitives）" class="headerlink" title="二、三大原语（Server Primitives）"></a>二、三大原语（Server Primitives）</h2><p>MCP Server 可以提供三类能力，称为 <strong>原语（Primitives）</strong>。它们分别对应 AI 与你的 Server 交互的三种方式。</p>
+<h3 id="1-Tool（工具）——做事情"><a href="#1-Tool（工具）——做事情" class="headerlink" title="1. Tool（工具）——做事情"></a>1. Tool（工具）——做事情</h3><figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">@mcp.tool()</span></span><br><span class="line"><span class="keyword">def</span> <span class="title function_">query_orders</span>(<span class="params">user_id: <span class="built_in">str</span>, status: <span class="built_in">str</span> = <span class="string">&quot;all&quot;</span>, days: <span class="built_in">int</span> = <span class="number">30</span></span>) -&gt; <span class="built_in">list</span>:</span><br><span class="line">    <span class="string">&quot;&quot;&quot;查询用户订单，支持按状态和日期筛选&quot;&quot;&quot;</span></span><br><span class="line">    <span class="comment"># 执行数据库查询，返回结果</span></span><br><span class="line">    <span class="keyword">return</span> db.query_orders(user_id, status, days)</span><br></pre></td></tr></table></figure>
+
+<p><strong>Tool &#x3D; 动作。</strong> 类似 HTTP 的 POST&#x2F;PUT&#x2F;DELETE。</p>
+<ul>
+<li>AI 调用它去<strong>执行一段逻辑</strong></li>
+<li>可以接受参数（筛选、排序、分页）</li>
+<li>可以有副作用（写入数据库、发邮件）</li>
+<li>返回结构化数据给 AI</li>
+</ul>
+<p>什么时候用 Tool：需要传参数、需要逻辑处理、需要写入操作。</p>
+<h3 id="2-Resource（资源）——读数据"><a href="#2-Resource（资源）——读数据" class="headerlink" title="2. Resource（资源）——读数据"></a>2. Resource（资源）——读数据</h3><figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">@mcp.resource(<span class="params"><span class="string">&quot;file://logs/app.log&quot;</span></span>)</span></span><br><span class="line"><span class="keyword">def</span> <span class="title function_">get_app_log</span>() -&gt; <span class="built_in">str</span>:</span><br><span class="line">    <span class="string">&quot;&quot;&quot;获取应用日志&quot;&quot;&quot;</span></span><br><span class="line">    <span class="keyword">return</span> read_file(<span class="string">&quot;logs/app.log&quot;</span>)</span><br><span class="line"></span><br><span class="line"><span class="meta">@mcp.resource(<span class="params"><span class="string">&quot;database://users/&#123;user_id&#125;&quot;</span></span>)</span></span><br><span class="line"><span class="keyword">def</span> <span class="title function_">get_user</span>(<span class="params">user_id: <span class="built_in">str</span></span>) -&gt; <span class="built_in">dict</span>:</span><br><span class="line">    <span class="string">&quot;&quot;&quot;获取用户信息&quot;&quot;&quot;</span></span><br><span class="line">    <span class="keyword">return</span> db.find_user(user_id)</span><br></pre></td></tr></table></figure>
+
+<p><strong>Resource &#x3D; 数据。</strong> 类似 HTTP 的 GET。</p>
+<ul>
+<li>AI “读取”一段数据，不做修改</li>
+<li>通过 URI 定位（<code>file://</code>、<code>database://</code>、<code>api://</code>）</li>
+<li>适合静态或动态的上下文数据</li>
+</ul>
+<p>什么时候用 Resource：内容已知 URI 就能获取、只读、不需要复杂参数。</p>
+<h3 id="3-Prompt（提示词模板）——教-AI-怎么处理"><a href="#3-Prompt（提示词模板）——教-AI-怎么处理" class="headerlink" title="3. Prompt（提示词模板）——教 AI 怎么处理"></a>3. Prompt（提示词模板）——教 AI 怎么处理</h3><figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">@mcp.prompt()</span></span><br><span class="line"><span class="keyword">def</span> <span class="title function_">code_review</span>(<span class="params">code: <span class="built_in">str</span></span>) -&gt; <span class="built_in">str</span>:</span><br><span class="line">    <span class="keyword">return</span> <span class="string">f&quot;&quot;&quot;Please review this code for:</span></span><br><span class="line"><span class="string">- Bugs</span></span><br><span class="line"><span class="string">- Security vulnerabilities</span></span><br><span class="line"><span class="string">- Performance issues</span></span><br><span class="line"><span class="string"></span></span><br><span class="line"><span class="string">Code:</span></span><br><span class="line"><span class="string"><span class="subst">&#123;code&#125;</span>&quot;&quot;&quot;</span></span><br></pre></td></tr></table></figure>
+
+<p><strong>Prompt &#x3D; 模板。</strong> 预写好的提示词。</p>
+<ul>
+<li>让 AI 用特定的方式思考或执行任务</li>
+<li>支持参数替换（动态模板）</li>
+<li>相当于”教 AI 怎么用数据和工具”</li>
+</ul>
+<h3 id="三者关系"><a href="#三者关系" class="headerlink" title="三者关系"></a>三者关系</h3><p>用一个后端的比喻来总结：</p>
+<table>
+<thead>
+<tr>
+<th>原语</th>
+<th>比喻</th>
+<th>类比 FastAPI</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>Resource</strong></td>
+<td>给 AI <strong>材料</strong>（数据）</td>
+<td><code>GET /users/&#123;id&#125;</code></td>
+</tr>
+<tr>
+<td><strong>Tool</strong></td>
+<td>让 AI <strong>动作</strong>（功能）</td>
+<td><code>POST /orders</code></td>
+</tr>
+<tr>
+<td><strong>Prompt</strong></td>
+<td>教 AI <strong>方法</strong>（模板）</td>
+<td>预填的请求体模板</td>
+</tr>
+</tbody></table>
+<h2 id="三、自动发现（Auto-discovery）"><a href="#三、自动发现（Auto-discovery）" class="headerlink" title="三、自动发现（Auto-discovery）"></a>三、自动发现（Auto-discovery）</h2><p>这是 MCP 最巧妙的设计之一。</p>
+<p>回到 FastAPI——当你启动 FastAPI 应用，它会自动生成 <code>/docs</code> 页面，列出所有接口和参数。客户端访问 <code>/docs</code> 就知道你的 API 长什么样。</p>
+<p><strong>MCP 也一样。</strong></p>
+<p>每个 MCP Server 启动时，会自动暴露三个”内置接口”（JSON-RPC 方法）：</p>
+<table>
+<thead>
+<tr>
+<th>MCP 方法</th>
+<th>相当于 FastAPI</th>
+<th>返回什么</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>tools/list</code></td>
+<td><code>GET /docs</code>（工具部分）</td>
+<td>所有工具的列表 + 参数 schema</td>
+</tr>
+<tr>
+<td><code>resources/list</code></td>
+<td><code>GET /docs</code>（资源部分）</td>
+<td>所有资源的 URI 列表</td>
+</tr>
+<tr>
+<td><code>prompts/list</code></td>
+<td><code>GET /docs</code>（提示词部分）</td>
+<td>所有提示词模板列表</td>
+</tr>
+</tbody></table>
+<p>AI 客户端连接上你的 Server 后，**第一步就是调用 <code>tools/list</code>**，拿到所有工具的 JSON Schema 描述，然后才知道”哦，这个 Server 能做什么”。</p>
+<p>拿上一篇的加法工具举例。你写的是：</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">@mcp.tool()</span></span><br><span class="line"><span class="keyword">def</span> <span class="title function_">add</span>(<span class="params">a: <span class="built_in">int</span>, b: <span class="built_in">int</span></span>) -&gt; <span class="built_in">int</span>:</span><br><span class="line">    <span class="string">&quot;&quot;&quot;Add two numbers&quot;&quot;&quot;</span></span><br><span class="line">    <span class="keyword">return</span> a + b</span><br></pre></td></tr></table></figure>
+
+<p>MCP SDK 自动把它翻译成：</p>
+<figure class="highlight json"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br></pre></td><td class="code"><pre><span class="line"><span class="punctuation">&#123;</span></span><br><span class="line">  <span class="attr">&quot;name&quot;</span><span class="punctuation">:</span> <span class="string">&quot;add&quot;</span><span class="punctuation">,</span></span><br><span class="line">  <span class="attr">&quot;description&quot;</span><span class="punctuation">:</span> <span class="string">&quot;Add two numbers&quot;</span><span class="punctuation">,</span></span><br><span class="line">  <span class="attr">&quot;inputSchema&quot;</span><span class="punctuation">:</span> <span class="punctuation">&#123;</span></span><br><span class="line">    <span class="attr">&quot;type&quot;</span><span class="punctuation">:</span> <span class="string">&quot;object&quot;</span><span class="punctuation">,</span></span><br><span class="line">    <span class="attr">&quot;properties&quot;</span><span class="punctuation">:</span> <span class="punctuation">&#123;</span></span><br><span class="line">      <span class="attr">&quot;a&quot;</span><span class="punctuation">:</span> <span class="punctuation">&#123;</span> <span class="attr">&quot;type&quot;</span><span class="punctuation">:</span> <span class="string">&quot;integer&quot;</span> <span class="punctuation">&#125;</span><span class="punctuation">,</span></span><br><span class="line">      <span class="attr">&quot;b&quot;</span><span class="punctuation">:</span> <span class="punctuation">&#123;</span> <span class="attr">&quot;type&quot;</span><span class="punctuation">:</span> <span class="string">&quot;integer&quot;</span> <span class="punctuation">&#125;</span></span><br><span class="line">    <span class="punctuation">&#125;</span><span class="punctuation">,</span></span><br><span class="line">    <span class="attr">&quot;required&quot;</span><span class="punctuation">:</span> <span class="punctuation">[</span><span class="string">&quot;a&quot;</span><span class="punctuation">,</span> <span class="string">&quot;b&quot;</span><span class="punctuation">]</span></span><br><span class="line">  <span class="punctuation">&#125;</span></span><br><span class="line"><span class="punctuation">&#125;</span></span><br></pre></td></tr></table></figure>
+
+<p><strong>你不需要手动写这个 JSON。</strong> 装饰器 + 类型注解，MCP 自动推断出来了。</p>
+<p>这让集成变成了零配置：</p>
+<blockquote>
+<p>传统方式：你写工具 → 告诉 AI 平台工具的格式 → 手动配置</p>
+<p>MCP 方式：你写工具 → 启动 Server → AI 自动发现 → 直接调用</p>
+</blockquote>
+<h2 id="四、传输层：本地-vs-远程"><a href="#四、传输层：本地-vs-远程" class="headerlink" title="四、传输层：本地 vs 远程"></a>四、传输层：本地 vs 远程</h2><p>MCP 协议本身只是一套”说好的消息格式”，它需要<strong>传输层</strong>来实际传数据。MCP 支持两种传输方式。</p>
+<h3 id="STDIO（本地模式）"><a href="#STDIO（本地模式）" class="headerlink" title="STDIO（本地模式）"></a>STDIO（本地模式）</h3><figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">你的终端里跑着 mcp run server.py</span><br><span class="line">          ↕  stdin/stdout（标准输入输出）</span><br><span class="line">    Claude Desktop / VS Code</span><br></pre></td></tr></table></figure>
+
+<p>Server 和 AI 工具在<strong>同一台机器</strong>上，通过进程的标准输入输出通信。就像你在终端跑一个 Python 脚本，输入内容看输出一样。</p>
+<p>优点：零网络开销，简单直接。</p>
+<h3 id="Streamable-HTTP（远程模式）"><a href="#Streamable-HTTP（远程模式）" class="headerlink" title="Streamable HTTP（远程模式）"></a>Streamable HTTP（远程模式）</h3><figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">你的 Server 部署在云服务器上</span><br><span class="line">         ↕  HTTP POST + SSE（Server-Sent Events）</span><br><span class="line">   远程的 AI 应用</span><br></pre></td></tr></table></figure>
+
+<p>变成了你熟悉的 HTTP API 模式。Server 可以跑在云端，AI 通过网络调用。支持标准的 HTTP 认证（Bearer Token、API Key、OAuth）。</p>
+<p>关键点：<strong>不管用什么传输方式，上面跑的 MCP 协议格式是一样的。</strong> 你可以在本地开发时用 STDIO，部署后切换到 HTTP，代码改动量很小。</p>
+<h2 id="五、消息格式：JSON-RPC-2-0"><a href="#五、消息格式：JSON-RPC-2-0" class="headerlink" title="五、消息格式：JSON-RPC 2.0"></a>五、消息格式：JSON-RPC 2.0</h2><p>MCP 的通信基于 <strong>JSON-RPC 2.0</strong> 协议。这是一种轻量级的远程调用协议，消息格式很简单。</p>
+<p>当 AI 想调用你的 <code>add</code> 工具时，它发送：</p>
+<figure class="highlight json"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br></pre></td><td class="code"><pre><span class="line"><span class="punctuation">&#123;</span></span><br><span class="line">  <span class="attr">&quot;jsonrpc&quot;</span><span class="punctuation">:</span> <span class="string">&quot;2.0&quot;</span><span class="punctuation">,</span></span><br><span class="line">  <span class="attr">&quot;id&quot;</span><span class="punctuation">:</span> <span class="number">1</span><span class="punctuation">,</span></span><br><span class="line">  <span class="attr">&quot;method&quot;</span><span class="punctuation">:</span> <span class="string">&quot;tools/call&quot;</span><span class="punctuation">,</span></span><br><span class="line">  <span class="attr">&quot;params&quot;</span><span class="punctuation">:</span> <span class="punctuation">&#123;</span></span><br><span class="line">    <span class="attr">&quot;name&quot;</span><span class="punctuation">:</span> <span class="string">&quot;add&quot;</span><span class="punctuation">,</span></span><br><span class="line">    <span class="attr">&quot;arguments&quot;</span><span class="punctuation">:</span> <span class="punctuation">&#123;</span> <span class="attr">&quot;a&quot;</span><span class="punctuation">:</span> <span class="number">2</span><span class="punctuation">,</span> <span class="attr">&quot;b&quot;</span><span class="punctuation">:</span> <span class="number">4</span> <span class="punctuation">&#125;</span></span><br><span class="line">  <span class="punctuation">&#125;</span></span><br><span class="line"><span class="punctuation">&#125;</span></span><br></pre></td></tr></table></figure>
+
+<p>你的 Server 返回：</p>
+<figure class="highlight json"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line"><span class="punctuation">&#123;</span></span><br><span class="line">  <span class="attr">&quot;jsonrpc&quot;</span><span class="punctuation">:</span> <span class="string">&quot;2.0&quot;</span><span class="punctuation">,</span></span><br><span class="line">  <span class="attr">&quot;id&quot;</span><span class="punctuation">:</span> <span class="number">1</span><span class="punctuation">,</span></span><br><span class="line">  <span class="attr">&quot;result&quot;</span><span class="punctuation">:</span> <span class="punctuation">&#123;</span></span><br><span class="line">    <span class="attr">&quot;content&quot;</span><span class="punctuation">:</span> <span class="punctuation">[</span><span class="punctuation">&#123;</span> <span class="attr">&quot;type&quot;</span><span class="punctuation">:</span> <span class="string">&quot;text&quot;</span><span class="punctuation">,</span> <span class="attr">&quot;text&quot;</span><span class="punctuation">:</span> <span class="string">&quot;6&quot;</span> <span class="punctuation">&#125;</span><span class="punctuation">]</span></span><br><span class="line">  <span class="punctuation">&#125;</span></span><br><span class="line"><span class="punctuation">&#125;</span></span><br></pre></td></tr></table></figure>
+
+<p>回顾最开始的代码——<code>@mcp.tool()</code> 装饰器帮你做的事情，<strong>本质上就是省掉了手写这坨 JSON 的功夫</strong>。</p>
+<h2 id="六、信息流全景"><a href="#六、信息流全景" class="headerlink" title="六、信息流全景"></a>六、信息流全景</h2><p>一个完整的 MCP 请求流程：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line">1. 用户发问：&quot;上个月订单总额是多少？&quot;</span><br><span class="line">2. Host（AI 应用）把问题交给 AI 模型</span><br><span class="line">3. AI 模型判断需要调用 order_tool</span><br><span class="line">4. Host 通过 Client 向 MCP Server 发起 tools/call 请求</span><br><span class="line">5. MCP Server 执行查询，返回结果</span><br><span class="line">6. Host 把结果交给 AI 模型</span><br><span class="line">7. AI 模型生成回答：&quot;上个月订单总额是 ¥12,800&quot;</span><br><span class="line">8. 用户看到答案</span><br></pre></td></tr></table></figure>
+
+<p>整个过程对你（Server 开发者）来说，就是写了一个 <code>@mcp.tool()</code> 函数。</p>
+<h2 id="七、安全模型（简述）"><a href="#七、安全模型（简述）" class="headerlink" title="七、安全模型（简述）"></a>七、安全模型（简述）</h2><p>MCP 在设计上强调用户控制：</p>
+<ul>
+<li><strong>用户授权</strong>：所有工具调用都需要用户明确同意</li>
+<li><strong>数据隐私</strong>：数据只在用户授权范围内暴露</li>
+<li><strong>输入校验</strong>：Server 端验证所有传入参数（自动基于类型注解）</li>
+<li><strong>权限控制</strong>：Host 可以限制 AI 能调用哪些工具</li>
+</ul>
+<h2 id="八、总结"><a href="#八、总结" class="headerlink" title="八、总结"></a>八、总结</h2><table>
+<thead>
+<tr>
+<th>概念</th>
+<th>一句话</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Tool</td>
+<td>让 AI 做事情（类似 POST）</td>
+</tr>
+<tr>
+<td>Resource</td>
+<td>给 AI 读数据（类似 GET）</td>
+</tr>
+<tr>
+<td>Prompt</td>
+<td>教 AI 怎么处理（模板）</td>
+</tr>
+<tr>
+<td>自动发现</td>
+<td>tools&#x2F;list ≈ FastAPI 的 &#x2F;docs</td>
+</tr>
+<tr>
+<td>传输层</td>
+<td>本地用 STDIO，远程用 HTTP</td>
+</tr>
+<tr>
+<td>消息格式</td>
+<td>JSON-RPC 2.0，@mcp.tool() 省掉了手写</td>
+</tr>
+</tbody></table>
+<h2 id="九、动手试试"><a href="#九、动手试试" class="headerlink" title="九、动手试试"></a>九、动手试试</h2><p>如果想亲手跑一下，只需要三步：</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">pip install <span class="string">&quot;mcp[cli]&quot;</span></span><br></pre></td></tr></table></figure>
+
+<p>创建一个 <code>server.py</code>，写入上面的 Demo 示例，然后：</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">mcp run server.py</span><br></pre></td></tr></table></figure>
+
+<p>另一个终端运行：</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">mcp dev server.py</span><br></pre></td></tr></table></figure>
+
+<p>就能看到一个网页界面，可以查看工具列表、参数，并测试调用。</p>
+<p>下一篇会进入 <strong>MCP 安全模型（Module 02）</strong>，或者直接跳到 <strong>动手写代码——你的第一个 MCP Client</strong>。</p>
+
+    </div>
+
+    
+    
+    
+
+    <footer class="post-footer">
+          
+
+<div class="post-copyright">
+<ul>
+  <li class="post-copyright-author">
+      <strong>本文作者： </strong>陌忆
+  </li>
+  <li class="post-copyright-link">
+      <strong>本文链接：</strong>
+      <a href="https://moyi-math.github.io/2026/07/31/MCP%E5%85%A5%E9%97%A8-%E4%BA%8C-%E4%B8%89%E5%A4%A7%E5%8E%9F%E8%AF%AD%E4%B8%8E%E8%87%AA%E5%8A%A8%E5%8F%91%E7%8E%B0/" title="MCP 入门（二）：三大原语与自动发现——从 FastAPI 类比理解 MCP 通信">https://moyi-math.github.io/2026/07/31/MCP入门-二-三大原语与自动发现/</a>
+  </li>
+  <li class="post-copyright-license">
+      <strong>版权声明： </strong>本博客所有文章除特别声明外，均采用 <a href="https://creativecommons.org/licenses/by-nc-sa/4.0/" rel="noopener" target="_blank"><i class="fab fa-fw fa-creative-commons"></i>BY-NC-SA</a> 许可协议。转载请注明出处！
+  </li>
+</ul>
+</div>
+
+          <div class="post-tags">
+              <a href="/tags/Python/" rel="tag"># Python</a>
+              <a href="/tags/MCP/" rel="tag"># MCP</a>
+              <a href="/tags/Model-Context-Protocol/" rel="tag"># Model Context Protocol</a>
+              <a href="/tags/Resource/" rel="tag"># Resource</a>
+              <a href="/tags/Tool/" rel="tag"># Tool</a>
+              <a href="/tags/Prompt/" rel="tag"># Prompt</a>
+              <a href="/tags/FastAPI/" rel="tag"># FastAPI</a>
+              <a href="/tags/JSON-RPC/" rel="tag"># JSON-RPC</a>
+          </div>
+
+        
+
+          <div class="post-nav">
+            <div class="post-nav-item">
+                <a href="/2026/07/31/MCP%E5%85%A5%E9%97%A8-%E4%B8%80-%E4%B8%BA%E4%BB%80%E4%B9%88AI%E9%9C%80%E8%A6%81USB-C/" rel="prev" title="MCP 入门（一）：为什么 AI 需要 USB-C——从痛点理解 Model Context Protocol">
+                  <i class="fa fa-angle-left"></i> MCP 入门（一）：为什么 AI 需要 USB-C——从痛点理解 Model Context Protocol
+                </a>
+            </div>
+            <div class="post-nav-item">
+                <a href="/2026/07/31/MCP%E5%85%A5%E9%97%A8-%E4%B8%89-%E5%AE%89%E5%85%A8%E6%A8%A1%E5%9E%8B/" rel="next" title="MCP 入门（三）：安全模型——当 AI 可以被&quot;骗&quot;时">
+                  MCP 入门（三）：安全模型——当 AI 可以被"骗"时 <i class="fa fa-angle-right"></i>
+                </a>
+            </div>
+          </div>
+    </footer>
+  </article>
+</div>
+
+
+
+
+
+
+</div>
+  </main>
+
+  <footer class="footer">
+    <div class="footer-inner">
+
+  <div class="copyright">
+    &copy; 
+    <span itemprop="copyrightYear">2026</span>
+    <span class="with-love">
+      <i class="fab fa-osi"></i>
+    </span>
+    <span class="author" itemprop="copyrightHolder">陌忆</span>
+  </div>
+<div class="wordcount">
+  <span class="post-meta-item">
+    <span class="post-meta-item-icon">
+      <i class="fa fa-chart-line"></i>
+    </span>
+    <span title="站点总字数">106k</span>
+  </span>
+  <span class="post-meta-item">
+    <span class="post-meta-item-icon">
+      <i class="fa fa-coffee"></i>
+    </span>
+    <span title="站点阅读时长">6:24</span>
+  </span>
+</div>
+  <div class="powered-by">由 <a href="https://hexo.io/" rel="noopener" target="_blank">Hexo</a> & <a href="https://theme-next.js.org/" rel="noopener" target="_blank">NexT.Gemini</a> 强力驱动
+  </div>
+
+    </div>
+  </footer>
+
+  
+  <div class="toggle sidebar-toggle" role="button">
+    <span class="toggle-line"></span>
+    <span class="toggle-line"></span>
+    <span class="toggle-line"></span>
+  </div>
+  <div class="sidebar-dimmer"></div>
+  <div class="back-to-top" role="button" aria-label="返回顶部">
+    <i class="fa fa-arrow-up fa-lg"></i>
+    <span>0%</span>
+  </div>
+
+<noscript>
+  <div class="noscript-warning">Theme NexT works best with JavaScript enabled</div>
+</noscript>
+<!-- Site running time -->
+<span id="timeDate" aria-live="off"></span>
+<script>
+(function() {
+  var start = new Date("2022-11-17T08:00:00+08:00");
+  function pad(n) { return n < 10 ? "0" + n : "" + n; }
+  function tick() {
+    var diff = Date.now() - start.getTime();
+    if (diff < 0) return;
+    var d = Math.floor(diff / 86400000);
+    var h = Math.floor((diff % 86400000) / 3600000);
+    var m = Math.floor((diff % 3600000) / 60000);
+    var timeDate = document.getElementById("timeDate");
+    if (!timeDate) return;
+    timeDate.textContent =
+      "\u672C\u7AD9\u5DF2\u5B89\u5168\u8FD0\u884C " + d + " \u5929 " + pad(h) + " \u5C0F\u65F6 " + pad(m) + " \u5206";
+  }
+  tick();
+  setInterval(tick, 60000);
+})();
+</script>
+
+</body>
+</html>

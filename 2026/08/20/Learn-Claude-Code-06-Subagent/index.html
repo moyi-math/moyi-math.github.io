@@ -1,0 +1,563 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width">
+<meta name="theme-color" content="#222" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#222" media="(prefers-color-scheme: dark)"><meta name="generator" content="Hexo 7.3.0">
+<link rel="preconnect" href="https://cdnjs.cloudflare.com" crossorigin>
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon-next.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32-next.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next.png">
+  <link rel="mask-icon" href="/images/logo.svg" color="#222">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/7.0.0/css/all.min.css" integrity="sha256-VHqXKFhhMxcpubYf9xiWdCiojEbY9NexQ4jh8AxbvcM=" crossorigin="anonymous">
+
+<script class="next-config" data-name="main" type="application/json">{"hostname":"moyi-math.github.io","root":"/","images":"/images","scheme":"Gemini","darkmode":true,"version":"8.28.0","exturl":false,"sidebar":{"position":"left","width_expanded":320,"width_dual_column":240,"display":"post","padding":18,"offset":12},"hljswrap":true,"codeblock":{"theme":{"light":"default","dark":"stackoverflow-dark"},"prism":{"light":"prism","dark":"prism-dark"},"copy_button":{"enable":true,"style":null},"fold":{"enable":false,"height":500},"language":false},"bookmark":{"enable":false,"color":"#222","save":"auto"},"mediumzoom":false,"lazyload":true,"pangu":false,"comments":{"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},"stickytabs":false,"motion":{"enable":false,"async":false,"duration":200,"transition":{"menu_item":"fadeInDown","post_block":"fadeIn","post_header":"fadeInDown","post_body":"fadeInDown","coll_header":"fadeInLeft","sidebar":"fadeInUp"}},"prism":false,"i18n":{"placeholder":"搜索...","empty":"没有找到任何搜索结果：${query}","hits_time":"找到 ${hits} 个搜索结果（用时 ${time} 毫秒）","hits":"找到 ${hits} 个搜索结果"},"path":"/search.json","localsearch":{"enable":true,"top_n_per_article":1,"unescape":false,"preload":false}}</script><script src="/js/config.js" defer></script>
+
+    <meta name="description" content="从上下文污染出发，拆解父子 Agent 的委派协议、独立消息历史、结果压缩、工具限制、权限冒泡与共享工作区风险。">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Learn Claude Code 06：Subagent——用独立上下文拆解复杂任务">
+<meta property="og:url" content="https://moyi-math.github.io/2026/08/20/Learn-Claude-Code-06-Subagent/index.html">
+<meta property="og:site_name" content="陌忆的博客">
+<meta property="og:description" content="从上下文污染出发，拆解父子 Agent 的委派协议、独立消息历史、结果压缩、工具限制、权限冒泡与共享工作区风险。">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:image" content="https://moyi-math.github.io/images/background.webp">
+<meta property="article:published_time" content="2026-08-20T02:50:00.000Z">
+<meta property="article:modified_time" content="2026-08-20T14:47:37.219Z">
+<meta property="article:author" content="陌忆">
+<meta property="article:tag" content="Agent">
+<meta property="article:tag" content="Claude Code">
+<meta property="article:tag" content="Subagent">
+<meta property="article:tag" content="Context Isolation">
+<meta property="article:tag" content="Multi-Agent">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:image" content="https://moyi-math.github.io/images/background.webp">
+
+
+<link rel="canonical" href="https://moyi-math.github.io/2026/08/20/Learn-Claude-Code-06-Subagent/">
+
+
+<script class="next-config" data-name="page" type="application/json">{"sidebar":"","isHome":false,"isPost":true,"lang":"zh-CN","comments":true,"permalink":"https://moyi-math.github.io/2026/08/20/Learn-Claude-Code-06-Subagent/","path":"2026/08/20/Learn-Claude-Code-06-Subagent/","title":"Learn Claude Code 06：Subagent——用独立上下文拆解复杂任务"}</script>
+
+<script class="next-config" data-name="calendar" type="application/json">""</script>
+<title>Learn Claude Code 06：Subagent——用独立上下文拆解复杂任务 | 陌忆的博客</title>
+  
+
+
+
+
+
+
+
+
+  
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/animejs/3.2.1/anime.min.js" integrity="sha256-XL2inqUJaslATFnHdJOi9GfQ60on8Wx1C2H8DYiN1xY=" crossorigin="anonymous" defer></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/lozad.js/1.16.0/lozad.min.js" integrity="sha256-mOFREFhqmHeQbXpK2lp4nA3qooVgACfh88fpJftLBbc=" crossorigin="anonymous" defer></script>
+<script src="/js/utils.js" defer></script><script src="/js/sidebar.js" defer></script><script src="/js/next-boot.js" defer></script>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/hexo-generator-searchdb/1.5.0/search.js" integrity="sha256-xFC6PJ82SL9b3WkGjFavNiA9gm5z6UBxWPiu4CYjptg=" crossorigin="anonymous" defer></script>
+<script src="/js/third-party/search/local-search.js" defer></script>
+
+
+
+
+
+
+
+  
+
+
+
+
+  
+
+  <script class="next-config" data-name="enableMath" type="application/json">false</script><link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/katex.min.css" integrity="sha256-UF1fgpAiu3tPJN/uCqEUHNe7pnr+QR0SQDNfgglgtcM=" crossorigin="anonymous">
+
+
+<link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
+
+
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"WebSite","name":"陌忆的博客","url":"https://moyi-math.github.io","description":"记录 RAG、Agent、MCP、算法与软件工程实践，按专栏整理可复用的技术笔记。","inLanguage":"zh-CN","author":{"@type":"Person","name":"陌忆"}}</script>
+
+
+
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"Article","headline":"Learn Claude Code 06：Subagent——用独立上下文拆解复杂任务","description":"从上下文污染出发，拆解父子 Agent 的委派协议、独立消息历史、结果压缩、工具限制、权限冒泡与共享工作区风险。","datePublished":"2026-08-20T02:50:00.000Z","dateModified":"2026-08-20T14:47:37.219Z","inLanguage":"zh-CN","mainEntityOfPage":{"@type":"WebPage","@id":"https://moyi-math.github.io/2026/08/20/Learn-Claude-Code-06-Subagent/index.html"},"author":{"@type":"Person","name":"陌忆"}}</script>
+<meta name="author" content="陌忆">
+
+
+  <noscript>
+    <link rel="stylesheet" href="/css/noscript.css">
+  </noscript>
+<!-- hexo injector head_end start --><link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/katex.min.css" integrity="sha512-fHwaWebuwA7NSF5Qg/af4UeDx9XqUpYpOGgubo3yWu+b2IQR4UeQwbb42Ti7gVAjNtVoI/I9TEoYeu9omwcC6g==" crossorigin="anonymous" referrerpolicy="no-referrer" /><!-- hexo injector head_end end --><link rel="alternate" href="/atom.xml" title="陌忆的博客" type="application/atom+xml">
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage">
+  <div class="headband"></div>
+
+  <main class="main">
+    <div class="column">
+      <header class="header" itemscope itemtype="http://schema.org/WPHeader"><div class="site-brand-container">
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="切换导航栏" role="button">
+        <span class="toggle-line"></span>
+        <span class="toggle-line"></span>
+        <span class="toggle-line"></span>
+    </div>
+  </div>
+
+  <div class="site-meta">
+
+    <a href="/" class="brand" rel="start">
+      <i class="logo-line"></i>
+      <p class="site-title">陌忆的博客</p>
+      <i class="logo-line"></i>
+    </a>
+      <p class="site-subtitle" itemprop="description">数据库无法得出结论</p>
+  </div>
+
+  <div class="site-nav-right">
+    <div class="toggle popup-trigger" aria-label="搜索" role="button">
+        <i class="fa fa-search fa-fw fa-lg"></i>
+    </div>
+  </div>
+</div>
+
+
+
+<nav class="site-nav">
+  <ul class="main-menu menu"><li class="menu-item menu-item-home"><a href="/" rel="section"><i class="fa fa-home fa-fw"></i>首页</a></li><li class="menu-item menu-item-about"><a href="/about/" rel="section"><i class="fa fa-user fa-fw"></i>关于</a></li><li class="menu-item menu-item-tags"><a href="/tags/" rel="section"><i class="fa fa-tags fa-fw"></i>标签</a></li><li class="menu-item menu-item-categories"><a href="/categories/" rel="section"><i class="fa fa-th fa-fw"></i>分类</a></li><li class="menu-item menu-item-archives"><a href="/archives/" rel="section"><i class="fa fa-archive fa-fw"></i>归档</a></li>
+      <li class="menu-item menu-item-search">
+        <a role="button" class="popup-trigger"><i class="fa fa-search fa-fw"></i>搜索
+        </a>
+      </li>
+  </ul>
+</nav>
+
+
+
+  <div class="search-pop-overlay">
+    <div class="popup search-popup">
+      <div class="search-header">
+        <span class="search-icon">
+          <i class="fa fa-search"></i>
+        </span>
+        <div class="search-input-container">
+          <input autocomplete="off" autocapitalize="off" maxlength="80"
+                placeholder="搜索..." spellcheck="false"
+                type="search" class="search-input">
+        </div>
+        <span class="popup-btn-close" role="button">
+          <i class="fa fa-times-circle"></i>
+        </span>
+      </div>
+      <div class="search-result-container">
+        <div class="search-result-icon">
+          <i class="fa fa-spinner fa-pulse fa-5x"></i>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</header>
+        
+  
+  <aside class="sidebar">
+
+    <div class="sidebar-inner sidebar-nav-active sidebar-toc-active">
+      <ul class="sidebar-nav">
+        <li class="sidebar-nav-toc">
+          文章目录
+        </li>
+        <li class="sidebar-nav-overview">
+          站点概览
+        </li>
+      </ul>
+
+      <div class="sidebar-panel-container">
+        <!--noindex-->
+        <div class="post-toc-wrap sidebar-panel">
+            <div class="post-toc animated"><ol class="nav"><li class="nav-item nav-level-2"><a class="nav-link" href="#%E4%B8%80%E3%80%81%E4%B8%BA%E4%BB%80%E4%B9%88%E6%9C%89%E4%BA%86%E8%AE%A1%E5%88%92%E8%BF%98%E9%9C%80%E8%A6%81-Subagent"><span class="nav-text">一、为什么有了计划还需要 Subagent</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E4%BA%8C%E3%80%81%E6%8A%8A-Subagent-%E6%9A%B4%E9%9C%B2%E6%88%90%E6%99%AE%E9%80%9A%E5%B7%A5%E5%85%B7"><span class="nav-text">二、把 Subagent 暴露成普通工具</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E4%B8%89%E3%80%81%E6%9C%80%E5%B0%8F-Subagent-%E5%B0%B1%E6%98%AF%E4%B8%80%E4%BB%BD%E6%96%B0%E7%9A%84-messages"><span class="nav-text">三、最小 Subagent 就是一份新的 messages</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%9B%9B%E3%80%81%E5%A7%94%E6%B4%BE%E6%8F%8F%E8%BF%B0%E5%B0%B1%E6%98%AF%E7%88%B6%E5%AD%90-Agent-%E7%9A%84%E6%8E%A5%E5%8F%A3%E5%A5%91%E7%BA%A6"><span class="nav-text">四、委派描述就是父子 Agent 的接口契约</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E4%BA%94%E3%80%81%E5%8F%AA%E5%9B%9E%E4%BC%A0%E7%BB%93%E8%AE%BA%EF%BC%8C%E4%B8%8D%E5%9B%9E%E4%BC%A0%E5%AE%8C%E6%95%B4%E5%AF%B9%E8%AF%9D"><span class="nav-text">五、只回传结论，不回传完整对话</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%85%AD%E3%80%81%E5%AD%90-Agent-%E5%BA%94%E6%8B%A5%E6%9C%89%E5%93%AA%E4%BA%9B%E5%B7%A5%E5%85%B7"><span class="nav-text">六、子 Agent 应拥有哪些工具</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E4%B8%83%E3%80%81%E4%B8%8A%E4%B8%8B%E6%96%87%E9%9A%94%E7%A6%BB%E4%B8%8D%E7%AD%89%E4%BA%8E%E6%9D%83%E9%99%90%E9%9A%94%E7%A6%BB"><span class="nav-text">七、上下文隔离不等于权限隔离</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%85%AB%E3%80%81%E6%B6%88%E6%81%AF%E9%9A%94%E7%A6%BB%E4%BA%86%EF%BC%8C%E6%96%87%E4%BB%B6%E7%B3%BB%E7%BB%9F%E5%8D%B4%E5%8F%AF%E8%83%BD%E5%85%B1%E4%BA%AB"><span class="nav-text">八、消息隔离了，文件系统却可能共享</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E4%B9%9D%E3%80%81%E5%90%8C%E6%AD%A5%E3%80%81%E5%BC%82%E6%AD%A5%E4%B8%8E-Fork-%E6%98%AF%E4%B8%8D%E5%90%8C%E9%97%AE%E9%A2%98"><span class="nav-text">九、同步、异步与 Fork 是不同问题</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%8D%81%E3%80%81%E4%BB%80%E4%B9%88%E6%97%B6%E5%80%99%E4%B8%8D%E8%AF%A5%E4%BD%BF%E7%94%A8-Subagent"><span class="nav-text">十、什么时候不该使用 Subagent</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%8D%81%E4%B8%80%E3%80%81%E8%BF%99%E4%B8%80%E7%AF%87%E7%9C%9F%E6%AD%A3%E9%9C%80%E8%A6%81%E8%AE%B0%E4%BD%8F%E4%BB%80%E4%B9%88"><span class="nav-text">十一、这一篇真正需要记住什么</span></a></li></ol></div>
+        </div>
+        <!--/noindex-->
+
+        <div class="site-overview-wrap sidebar-panel">
+          <div class="site-author animated" itemprop="author" itemscope itemtype="http://schema.org/Person">
+    <img class="site-author-image" itemprop="image" alt="陌忆"
+      src="/images/avatar.webp">
+  <p class="site-author-name" itemprop="name">陌忆</p>
+  <div class="site-description" itemprop="description">记录 RAG、Agent、MCP、算法与软件工程实践，按专栏整理可复用的技术笔记。</div>
+</div>
+<div class="site-state-wrap animated">
+  <nav class="site-state">
+      <div class="site-state-item site-state-posts">
+        <a href="/archives/">
+          <span class="site-state-item-count">50</span>
+          <span class="site-state-item-name">日志</span>
+        </a>
+      </div>
+      <div class="site-state-item site-state-categories">
+          <a href="/categories/">
+        <span class="site-state-item-count">10</span>
+        <span class="site-state-item-name">分类</span></a>
+      </div>
+      <div class="site-state-item site-state-tags">
+          <a href="/tags/">
+        <span class="site-state-item-count">172</span>
+        <span class="site-state-item-name">标签</span></a>
+      </div>
+  </nav>
+</div>
+  <div class="links-of-author animated">
+      <span class="links-of-author-item">
+        <a href="https://github.com/moyi-math" title="GitHub → https:&#x2F;&#x2F;github.com&#x2F;moyi-math" rel="noopener me" target="_blank"><i class="fab fa-github fa-fw"></i>GitHub</a>
+      </span>
+  </div>
+  <div class="cc-license animated" itemprop="license">
+    <a href="https://creativecommons.org/licenses/by-nc-sa/4.0/" class="cc-opacity" rel="noopener" target="_blank"><img src="https://cdnjs.cloudflare.com/ajax/libs/creativecommons-vocabulary/2020.11.3/assets/license_badges/small/by_nc_sa.svg" alt="Creative Commons"></a>
+  </div>
+
+        </div>
+      </div>
+    </div>
+
+    
+  </aside>
+
+
+    </div>
+
+    <div class="main-inner post posts-expand">
+
+
+  
+
+
+<div class="post-block">
+  
+  
+
+  <article itemscope itemtype="http://schema.org/Article" class="post-content" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="https://moyi-math.github.io/2026/08/20/Learn-Claude-Code-06-Subagent/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.webp">
+      <meta itemprop="name" content="陌忆">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="陌忆的博客">
+      <meta itemprop="description" content="记录 RAG、Agent、MCP、算法与软件工程实践，按专栏整理可复用的技术笔记。">
+    </span>
+
+    <span hidden itemprop="post" itemscope itemtype="http://schema.org/CreativeWork">
+      <meta itemprop="name" content="Learn Claude Code 06：Subagent——用独立上下文拆解复杂任务 | 陌忆的博客">
+      <meta itemprop="description" content="从上下文污染出发，拆解父子 Agent 的委派协议、独立消息历史、结果压缩、工具限制、权限冒泡与共享工作区风险。">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          Learn Claude Code 06：Subagent——用独立上下文拆解复杂任务
+        </h1>
+
+        <div class="post-meta-container">
+          <div class="post-meta">
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-calendar"></i>
+      </span>
+      <span class="post-meta-item-text">发表于</span>
+      
+
+      <time title="创建时间：2026-08-20 10:50:00 / 修改时间：22:47:37" itemprop="dateCreated datePublished" datetime="2026-08-20T10:50:00+08:00">2026-08-20</time>
+    </span>
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-folder"></i>
+      </span>
+      <span class="post-meta-item-text">分类于</span>
+        <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+          <a href="/categories/Learn-Claude-Code/" itemprop="url" rel="index"><span itemprop="name">Learn Claude Code</span></a>
+        </span>
+    </span>
+
+  
+    <span class="post-meta-break"></span>
+    <span class="post-meta-item" title="本文字数">
+      <span class="post-meta-item-icon">
+        <i class="far fa-file-word"></i>
+      </span>
+      <span class="post-meta-item-text">本文字数：</span>
+      <span>2.6k</span>
+    </span>
+    <span class="post-meta-item" title="阅读时长">
+      <span class="post-meta-item-icon">
+        <i class="far fa-clock"></i>
+      </span>
+      <span class="post-meta-item-text">阅读时长 &asymp;</span>
+      <span>9 分钟</span>
+    </span>
+</div>
+
+            <div class="post-description">从上下文污染出发，拆解父子 Agent 的委派协议、独立消息历史、结果压缩、工具限制、权限冒泡与共享工作区风险。</div>
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody"><span id="more"></span>
+
+<blockquote>
+<p><strong>系列定位：</strong> TodoWrite 让主 Agent 看清任务结构，但所有调查、读取和试错仍然堆在同一份消息历史里。本文增加一个 <code>task</code> 工具，把边界清晰的子任务委派给拥有独立上下文的 Subagent，主线程只接收最终结论。</p>
+</blockquote>
+<h2 id="一、为什么有了计划还需要-Subagent"><a href="#一、为什么有了计划还需要-Subagent" class="headerlink" title="一、为什么有了计划还需要 Subagent"></a>一、为什么有了计划还需要 Subagent</h2><p>假设主任务是“修复登录偶发失败并补充测试”。为了定位原因，Agent 可能要：</p>
+<ul>
+<li>搜索认证入口；</li>
+<li>阅读 Token、缓存和数据库代码；</li>
+<li>追踪几十个调用点；</li>
+<li>比较测试与生产配置；</li>
+<li>查看日志中的失败模式。</li>
+</ul>
+<p>这些调查过程会产生大量暂时有用、最终却不重要的信息。即使 TODO 列表始终正确，主上下文也可能被几十次文件读取和搜索结果占满。</p>
+<p>Subagent 的思路类似开发者“开一个新终端做专项调查”：</p>
+<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line">主 Agent：保留目标、约束、计划与最终决策</span><br><span class="line">    │</span><br><span class="line">    ├─ 委派：定位 Token 刷新竞态条件</span><br><span class="line">    │</span><br><span class="line">子 Agent：在独立上下文中搜索、阅读、推理</span><br><span class="line">    │</span><br><span class="line">    └─ 回传：结论 + 证据 + 建议</span><br></pre></td></tr></table></figure>
+
+<p>子 Agent 结束后，中间消息历史可以释放，只有高信息密度的结果回到主线程。这是一种<strong>上下文隔离与压缩机制</strong>，并不只是“多开一个模型”。</p>
+<h2 id="二、把-Subagent-暴露成普通工具"><a href="#二、把-Subagent-暴露成普通工具" class="headerlink" title="二、把 Subagent 暴露成普通工具"></a>二、把 Subagent 暴露成普通工具</h2><p>对主 Agent 来说，委派仍然是一次工具调用：</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br></pre></td><td class="code"><pre><span class="line">TASK_TOOL = &#123;</span><br><span class="line">    <span class="string">&quot;name&quot;</span>: <span class="string">&quot;task&quot;</span>,</span><br><span class="line">    <span class="string">&quot;description&quot;</span>: (</span><br><span class="line">        <span class="string">&quot;Delegate a self-contained subtask to a subagent. &quot;</span></span><br><span class="line">        <span class="string">&quot;Returns a concise result with evidence.&quot;</span></span><br><span class="line">    ),</span><br><span class="line">    <span class="string">&quot;input_schema&quot;</span>: &#123;</span><br><span class="line">        <span class="string">&quot;type&quot;</span>: <span class="string">&quot;object&quot;</span>,</span><br><span class="line">        <span class="string">&quot;properties&quot;</span>: &#123;</span><br><span class="line">            <span class="string">&quot;description&quot;</span>: &#123;</span><br><span class="line">                <span class="string">&quot;type&quot;</span>: <span class="string">&quot;string&quot;</span>,</span><br><span class="line">                <span class="string">&quot;minLength&quot;</span>: <span class="number">1</span>,</span><br><span class="line">            &#125;,</span><br><span class="line">        &#125;,</span><br><span class="line">        <span class="string">&quot;required&quot;</span>: [<span class="string">&quot;description&quot;</span>],</span><br><span class="line">        <span class="string">&quot;additionalProperties&quot;</span>: <span class="literal">False</span>,</span><br><span class="line">    &#125;,</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line">TOOLS.append(TASK_TOOL)</span><br><span class="line">TOOL_HANDLERS[<span class="string">&quot;task&quot;</span>] = spawn_subagent</span><br></pre></td></tr></table></figure>
+
+<p>这再次体现了工具分发表的稳定性：<code>task</code> 内部虽然会启动另一个 Agent Loop，但外层无需新增特殊控制流。</p>
+<h2 id="三、最小-Subagent-就是一份新的-messages"><a href="#三、最小-Subagent-就是一份新的-messages" class="headerlink" title="三、最小 Subagent 就是一份新的 messages"></a>三、最小 Subagent 就是一份新的 messages</h2><p>同步子 Agent 的骨架可以写成：</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br></pre></td><td class="code"><pre><span class="line">SUBAGENT_TOOLS = [</span><br><span class="line">    BASH_TOOL,</span><br><span class="line">    READ_FILE_TOOL,</span><br><span class="line">    WRITE_FILE_TOOL,</span><br><span class="line">    EDIT_FILE_TOOL,</span><br><span class="line">    GLOB_TOOL,</span><br><span class="line">]</span><br><span class="line"></span><br><span class="line"></span><br><span class="line"><span class="keyword">def</span> <span class="title function_">spawn_subagent</span>(<span class="params">description: <span class="built_in">str</span></span>) -&gt; <span class="built_in">str</span>:</span><br><span class="line">    messages = [&#123;<span class="string">&quot;role&quot;</span>: <span class="string">&quot;user&quot;</span>, <span class="string">&quot;content&quot;</span>: description&#125;]</span><br><span class="line"></span><br><span class="line">    <span class="keyword">for</span> _ <span class="keyword">in</span> <span class="built_in">range</span>(MAX_SUBAGENT_TURNS):</span><br><span class="line">        response = client.messages.create(</span><br><span class="line">            model=MODEL,</span><br><span class="line">            system=SUBAGENT_SYSTEM,</span><br><span class="line">            messages=messages,</span><br><span class="line">            tools=SUBAGENT_TOOLS,</span><br><span class="line">            max_tokens=<span class="number">4096</span>,</span><br><span class="line">        )</span><br><span class="line">        messages.append(&#123;</span><br><span class="line">            <span class="string">&quot;role&quot;</span>: <span class="string">&quot;assistant&quot;</span>,</span><br><span class="line">            <span class="string">&quot;content&quot;</span>: response.content,</span><br><span class="line">        &#125;)</span><br><span class="line"></span><br><span class="line">        tool_calls = [</span><br><span class="line">            block <span class="keyword">for</span> block <span class="keyword">in</span> response.content</span><br><span class="line">            <span class="keyword">if</span> block.<span class="built_in">type</span> == <span class="string">&quot;tool_use&quot;</span></span><br><span class="line">        ]</span><br><span class="line">        <span class="keyword">if</span> <span class="keyword">not</span> tool_calls:</span><br><span class="line">            <span class="keyword">return</span> extract_final_text(response.content)</span><br><span class="line"></span><br><span class="line">        results = execute_subagent_tools(tool_calls)</span><br><span class="line">        messages.append(&#123;<span class="string">&quot;role&quot;</span>: <span class="string">&quot;user&quot;</span>, <span class="string">&quot;content&quot;</span>: results&#125;)</span><br><span class="line"></span><br><span class="line">    <span class="keyword">return</span> <span class="string">&quot;Subagent stopped after reaching its turn limit.&quot;</span></span><br></pre></td></tr></table></figure>
+
+<p>与主循环相比，真正关键的差异只有一行：</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">messages = [&#123;<span class="string">&quot;role&quot;</span>: <span class="string">&quot;user&quot;</span>, <span class="string">&quot;content&quot;</span>: description&#125;]</span><br></pre></td></tr></table></figure>
+
+<p>它没有复制主 Agent 的全部历史，只拿到委派描述以及专用 System Prompt。于是子任务不会被主线程中的闲聊和旧工具结果干扰，主线程也不会被子任务的探索过程污染。</p>
+<h2 id="四、委派描述就是父子-Agent-的接口契约"><a href="#四、委派描述就是父子-Agent-的接口契约" class="headerlink" title="四、委派描述就是父子 Agent 的接口契约"></a>四、委派描述就是父子 Agent 的接口契约</h2><p>如果主 Agent 只传一句“看看认证模块”，子 Agent 很难知道调查边界和期望输出。高质量委派应像一个小型任务说明，至少包含：</p>
+<ul>
+<li><strong>目标：</strong> 最终要回答什么问题；</li>
+<li><strong>范围：</strong> 可以检查哪些目录、模块或数据；</li>
+<li><strong>约束：</strong> 只读还是允许修改，不能做什么；</li>
+<li><strong>交付物：</strong> 需要结论、文件位置、验证结果还是补丁；</li>
+<li><strong>完成标准：</strong> 什么证据足以结束。</li>
+</ul>
+<p>例如：</p>
+<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br></pre></td><td class="code"><pre><span class="line">调查登录偶发 401 的原因，仅进行只读分析。</span><br><span class="line"></span><br><span class="line">范围：src/auth、tests/auth 和相关配置。</span><br><span class="line">请返回：</span><br><span class="line">1. 最可能的根因；</span><br><span class="line">2. 支撑结论的文件路径与关键函数；</span><br><span class="line">3. 一个最小修复建议；</span><br><span class="line">4. 仍然不确定的地方。</span><br><span class="line">不要修改文件，也不要继续委派。</span><br></pre></td></tr></table></figure>
+
+<p>上下文隔离意味着子 Agent 不知道父线程“心里在想什么”。父 Agent 省略的背景不会自动出现，因此委派质量直接决定结果质量。</p>
+<h2 id="五、只回传结论，不回传完整对话"><a href="#五、只回传结论，不回传完整对话" class="headerlink" title="五、只回传结论，不回传完整对话"></a>五、只回传结论，不回传完整对话</h2><p>如果子 Agent 把自己的所有消息原样塞回主上下文，隔离就失去了意义。正确的数据流是：</p>
+<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line">父：任务描述（几百字）</span><br><span class="line">          ↓</span><br><span class="line">子：搜索 + 读取 + 推理（可能数万字）</span><br><span class="line">          ↓</span><br><span class="line">父：结论 + 证据 + 风险（几百到几千字）</span><br></pre></td></tr></table></figure>
+
+<p>最终报告最好采用稳定结构：</p>
+<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line">结论：一句话回答子任务</span><br><span class="line">证据：文件、函数、测试或命令结果</span><br><span class="line">产物：修改了什么，或明确说明只读</span><br><span class="line">风险：哪些判断仍不确定</span><br><span class="line">建议：父 Agent 下一步应该做什么</span><br></pre></td></tr></table></figure>
+
+<p>“只回传最后一条文本”适合最小实现，但生产系统还应处理这些情况：子 Agent 超时、最后一条消息是工具调用、执行被取消、工具失败后没有生成总结。父线程需要收到结构化状态，而不是空字符串。</p>
+<h2 id="六、子-Agent-应拥有哪些工具"><a href="#六、子-Agent-应拥有哪些工具" class="headerlink" title="六、子 Agent 应拥有哪些工具"></a>六、子 Agent 应拥有哪些工具</h2><p>最小实现通常不给子 Agent <code>task</code> 工具，防止无限递归委派：</p>
+<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">主 Agent 工具：bash / read / write / edit / glob / todo_write / task</span><br><span class="line">子 Agent 工具：bash / read / write / edit / glob</span><br></pre></td></tr></table></figure>
+
+<p>工具集合应遵循最小能力原则。只负责代码搜索的子 Agent 甚至只需要 <code>read_file</code> 和 <code>glob</code>；允许写文件会扩大权限面，也会制造并发冲突。</p>
+<p>递归深度限制也不能只靠 Prompt 中的“不要再委派”。生产系统应从工具注册层移除委派能力，或由运行框架维护 <code>depth</code> 并拒绝超过上限的创建请求。</p>
+<p>同样，每个子 Agent 都需要独立预算：</p>
+<ul>
+<li>最大轮数；</li>
+<li>最大 Token 或费用；</li>
+<li>总运行时间；</li>
+<li>工具输出上限；</li>
+<li>可取消的子级控制器。</li>
+</ul>
+<p>父任务被用户取消时，取消信号应向下传播到所有子 Agent，避免主线程已经停止，后台仍在继续修改文件或消耗额度。</p>
+<h2 id="七、上下文隔离不等于权限隔离"><a href="#七、上下文隔离不等于权限隔离" class="headerlink" title="七、上下文隔离不等于权限隔离"></a>七、上下文隔离不等于权限隔离</h2><p>子 Agent 拥有新的消息历史，不代表它可以绕过父 Agent 的安全策略。它的每次工具调用仍应经过参数验证、<code>PreToolUse</code> Hooks 和权限管线。</p>
+<p>当子 Agent 触发需要人工确认的操作时，常见做法是“权限冒泡”：</p>
+<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br></pre></td><td class="code"><pre><span class="line">子 Agent 请求写入工作区外文件</span><br><span class="line">            ↓</span><br><span class="line">子运行框架产生 ask 决策</span><br><span class="line">            ↓</span><br><span class="line">审批请求冒泡到父终端</span><br><span class="line">            ↓</span><br><span class="line">用户在主界面允许或拒绝</span><br><span class="line">            ↓</span><br><span class="line">结果返回子 Agent</span><br></pre></td></tr></table></figure>
+
+<p>不能因为子 Agent 没有自己的交互界面就默认允许，也不应不加说明地静默拒绝。审批请求应带上子任务身份、工具参数和原因，让用户知道究竟是谁要做什么。</p>
+<h2 id="八、消息隔离了，文件系统却可能共享"><a href="#八、消息隔离了，文件系统却可能共享" class="headerlink" title="八、消息隔离了，文件系统却可能共享"></a>八、消息隔离了，文件系统却可能共享</h2><p>教学版父子 Agent 使用同一个工作目录。于是出现一个重要区别：</p>
+<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">消息历史：隔离</span><br><span class="line">文件系统：共享</span><br></pre></td></tr></table></figure>
+
+<p>子 Agent 修改的文件会立即被父 Agent 看见。这对同步委派很方便，却在并发场景中带来风险：</p>
+<ul>
+<li>两个子 Agent 同时编辑同一文件，后写覆盖先写；</li>
+<li>父 Agent 基于旧内容生成补丁，覆盖子 Agent 的新修改；</li>
+<li>子 Agent 修改了工作区，却只在摘要中报告部分变化；</li>
+<li>一个子任务失败，留下半完成状态影响后续任务。</li>
+</ul>
+<p>因此，同步子 Agent 最好一次只负责边界清楚的修改；多个写任务并行时，应分配不相交的文件范围，或使用独立 Worktree、事务式补丁和合并阶段。共享工作区是一种协作机制，也是一种共享可变状态。</p>
+<h2 id="九、同步、异步与-Fork-是不同问题"><a href="#九、同步、异步与-Fork-是不同问题" class="headerlink" title="九、同步、异步与 Fork 是不同问题"></a>九、同步、异步与 Fork 是不同问题</h2><p>最容易理解的是同步子 Agent：父 Agent 调用 <code>task</code> 后等待，收到结果再继续。除此之外还有两种常见演进：</p>
+<table>
+<thead>
+<tr>
+<th>模式</th>
+<th>父 Agent 行为</th>
+<th>适合场景</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>同步</td>
+<td>等待子任务完成</td>
+<td>后续步骤依赖子任务结果</td>
+</tr>
+<tr>
+<td>异步</td>
+<td>立即继续，稍后接收通知</td>
+<td>相互独立、耗时较长的调查</td>
+</tr>
+<tr>
+<td>Fork 上下文</td>
+<td>继承可复用的父消息前缀</td>
+<td>子任务高度依赖父上下文或 Prompt Cache</td>
+</tr>
+</tbody></table>
+<p>Fork 并不是完全“干净”的新上下文，它可能保留父线程的消息前缀，以共享必要背景或提高 Prompt Cache 命中率。要想命中缓存，System Prompt、工具定义、模型、消息前缀和思考配置等内容通常需要保持一致。</p>
+<p>所以，“子 Agent 一定拥有完全空白上下文”只是教学阶段的简化。真实系统应根据隔离程度、背景复用、延迟与成本选择运行模式。</p>
+<h2 id="十、什么时候不该使用-Subagent"><a href="#十、什么时候不该使用-Subagent" class="headerlink" title="十、什么时候不该使用 Subagent"></a>十、什么时候不该使用 Subagent</h2><p>委派本身有固定成本：构造任务说明、再次调用模型、重复读取背景、压缩结果、处理失败。如果任务只需要一次文件读取或简单命令，直接执行往往更快。</p>
+<p>适合委派的任务通常具有以下特征：</p>
+<ul>
+<li>边界清晰，可以写出独立完成标准；</li>
+<li>会产生大量中间上下文，但主线程只需要结论；</li>
+<li>可以与主任务或其他子任务相对独立地进行；</li>
+<li>需要不同的工具、模型、System Prompt 或专业知识。</li>
+</ul>
+<p>不适合委派的任务包括：步骤极短、与主线程频繁来回依赖、多人同时修改同一小段代码，或背景难以完整描述的工作。</p>
+<h2 id="十一、这一篇真正需要记住什么"><a href="#十一、这一篇真正需要记住什么" class="headerlink" title="十一、这一篇真正需要记住什么"></a>十一、这一篇真正需要记住什么</h2><ol>
+<li><strong>Subagent 首先解决上下文污染。</strong> 独立消息历史承载探索过程，主线程只保留高密度结论。</li>
+<li><strong>委派描述是接口契约。</strong> 目标、范围、约束、交付物和完成标准都应明确。</li>
+<li><strong>结果要压缩，但不能丢失证据。</strong> 结论之外还应报告产物、风险和验证状态。</li>
+<li><strong>工具与预算必须受限。</strong> 禁止无界递归，限制轮次、时间、Token，并传播取消信号。</li>
+<li><strong>权限不会因上下文隔离而消失。</strong> 子调用仍走同一安全管线，需要审批时向父界面冒泡。</li>
+<li><strong>共享工作区仍是共享状态。</strong> 并行写入需要文件边界、Worktree 或明确的合并机制。</li>
+</ol>
+<p>有了 Subagent，主 Agent 能把不同问题交给独立上下文，但子任务所需的专业知识仍然可能让 System Prompt 越来越大。下一篇将进入 Skills：只在任务需要时加载对应知识，而不是把所有说明一次性塞给每个 Agent。</p>
+
+    </div>
+
+    
+    
+    
+
+    <footer class="post-footer">
+          
+
+<div class="post-copyright">
+<ul>
+  <li class="post-copyright-author">
+      <strong>本文作者： </strong>陌忆
+  </li>
+  <li class="post-copyright-link">
+      <strong>本文链接：</strong>
+      <a href="https://moyi-math.github.io/2026/08/20/Learn-Claude-Code-06-Subagent/" title="Learn Claude Code 06：Subagent——用独立上下文拆解复杂任务">https://moyi-math.github.io/2026/08/20/Learn-Claude-Code-06-Subagent/</a>
+  </li>
+  <li class="post-copyright-license">
+      <strong>版权声明： </strong>本博客所有文章除特别声明外，均采用 <a href="https://creativecommons.org/licenses/by-nc-sa/4.0/" rel="noopener" target="_blank"><i class="fab fa-fw fa-creative-commons"></i>BY-NC-SA</a> 许可协议。转载请注明出处！
+  </li>
+</ul>
+</div>
+
+          <div class="post-tags">
+              <a href="/tags/Agent/" rel="tag"># Agent</a>
+              <a href="/tags/Claude-Code/" rel="tag"># Claude Code</a>
+              <a href="/tags/Subagent/" rel="tag"># Subagent</a>
+              <a href="/tags/Context-Isolation/" rel="tag"># Context Isolation</a>
+              <a href="/tags/Multi-Agent/" rel="tag"># Multi-Agent</a>
+          </div>
+
+        
+
+          <div class="post-nav">
+            <div class="post-nav-item">
+                <a href="/2026/08/20/Learn-Claude-Code-05-TodoWrite/" rel="prev" title="Learn Claude Code 05：TodoWrite——让 Agent 的计划看得见">
+                  <i class="fa fa-angle-left"></i> Learn Claude Code 05：TodoWrite——让 Agent 的计划看得见
+                </a>
+            </div>
+            <div class="post-nav-item">
+                <a href="/2026/08/20/Learn-Claude-Code-07-Skills/" rel="next" title="Learn Claude Code 07：Skills——让专业知识按需进入上下文">
+                  Learn Claude Code 07：Skills——让专业知识按需进入上下文 <i class="fa fa-angle-right"></i>
+                </a>
+            </div>
+          </div>
+    </footer>
+  </article>
+</div>
+
+
+
+
+
+
+</div>
+  </main>
+
+  <footer class="footer">
+    <div class="footer-inner">
+
+  <div class="copyright">
+    &copy; 
+    <span itemprop="copyrightYear">2026</span>
+    <span class="with-love">
+      <i class="fab fa-osi"></i>
+    </span>
+    <span class="author" itemprop="copyrightHolder">陌忆</span>
+  </div>
+<div class="wordcount">
+  <span class="post-meta-item">
+    <span class="post-meta-item-icon">
+      <i class="fa fa-chart-line"></i>
+    </span>
+    <span title="站点总字数">106k</span>
+  </span>
+  <span class="post-meta-item">
+    <span class="post-meta-item-icon">
+      <i class="fa fa-coffee"></i>
+    </span>
+    <span title="站点阅读时长">6:24</span>
+  </span>
+</div>
+  <div class="powered-by">由 <a href="https://hexo.io/" rel="noopener" target="_blank">Hexo</a> & <a href="https://theme-next.js.org/" rel="noopener" target="_blank">NexT.Gemini</a> 强力驱动
+  </div>
+
+    </div>
+  </footer>
+
+  
+  <div class="toggle sidebar-toggle" role="button">
+    <span class="toggle-line"></span>
+    <span class="toggle-line"></span>
+    <span class="toggle-line"></span>
+  </div>
+  <div class="sidebar-dimmer"></div>
+  <div class="back-to-top" role="button" aria-label="返回顶部">
+    <i class="fa fa-arrow-up fa-lg"></i>
+    <span>0%</span>
+  </div>
+
+<noscript>
+  <div class="noscript-warning">Theme NexT works best with JavaScript enabled</div>
+</noscript>
+<!-- Site running time -->
+<span id="timeDate" aria-live="off"></span>
+<script>
+(function() {
+  var start = new Date("2022-11-17T08:00:00+08:00");
+  function pad(n) { return n < 10 ? "0" + n : "" + n; }
+  function tick() {
+    var diff = Date.now() - start.getTime();
+    if (diff < 0) return;
+    var d = Math.floor(diff / 86400000);
+    var h = Math.floor((diff % 86400000) / 3600000);
+    var m = Math.floor((diff % 3600000) / 60000);
+    var timeDate = document.getElementById("timeDate");
+    if (!timeDate) return;
+    timeDate.textContent =
+      "\u672C\u7AD9\u5DF2\u5B89\u5168\u8FD0\u884C " + d + " \u5929 " + pad(h) + " \u5C0F\u65F6 " + pad(m) + " \u5206";
+  }
+  tick();
+  setInterval(tick, 60000);
+})();
+</script>
+
+</body>
+</html>

@@ -1,0 +1,523 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width">
+<meta name="theme-color" content="#222" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#222" media="(prefers-color-scheme: dark)"><meta name="generator" content="Hexo 7.3.0">
+<link rel="preconnect" href="https://cdnjs.cloudflare.com" crossorigin>
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon-next.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32-next.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next.png">
+  <link rel="mask-icon" href="/images/logo.svg" color="#222">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/7.0.0/css/all.min.css" integrity="sha256-VHqXKFhhMxcpubYf9xiWdCiojEbY9NexQ4jh8AxbvcM=" crossorigin="anonymous">
+
+<script class="next-config" data-name="main" type="application/json">{"hostname":"moyi-math.github.io","root":"/","images":"/images","scheme":"Gemini","darkmode":true,"version":"8.28.0","exturl":false,"sidebar":{"position":"left","width_expanded":320,"width_dual_column":240,"display":"post","padding":18,"offset":12},"hljswrap":true,"codeblock":{"theme":{"light":"default","dark":"stackoverflow-dark"},"prism":{"light":"prism","dark":"prism-dark"},"copy_button":{"enable":true,"style":null},"fold":{"enable":false,"height":500},"language":false},"bookmark":{"enable":false,"color":"#222","save":"auto"},"mediumzoom":false,"lazyload":true,"pangu":false,"comments":{"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},"stickytabs":false,"motion":{"enable":false,"async":false,"duration":200,"transition":{"menu_item":"fadeInDown","post_block":"fadeIn","post_header":"fadeInDown","post_body":"fadeInDown","coll_header":"fadeInLeft","sidebar":"fadeInUp"}},"prism":false,"i18n":{"placeholder":"搜索...","empty":"没有找到任何搜索结果：${query}","hits_time":"找到 ${hits} 个搜索结果（用时 ${time} 毫秒）","hits":"找到 ${hits} 个搜索结果"},"path":"/search.json","localsearch":{"enable":true,"top_n_per_article":1,"unescape":false,"preload":false}}</script><script src="/js/config.js" defer></script>
+
+    <meta name="description" content="通过 System Prompt 和工具描述，拆解 LLM 的纯推理边界，以及它何时应该把任务交给工具执行。">
+<meta property="og:type" content="article">
+<meta property="og:title" content="从零实践 Function Call（二）：System Prompt 的艺术与纯推理的边界">
+<meta property="og:url" content="https://moyi-math.github.io/2026/07/30/%E4%BB%8E%E9%9B%B6%E5%AE%9E%E8%B7%B5-Function-Call-2-System-Prompt-%E4%B8%8E%E6%8E%A8%E7%90%86%E8%BE%B9%E7%95%8C/index.html">
+<meta property="og:site_name" content="陌忆的博客">
+<meta property="og:description" content="通过 System Prompt 和工具描述，拆解 LLM 的纯推理边界，以及它何时应该把任务交给工具执行。">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:image" content="https://moyi-math.github.io/images/background.webp">
+<meta property="article:published_time" content="2026-07-30T07:00:00.000Z">
+<meta property="article:modified_time" content="2026-08-20T14:47:37.221Z">
+<meta property="article:author" content="陌忆">
+<meta property="article:tag" content="Agent">
+<meta property="article:tag" content="LLM">
+<meta property="article:tag" content="Function Call">
+<meta property="article:tag" content="System Prompt">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:image" content="https://moyi-math.github.io/images/background.webp">
+
+
+<link rel="canonical" href="https://moyi-math.github.io/2026/07/30/%E4%BB%8E%E9%9B%B6%E5%AE%9E%E8%B7%B5-Function-Call-2-System-Prompt-%E4%B8%8E%E6%8E%A8%E7%90%86%E8%BE%B9%E7%95%8C/">
+
+
+<script class="next-config" data-name="page" type="application/json">{"sidebar":"","isHome":false,"isPost":true,"lang":"zh-CN","comments":true,"permalink":"https://moyi-math.github.io/2026/07/30/%E4%BB%8E%E9%9B%B6%E5%AE%9E%E8%B7%B5-Function-Call-2-System-Prompt-%E4%B8%8E%E6%8E%A8%E7%90%86%E8%BE%B9%E7%95%8C/","path":"2026/07/30/从零实践-Function-Call-2-System-Prompt-与推理边界/","title":"从零实践 Function Call（二）：System Prompt 的艺术与纯推理的边界"}</script>
+
+<script class="next-config" data-name="calendar" type="application/json">""</script>
+<title>从零实践 Function Call（二）：System Prompt 的艺术与纯推理的边界 | 陌忆的博客</title>
+  
+
+
+
+
+
+
+
+
+  
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/animejs/3.2.1/anime.min.js" integrity="sha256-XL2inqUJaslATFnHdJOi9GfQ60on8Wx1C2H8DYiN1xY=" crossorigin="anonymous" defer></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/lozad.js/1.16.0/lozad.min.js" integrity="sha256-mOFREFhqmHeQbXpK2lp4nA3qooVgACfh88fpJftLBbc=" crossorigin="anonymous" defer></script>
+<script src="/js/utils.js" defer></script><script src="/js/sidebar.js" defer></script><script src="/js/next-boot.js" defer></script>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/hexo-generator-searchdb/1.5.0/search.js" integrity="sha256-xFC6PJ82SL9b3WkGjFavNiA9gm5z6UBxWPiu4CYjptg=" crossorigin="anonymous" defer></script>
+<script src="/js/third-party/search/local-search.js" defer></script>
+
+
+
+
+
+
+
+  
+
+
+
+
+  
+
+  <script class="next-config" data-name="enableMath" type="application/json">false</script><link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/katex.min.css" integrity="sha256-UF1fgpAiu3tPJN/uCqEUHNe7pnr+QR0SQDNfgglgtcM=" crossorigin="anonymous">
+
+
+<link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
+
+
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"WebSite","name":"陌忆的博客","url":"https://moyi-math.github.io","description":"记录 RAG、Agent、MCP、算法与软件工程实践，按专栏整理可复用的技术笔记。","inLanguage":"zh-CN","author":{"@type":"Person","name":"陌忆"}}</script>
+
+
+
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"Article","headline":"从零实践 Function Call（二）：System Prompt 的艺术与纯推理的边界","description":"通过 System Prompt 和工具描述，拆解 LLM 的纯推理边界，以及它何时应该把任务交给工具执行。","datePublished":"2026-07-30T07:00:00.000Z","dateModified":"2026-08-20T14:47:37.221Z","inLanguage":"zh-CN","mainEntityOfPage":{"@type":"WebPage","@id":"https://moyi-math.github.io/2026/07/30/%E4%BB%8E%E9%9B%B6%E5%AE%9E%E8%B7%B5-Function-Call-2-System-Prompt-%E4%B8%8E%E6%8E%A8%E7%90%86%E8%BE%B9%E7%95%8C/index.html"},"author":{"@type":"Person","name":"陌忆"}}</script>
+<meta name="author" content="陌忆">
+
+
+  <noscript>
+    <link rel="stylesheet" href="/css/noscript.css">
+  </noscript>
+<!-- hexo injector head_end start --><link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/katex.min.css" integrity="sha512-fHwaWebuwA7NSF5Qg/af4UeDx9XqUpYpOGgubo3yWu+b2IQR4UeQwbb42Ti7gVAjNtVoI/I9TEoYeu9omwcC6g==" crossorigin="anonymous" referrerpolicy="no-referrer" /><!-- hexo injector head_end end --><link rel="alternate" href="/atom.xml" title="陌忆的博客" type="application/atom+xml">
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage">
+  <div class="headband"></div>
+
+  <main class="main">
+    <div class="column">
+      <header class="header" itemscope itemtype="http://schema.org/WPHeader"><div class="site-brand-container">
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="切换导航栏" role="button">
+        <span class="toggle-line"></span>
+        <span class="toggle-line"></span>
+        <span class="toggle-line"></span>
+    </div>
+  </div>
+
+  <div class="site-meta">
+
+    <a href="/" class="brand" rel="start">
+      <i class="logo-line"></i>
+      <p class="site-title">陌忆的博客</p>
+      <i class="logo-line"></i>
+    </a>
+      <p class="site-subtitle" itemprop="description">数据库无法得出结论</p>
+  </div>
+
+  <div class="site-nav-right">
+    <div class="toggle popup-trigger" aria-label="搜索" role="button">
+        <i class="fa fa-search fa-fw fa-lg"></i>
+    </div>
+  </div>
+</div>
+
+
+
+<nav class="site-nav">
+  <ul class="main-menu menu"><li class="menu-item menu-item-home"><a href="/" rel="section"><i class="fa fa-home fa-fw"></i>首页</a></li><li class="menu-item menu-item-about"><a href="/about/" rel="section"><i class="fa fa-user fa-fw"></i>关于</a></li><li class="menu-item menu-item-tags"><a href="/tags/" rel="section"><i class="fa fa-tags fa-fw"></i>标签</a></li><li class="menu-item menu-item-categories"><a href="/categories/" rel="section"><i class="fa fa-th fa-fw"></i>分类</a></li><li class="menu-item menu-item-archives"><a href="/archives/" rel="section"><i class="fa fa-archive fa-fw"></i>归档</a></li>
+      <li class="menu-item menu-item-search">
+        <a role="button" class="popup-trigger"><i class="fa fa-search fa-fw"></i>搜索
+        </a>
+      </li>
+  </ul>
+</nav>
+
+
+
+  <div class="search-pop-overlay">
+    <div class="popup search-popup">
+      <div class="search-header">
+        <span class="search-icon">
+          <i class="fa fa-search"></i>
+        </span>
+        <div class="search-input-container">
+          <input autocomplete="off" autocapitalize="off" maxlength="80"
+                placeholder="搜索..." spellcheck="false"
+                type="search" class="search-input">
+        </div>
+        <span class="popup-btn-close" role="button">
+          <i class="fa fa-times-circle"></i>
+        </span>
+      </div>
+      <div class="search-result-container">
+        <div class="search-result-icon">
+          <i class="fa fa-spinner fa-pulse fa-5x"></i>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</header>
+        
+  
+  <aside class="sidebar">
+
+    <div class="sidebar-inner sidebar-nav-active sidebar-toc-active">
+      <ul class="sidebar-nav">
+        <li class="sidebar-nav-toc">
+          文章目录
+        </li>
+        <li class="sidebar-nav-overview">
+          站点概览
+        </li>
+      </ul>
+
+      <div class="sidebar-panel-container">
+        <!--noindex-->
+        <div class="post-toc-wrap sidebar-panel">
+            <div class="post-toc animated"><ol class="nav"><li class="nav-item nav-level-2"><a class="nav-link" href="#%E4%B8%80%E3%80%81%E5%BC%95%E8%A8%80"><span class="nav-text">一、引言</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E4%BA%8C%E3%80%81%E4%BB%8E%E2%80%9D%E6%97%A0%E6%8F%90%E7%A4%BA%E2%80%9D%E5%88%B0%E2%80%9D%E6%9C%89%E6%8F%90%E7%A4%BA%E2%80%9D%E7%9A%84%E8%B4%A8%E5%8F%98"><span class="nav-text">二、从”无提示”到”有提示”的质变</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E4%B8%89%E3%80%81System-Prompt-%E7%9A%84%E5%9B%9B%E6%AE%B5%E5%BC%8F%E7%BB%93%E6%9E%84"><span class="nav-text">三、System Prompt 的四段式结构</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#1-%E8%A7%92%E8%89%B2%E5%AE%9A%E4%B9%89%EF%BC%88Role%EF%BC%89"><span class="nav-text">1. 角色定义（Role）</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#2-%E4%BB%BB%E5%8A%A1%E6%8F%8F%E8%BF%B0%EF%BC%88Task%EF%BC%89"><span class="nav-text">2. 任务描述（Task）</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#3-%E8%A1%8C%E4%B8%BA%E8%A7%84%E5%88%99%EF%BC%88Rules%EF%BC%89"><span class="nav-text">3. 行为规则（Rules）</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#4-%E8%BE%93%E5%87%BA%E7%BA%A6%E6%9D%9F%EF%BC%88Constraints%EF%BC%89"><span class="nav-text">4. 输出约束（Constraints）</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%9B%9B%E3%80%81%E5%9B%9B%E6%AE%B5%E5%BC%8F%E5%9C%A8-Function-Call-%E4%B8%AD%E7%9A%84%E6%BC%94%E5%8F%98"><span class="nav-text">四、四段式在 Function Call 中的演变</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E4%BA%94%E3%80%81%E7%BA%AF-LLM-%E6%8E%A8%E7%90%86%E7%9A%84%E8%BE%B9%E7%95%8C"><span class="nav-text">五、纯 LLM 推理的边界</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#%E9%97%AE%E9%A2%98-1%EF%BC%9A%E8%AE%A1%E7%AE%97%E4%B8%8D%E5%8F%AF%E9%9D%A0"><span class="nav-text">问题 1：计算不可靠</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E9%97%AE%E9%A2%98-2%EF%BC%9A%E4%B8%8A%E4%B8%8B%E6%96%87%E7%AA%97%E5%8F%A3%E9%A5%B1%E5%92%8C"><span class="nav-text">问题 2：上下文窗口饱和</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E9%97%AE%E9%A2%98-3%EF%BC%9A%E6%97%A0%E9%AA%8C%E8%AF%81%E6%9C%BA%E5%88%B6"><span class="nav-text">问题 3：无验证机制</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%85%AD%E3%80%81%E5%B7%A5%E5%85%B7-%E7%BB%99-LLM-%E9%85%8D%E4%B8%80%E4%B8%AA%E2%80%9D%E8%AE%A1%E7%AE%97%E5%99%A8%E2%80%9D"><span class="nav-text">六、工具 &#x3D; 给 LLM 配一个”计算器”</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E4%B8%83%E3%80%81%E4%BB%8E%E2%80%9D%E8%BA%AB%E4%BB%BD%E8%AE%BE%E5%AE%9A%E2%80%9D%E5%88%B0%E2%80%9D%E5%8D%8F%E8%AE%AE%E7%BA%A6%E6%9D%9F%E2%80%9D%E7%9A%84%E6%BC%94%E8%BF%9B"><span class="nav-text">七、从”身份设定”到”协议约束”的演进</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%85%AB%E3%80%81%E4%B8%8B%E4%B8%80%E7%AF%87%E9%A2%84%E5%91%8A"><span class="nav-text">八、下一篇预告</span></a></li></ol></div>
+        </div>
+        <!--/noindex-->
+
+        <div class="site-overview-wrap sidebar-panel">
+          <div class="site-author animated" itemprop="author" itemscope itemtype="http://schema.org/Person">
+    <img class="site-author-image" itemprop="image" alt="陌忆"
+      src="/images/avatar.webp">
+  <p class="site-author-name" itemprop="name">陌忆</p>
+  <div class="site-description" itemprop="description">记录 RAG、Agent、MCP、算法与软件工程实践，按专栏整理可复用的技术笔记。</div>
+</div>
+<div class="site-state-wrap animated">
+  <nav class="site-state">
+      <div class="site-state-item site-state-posts">
+        <a href="/archives/">
+          <span class="site-state-item-count">50</span>
+          <span class="site-state-item-name">日志</span>
+        </a>
+      </div>
+      <div class="site-state-item site-state-categories">
+          <a href="/categories/">
+        <span class="site-state-item-count">10</span>
+        <span class="site-state-item-name">分类</span></a>
+      </div>
+      <div class="site-state-item site-state-tags">
+          <a href="/tags/">
+        <span class="site-state-item-count">172</span>
+        <span class="site-state-item-name">标签</span></a>
+      </div>
+  </nav>
+</div>
+  <div class="links-of-author animated">
+      <span class="links-of-author-item">
+        <a href="https://github.com/moyi-math" title="GitHub → https:&#x2F;&#x2F;github.com&#x2F;moyi-math" rel="noopener me" target="_blank"><i class="fab fa-github fa-fw"></i>GitHub</a>
+      </span>
+  </div>
+  <div class="cc-license animated" itemprop="license">
+    <a href="https://creativecommons.org/licenses/by-nc-sa/4.0/" class="cc-opacity" rel="noopener" target="_blank"><img src="https://cdnjs.cloudflare.com/ajax/libs/creativecommons-vocabulary/2020.11.3/assets/license_badges/small/by_nc_sa.svg" alt="Creative Commons"></a>
+  </div>
+
+        </div>
+      </div>
+    </div>
+
+    
+  </aside>
+
+
+    </div>
+
+    <div class="main-inner post posts-expand">
+
+
+  
+
+
+<div class="post-block">
+  
+  
+
+  <article itemscope itemtype="http://schema.org/Article" class="post-content" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="https://moyi-math.github.io/2026/07/30/%E4%BB%8E%E9%9B%B6%E5%AE%9E%E8%B7%B5-Function-Call-2-System-Prompt-%E4%B8%8E%E6%8E%A8%E7%90%86%E8%BE%B9%E7%95%8C/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.webp">
+      <meta itemprop="name" content="陌忆">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="陌忆的博客">
+      <meta itemprop="description" content="记录 RAG、Agent、MCP、算法与软件工程实践，按专栏整理可复用的技术笔记。">
+    </span>
+
+    <span hidden itemprop="post" itemscope itemtype="http://schema.org/CreativeWork">
+      <meta itemprop="name" content="从零实践 Function Call（二）：System Prompt 的艺术与纯推理的边界 | 陌忆的博客">
+      <meta itemprop="description" content="通过 System Prompt 和工具描述，拆解 LLM 的纯推理边界，以及它何时应该把任务交给工具执行。">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          从零实践 Function Call（二）：System Prompt 的艺术与纯推理的边界
+        </h1>
+
+        <div class="post-meta-container">
+          <div class="post-meta">
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-calendar"></i>
+      </span>
+      <span class="post-meta-item-text">发表于</span>
+
+      <time title="创建时间：2026-07-30 15:00:00" itemprop="dateCreated datePublished" datetime="2026-07-30T15:00:00+08:00">2026-07-30</time>
+    </span>
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-calendar-check"></i>
+      </span>
+      <span class="post-meta-item-text">更新于</span>
+      <time title="修改时间：2026-08-20 22:47:37" itemprop="dateModified" datetime="2026-08-20T22:47:37+08:00">2026-08-20</time>
+    </span>
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-folder"></i>
+      </span>
+      <span class="post-meta-item-text">分类于</span>
+        <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+          <a href="/categories/%E4%BB%8E%E9%9B%B6%E5%AE%9E%E8%B7%B5-Function-Call/" itemprop="url" rel="index"><span itemprop="name">从零实践 Function Call</span></a>
+        </span>
+    </span>
+
+  
+    <span class="post-meta-break"></span>
+    <span class="post-meta-item" title="本文字数">
+      <span class="post-meta-item-icon">
+        <i class="far fa-file-word"></i>
+      </span>
+      <span class="post-meta-item-text">本文字数：</span>
+      <span>1.5k</span>
+    </span>
+    <span class="post-meta-item" title="阅读时长">
+      <span class="post-meta-item-icon">
+        <i class="far fa-clock"></i>
+      </span>
+      <span class="post-meta-item-text">阅读时长 &asymp;</span>
+      <span>6 分钟</span>
+    </span>
+</div>
+
+            <div class="post-description">通过 System Prompt 和工具描述，拆解 LLM 的纯推理边界，以及它何时应该把任务交给工具执行。</div>
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody"><span id="more"></span>
+
+<h2 id="一、引言"><a href="#一、引言" class="headerlink" title="一、引言"></a>一、引言</h2><p>上一篇我们用 60 行代码展示了 Function Call 的完整机制。但你可能会想：LLM 怎么知道<strong>什么时候</strong>该调用工具？怎么知道该<strong>传什么参数</strong>？怎么保证它<strong>不滥用</strong>工具？</p>
+<p>答案都在 <strong>System Prompt</strong> 里。</p>
+<p>System Prompt 是 Agent 的”操作手册”。同一个模型，配上不同的 System Prompt，可以是翻译官、数学老师、客服、代码助手——<strong>模型没变，行为变了</strong>。</p>
+<p>这篇文章分两部分：</p>
+<ol>
+<li><strong>System Prompt 的结构化设计</strong>——如何写一个有效的 System Prompt</li>
+<li><strong>纯推理的边界</strong>——为什么 LLM 需要工具，不能全靠自己</li>
+</ol>
+<h2 id="二、从”无提示”到”有提示”的质变"><a href="#二、从”无提示”到”有提示”的质变" class="headerlink" title="二、从”无提示”到”有提示”的质变"></a>二、从”无提示”到”有提示”的质变</h2><p>先看最基础的例子——没有任何 System Prompt：</p>
+<figure class="highlight javascript"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// 01_intro.js</span></span><br><span class="line"><span class="keyword">const</span> session = <span class="keyword">new</span> <span class="title class_">LlamaChatSession</span>(&#123;</span><br><span class="line">    <span class="attr">contextSequence</span>: context.<span class="title function_">getSequence</span>(),</span><br><span class="line">    <span class="comment">// 没有 systemPrompt</span></span><br><span class="line">&#125;);</span><br><span class="line"><span class="keyword">const</span> a1 = <span class="keyword">await</span> session.<span class="title function_">prompt</span>(<span class="string">&quot;do you know node-llama-cpp&quot;</span>);</span><br></pre></td></tr></table></figure>
+
+<p>模型自由发挥，回答什么取决于它的训练数据。</p>
+<p>再看加了 System Prompt 的例子：</p>
+<figure class="highlight javascript"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// 03_translation.js</span></span><br><span class="line"><span class="keyword">const</span> session = <span class="keyword">new</span> <span class="title class_">LlamaChatSession</span>(&#123;</span><br><span class="line">    <span class="attr">contextSequence</span>: context.<span class="title function_">getSequence</span>(),</span><br><span class="line">    <span class="attr">systemPrompt</span>: <span class="string">`You are a professional English-to-Chinese translator</span></span><br><span class="line"><span class="string">    specializing in technical AI/ML content.</span></span><br><span class="line"><span class="string"></span></span><br><span class="line"><span class="string">    Follow these rules:</span></span><br><span class="line"><span class="string">    - Preserve all technical statements exactly</span></span><br><span class="line"><span class="string">    - Use idiomatic, natural Chinese</span></span><br><span class="line"><span class="string">    - Avoid literal English sentence structures</span></span><br><span class="line"><span class="string">    - Use proper Chinese punctuation and typography</span></span><br><span class="line"><span class="string">    - Keep a neutral, academic tone</span></span><br><span class="line"><span class="string">    - CRITICAL: Output ONLY the translation, no commentary.`</span></span><br><span class="line">&#125;);</span><br></pre></td></tr></table></figure>
+
+<p>同一个模型，同一个 API，输出从自由聊天变成了<strong>专业学术翻译</strong>。</p>
+<h2 id="三、System-Prompt-的四段式结构"><a href="#三、System-Prompt-的四段式结构" class="headerlink" title="三、System Prompt 的四段式结构"></a>三、System Prompt 的四段式结构</h2><p>有效的 System Prompt 通常包含四个部分，每层递进：</p>
+<h3 id="1-角色定义（Role）"><a href="#1-角色定义（Role）" class="headerlink" title="1. 角色定义（Role）"></a>1. 角色定义（Role）</h3><p>告诉模型它”是谁”：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">You are a professional English-to-Chinese translator.</span><br><span class="line">You are an expert logical and quantitative reasoner.</span><br><span class="line">You are a senior software engineer specializing in Python.</span><br></pre></td></tr></table></figure>
+
+<p>角色越具体，行为越一致。 “A translator” 不如 “a professional scientific translator for AI&#x2F;ML papers”。</p>
+<h3 id="2-任务描述（Task）"><a href="#2-任务描述（Task）" class="headerlink" title="2. 任务描述（Task）"></a>2. 任务描述（Task）</h3><p>告诉模型它的目标是什么：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">Your task: Produce an accurate Chinese translation that preserves</span><br><span class="line">every technical detail and nuance of the original English text.</span><br></pre></td></tr></table></figure>
+
+<p>任务描述应该明确回答：<strong>什么输入？期望什么输出？</strong></p>
+<h3 id="3-行为规则（Rules）"><a href="#3-行为规则（Rules）" class="headerlink" title="3. 行为规则（Rules）"></a>3. 行为规则（Rules）</h3><p>具体的约束条件：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line">- Preserve all technical statements exactly</span><br><span class="line">- Use idiomatic, natural Chinese</span><br><span class="line">- Avoid literal English sentence structures</span><br><span class="line">- Use proper Chinese typography (e.g., &quot;54 %&quot;, &quot;3 m&quot;)</span><br></pre></td></tr></table></figure>
+
+<p>规则越具体，输出越可控。模糊的规则（”翻译好一点”）等于没规则。</p>
+<h3 id="4-输出约束（Constraints）"><a href="#4-输出约束（Constraints）" class="headerlink" title="4. 输出约束（Constraints）"></a>4. 输出约束（Constraints）</h3><p>最强的控制手段：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">- CRITICAL: DO NOT add any explanation</span><br><span class="line">- Output ONLY the translated text</span><br><span class="line">- After writing &quot;Answer:&quot;, DO NOT continue calculating</span><br></pre></td></tr></table></figure>
+
+<p><strong>为什么需要约束？</strong> 因为 LLM 默认是”话痨”。没有约束时：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line">AI: 好的，我来为你翻译这段文字。</span><br><span class="line">以下是翻译结果：</span><br><span class="line">[译文]</span><br><span class="line">希望这对你有帮助！</span><br></pre></td></tr></table></figure>
+
+<p>有约束时：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">AI: [仅翻译文本]</span><br></pre></td></tr></table></figure>
+
+<h2 id="四、四段式在-Function-Call-中的演变"><a href="#四、四段式在-Function-Call-中的演变" class="headerlink" title="四、四段式在 Function Call 中的演变"></a>四、四段式在 Function Call 中的演变</h2><p>有趣的是，随着 Agent 越来越复杂，System Prompt 的重心也在变化：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line">| 阶段              | Role 重心     | Rules 重心              |</span><br><span class="line">|-------------------|---------------|-------------------------|</span><br><span class="line">| 翻译 (03)         | 角色设定       | 翻译规范                |</span><br><span class="line">| 记忆 (08)         | 决策逻辑       | &quot;存还是不存&quot;的判断规则   |</span><br><span class="line">| ReAct (09)        | 协议约束       | Thought-&gt;Action-&gt;Observation 格式 |</span><br></pre></td></tr></table></figure>
+
+<p>到了 ReAct Agent，System Prompt 已经不再是”你是什么人”，而是<strong>你必须遵循什么流程</strong>：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br></pre></td><td class="code"><pre><span class="line">CRITICAL: You must follow this EXACT pattern:</span><br><span class="line"></span><br><span class="line">Thought: [Explain what calculation you need]</span><br><span class="line">Action: [Call ONE tool]</span><br><span class="line">Observation: [Wait for result]</span><br><span class="line">...</span><br><span class="line">Answer: [Final answer and STOP]</span><br><span class="line"></span><br><span class="line">RULES:</span><br><span class="line">- Use tools for ALL calculations - never calculate in your head</span><br><span class="line">- Each Action should call exactly ONE tool</span><br><span class="line">- Only write &quot;Answer:&quot; when you have the complete final answer</span><br></pre></td></tr></table></figure>
+
+<p>**System Prompt 从一个”身份设定”变成了一个”协议”**。这是 Agent 设计中最关键的心智转变。</p>
+<h2 id="五、纯-LLM-推理的边界"><a href="#五、纯-LLM-推理的边界" class="headerlink" title="五、纯 LLM 推理的边界"></a>五、纯 LLM 推理的边界</h2><p>有了好的 System Prompt，LLM 能解决复杂问题了吗？<strong>不一定。</strong></p>
+<p>试试这个题：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line">My family reunion is this week, and I was assigned the mashed potatoes to bring.</span><br><span class="line">The attendees include my married mother and father, my twin brother and his family,</span><br><span class="line">my aunt and her family, my grandma and her brother, her brother&#x27;s daughter,</span><br><span class="line">and his daughter&#x27;s family...</span><br><span class="line">How many whole bags of potatoes do I need?</span><br></pre></td></tr></table></figure>
+
+<p>这个题目需要：</p>
+<ol>
+<li>数清家庭关系中的每一个人</li>
+<li>区分成人和小孩</li>
+<li>排除不吃碳水的人</li>
+<li>按人头算土豆需求量</li>
+<li>换算成磅</li>
+<li>再换算成袋数（向上取整）</li>
+</ol>
+<p><strong>纯 LLM “心算”做这种题，经常出错。</strong> 原因有三：</p>
+<h3 id="问题-1：计算不可靠"><a href="#问题-1：计算不可靠" class="headerlink" title="问题 1：计算不可靠"></a>问题 1：计算不可靠</h3><p>LLM 本质上是语言模型，不是计算器。它”学过”数学，但每一步都是概率性的。三位数以上的运算，1.7B 模型的错误率明显上升。</p>
+<h3 id="问题-2：上下文窗口饱和"><a href="#问题-2：上下文窗口饱和" class="headerlink" title="问题 2：上下文窗口饱和"></a>问题 2：上下文窗口饱和</h3><p>复杂的推理链会消耗大量 token。家庭聚餐这道题，光描述就有几百个 token，推理过程更容易撑爆上下文窗口。</p>
+<h3 id="问题-3：无验证机制"><a href="#问题-3：无验证机制" class="headerlink" title="问题 3：无验证机制"></a>问题 3：无验证机制</h3><p>LLM 算出一个数就是最终答案。它没法回溯验证，没法”重算一遍”，也没法说”这一步我不确定，我用计算器确认一下”。</p>
+<h2 id="六、工具-给-LLM-配一个”计算器”"><a href="#六、工具-给-LLM-配一个”计算器”" class="headerlink" title="六、工具 &#x3D; 给 LLM 配一个”计算器”"></a>六、工具 &#x3D; 给 LLM 配一个”计算器”</h2><p>这些问题的解决方案从来不是”换更大的模型”——而是<strong>给 LLM 配工具</strong>。</p>
+<p>对比两种方式：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br></pre></td><td class="code"><pre><span class="line">纯 LLM 方式：</span><br><span class="line">  问题： (15 + 7) x 3 - 10 = ?</span><br><span class="line">  LLM 心算：...可能算错...</span><br><span class="line">  输出答案</span><br><span class="line"></span><br><span class="line">有工具的 Agent 方式：</span><br><span class="line">  问题： (15 + 7) x 3 - 10 = ?</span><br><span class="line">  Thought: 先算 15 + 7</span><br><span class="line">  Action: add(15, 7)       &lt;- 工具保证正确</span><br><span class="line">  Observation: 22</span><br><span class="line">  Thought: 再乘 3</span><br><span class="line">  Action: multiply(22, 3)  &lt;- 工具保证正确</span><br><span class="line">  Observation: 66</span><br><span class="line">  Thought: 减 10</span><br><span class="line">  Action: subtract(66, 10) &lt;- 工具保证正确</span><br><span class="line">  Observation: 56</span><br><span class="line">  Answer: 56</span><br></pre></td></tr></table></figure>
+
+<p>每一步的计算都由工具完成，LLM 只负责<strong>决策</strong>——“下一步该算什么”，而不是”结果是多少”。</p>
+<p>这就是 04_think 教给我们的核心教训：</p>
+<blockquote>
+<p><strong>LLM 应该做它擅长的（推理、规划），把不擅长的（计算、记忆、实时信息）交给工具。</strong></p>
+</blockquote>
+<h2 id="七、从”身份设定”到”协议约束”的演进"><a href="#七、从”身份设定”到”协议约束”的演进" class="headerlink" title="七、从”身份设定”到”协议约束”的演进"></a>七、从”身份设定”到”协议约束”的演进</h2><p>总结 System Prompt 在 Agent 进化路径中的变化：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line">| 阶段                | System Prompt 重心           |</span><br><span class="line">|---------------------|------------------------------|</span><br><span class="line">| 基础问答 (01)       | 无                           |</span><br><span class="line">| 翻译 (03)           | 角色 + 规则 + 格式           |</span><br><span class="line">| 推理 (04)           | 角色 + 输出约束              |</span><br><span class="line">| Simple Agent (07)   | 角色 + 工具使用指引          |</span><br><span class="line">| Memoru Agent (08)   | 角色 + 决策逻辑 + 记忆注入    |</span><br><span class="line">| ReAct Agent (09)    | 协议（Thought-&gt;Action-&gt;...）|</span><br></pre></td></tr></table></figure>
+
+<p>一个关键的转折点是：<strong>你不再是在”教育”一个助手，而是在”编程”一个系统。</strong> System Prompt 从”身份卡片”变成了”执行协议”。</p>
+<h2 id="八、下一篇预告"><a href="#八、下一篇预告" class="headerlink" title="八、下一篇预告"></a>八、下一篇预告</h2><p>现在我们有了 Function Call（工具调用能力）和 System Prompt（行为控制），下一步就是把它们组合成一个<strong>循环</strong>——让 Agent 可以多步推理、反复调用工具、直到问题解决。</p>
+<p>下一篇我们深入 <strong>ReAct 模式</strong>：Thought -&gt; Action -&gt; Observation，Agent 的完整形态。</p>
+
+    </div>
+
+    
+    
+    
+
+    <footer class="post-footer">
+          
+
+<div class="post-copyright">
+<ul>
+  <li class="post-copyright-author">
+      <strong>本文作者： </strong>陌忆
+  </li>
+  <li class="post-copyright-link">
+      <strong>本文链接：</strong>
+      <a href="https://moyi-math.github.io/2026/07/30/%E4%BB%8E%E9%9B%B6%E5%AE%9E%E8%B7%B5-Function-Call-2-System-Prompt-%E4%B8%8E%E6%8E%A8%E7%90%86%E8%BE%B9%E7%95%8C/" title="从零实践 Function Call（二）：System Prompt 的艺术与纯推理的边界">https://moyi-math.github.io/2026/07/30/从零实践-Function-Call-2-System-Prompt-与推理边界/</a>
+  </li>
+  <li class="post-copyright-license">
+      <strong>版权声明： </strong>本博客所有文章除特别声明外，均采用 <a href="https://creativecommons.org/licenses/by-nc-sa/4.0/" rel="noopener" target="_blank"><i class="fab fa-fw fa-creative-commons"></i>BY-NC-SA</a> 许可协议。转载请注明出处！
+  </li>
+</ul>
+</div>
+
+          <div class="post-tags">
+              <a href="/tags/Agent/" rel="tag"># Agent</a>
+              <a href="/tags/LLM/" rel="tag"># LLM</a>
+              <a href="/tags/Function-Call/" rel="tag"># Function Call</a>
+              <a href="/tags/System-Prompt/" rel="tag"># System Prompt</a>
+          </div>
+
+        
+
+          <div class="post-nav">
+            <div class="post-nav-item">
+                <a href="/2026/07/30/%E4%BB%8E%E9%9B%B6%E5%AE%9E%E8%B7%B5-Function-Call-1-%E5%85%A5%E9%97%A8/" rel="prev" title="从零实践 Function Call（一）：从 LLM 到 Agent——Function Call 入门">
+                  <i class="fa fa-angle-left"></i> 从零实践 Function Call（一）：从 LLM 到 Agent——Function Call 入门
+                </a>
+            </div>
+            <div class="post-nav-item">
+                <a href="/2026/07/30/%E4%BB%8E%E9%9B%B6%E5%AE%9E%E8%B7%B5-Function-Call-3-ReAct-%E6%A8%A1%E5%BC%8F/" rel="next" title="从零实践 Function Call（三）：ReAct 模式——Thought、Action、Observation">
+                  从零实践 Function Call（三）：ReAct 模式——Thought、Action、Observation <i class="fa fa-angle-right"></i>
+                </a>
+            </div>
+          </div>
+    </footer>
+  </article>
+</div>
+
+
+
+
+
+
+</div>
+  </main>
+
+  <footer class="footer">
+    <div class="footer-inner">
+
+  <div class="copyright">
+    &copy; 
+    <span itemprop="copyrightYear">2026</span>
+    <span class="with-love">
+      <i class="fab fa-osi"></i>
+    </span>
+    <span class="author" itemprop="copyrightHolder">陌忆</span>
+  </div>
+<div class="wordcount">
+  <span class="post-meta-item">
+    <span class="post-meta-item-icon">
+      <i class="fa fa-chart-line"></i>
+    </span>
+    <span title="站点总字数">106k</span>
+  </span>
+  <span class="post-meta-item">
+    <span class="post-meta-item-icon">
+      <i class="fa fa-coffee"></i>
+    </span>
+    <span title="站点阅读时长">6:24</span>
+  </span>
+</div>
+  <div class="powered-by">由 <a href="https://hexo.io/" rel="noopener" target="_blank">Hexo</a> & <a href="https://theme-next.js.org/" rel="noopener" target="_blank">NexT.Gemini</a> 强力驱动
+  </div>
+
+    </div>
+  </footer>
+
+  
+  <div class="toggle sidebar-toggle" role="button">
+    <span class="toggle-line"></span>
+    <span class="toggle-line"></span>
+    <span class="toggle-line"></span>
+  </div>
+  <div class="sidebar-dimmer"></div>
+  <div class="back-to-top" role="button" aria-label="返回顶部">
+    <i class="fa fa-arrow-up fa-lg"></i>
+    <span>0%</span>
+  </div>
+
+<noscript>
+  <div class="noscript-warning">Theme NexT works best with JavaScript enabled</div>
+</noscript>
+<!-- Site running time -->
+<span id="timeDate" aria-live="off"></span>
+<script>
+(function() {
+  var start = new Date("2022-11-17T08:00:00+08:00");
+  function pad(n) { return n < 10 ? "0" + n : "" + n; }
+  function tick() {
+    var diff = Date.now() - start.getTime();
+    if (diff < 0) return;
+    var d = Math.floor(diff / 86400000);
+    var h = Math.floor((diff % 86400000) / 3600000);
+    var m = Math.floor((diff % 3600000) / 60000);
+    var timeDate = document.getElementById("timeDate");
+    if (!timeDate) return;
+    timeDate.textContent =
+      "\u672C\u7AD9\u5DF2\u5B89\u5168\u8FD0\u884C " + d + " \u5929 " + pad(h) + " \u5C0F\u65F6 " + pad(m) + " \u5206";
+  }
+  tick();
+  setInterval(tick, 60000);
+})();
+</script>
+
+</body>
+</html>

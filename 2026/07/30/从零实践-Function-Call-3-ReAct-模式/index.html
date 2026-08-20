@@ -1,0 +1,551 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width">
+<meta name="theme-color" content="#222" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#222" media="(prefers-color-scheme: dark)"><meta name="generator" content="Hexo 7.3.0">
+<link rel="preconnect" href="https://cdnjs.cloudflare.com" crossorigin>
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon-next.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32-next.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next.png">
+  <link rel="mask-icon" href="/images/logo.svg" color="#222">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/7.0.0/css/all.min.css" integrity="sha256-VHqXKFhhMxcpubYf9xiWdCiojEbY9NexQ4jh8AxbvcM=" crossorigin="anonymous">
+
+<script class="next-config" data-name="main" type="application/json">{"hostname":"moyi-math.github.io","root":"/","images":"/images","scheme":"Gemini","darkmode":true,"version":"8.28.0","exturl":false,"sidebar":{"position":"left","width_expanded":320,"width_dual_column":240,"display":"post","padding":18,"offset":12},"hljswrap":true,"codeblock":{"theme":{"light":"default","dark":"stackoverflow-dark"},"prism":{"light":"prism","dark":"prism-dark"},"copy_button":{"enable":true,"style":null},"fold":{"enable":false,"height":500},"language":false},"bookmark":{"enable":false,"color":"#222","save":"auto"},"mediumzoom":false,"lazyload":true,"pangu":false,"comments":{"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},"stickytabs":false,"motion":{"enable":false,"async":false,"duration":200,"transition":{"menu_item":"fadeInDown","post_block":"fadeIn","post_header":"fadeInDown","post_body":"fadeInDown","coll_header":"fadeInLeft","sidebar":"fadeInUp"}},"prism":false,"i18n":{"placeholder":"搜索...","empty":"没有找到任何搜索结果：${query}","hits_time":"找到 ${hits} 个搜索结果（用时 ${time} 毫秒）","hits":"找到 ${hits} 个搜索结果"},"path":"/search.json","localsearch":{"enable":true,"top_n_per_article":1,"unescape":false,"preload":false}}</script><script src="/js/config.js" defer></script>
+
+    <meta name="description" content="用 Thought、Action、Observation 三步循环解释 ReAct，让 Agent 的决策、执行和反馈过程可观察。">
+<meta property="og:type" content="article">
+<meta property="og:title" content="从零实践 Function Call（三）：ReAct 模式——Thought、Action、Observation">
+<meta property="og:url" content="https://moyi-math.github.io/2026/07/30/%E4%BB%8E%E9%9B%B6%E5%AE%9E%E8%B7%B5-Function-Call-3-ReAct-%E6%A8%A1%E5%BC%8F/index.html">
+<meta property="og:site_name" content="陌忆的博客">
+<meta property="og:description" content="用 Thought、Action、Observation 三步循环解释 ReAct，让 Agent 的决策、执行和反馈过程可观察。">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:image" content="https://moyi-math.github.io/images/background.webp">
+<meta property="article:published_time" content="2026-07-30T07:10:00.000Z">
+<meta property="article:modified_time" content="2026-08-20T14:47:37.221Z">
+<meta property="article:author" content="陌忆">
+<meta property="article:tag" content="Agent">
+<meta property="article:tag" content="LLM">
+<meta property="article:tag" content="Tool Use">
+<meta property="article:tag" content="Function Call">
+<meta property="article:tag" content="ReAct">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:image" content="https://moyi-math.github.io/images/background.webp">
+
+
+<link rel="canonical" href="https://moyi-math.github.io/2026/07/30/%E4%BB%8E%E9%9B%B6%E5%AE%9E%E8%B7%B5-Function-Call-3-ReAct-%E6%A8%A1%E5%BC%8F/">
+
+
+<script class="next-config" data-name="page" type="application/json">{"sidebar":"","isHome":false,"isPost":true,"lang":"zh-CN","comments":true,"permalink":"https://moyi-math.github.io/2026/07/30/%E4%BB%8E%E9%9B%B6%E5%AE%9E%E8%B7%B5-Function-Call-3-ReAct-%E6%A8%A1%E5%BC%8F/","path":"2026/07/30/从零实践-Function-Call-3-ReAct-模式/","title":"从零实践 Function Call（三）：ReAct 模式——Thought、Action、Observation"}</script>
+
+<script class="next-config" data-name="calendar" type="application/json">""</script>
+<title>从零实践 Function Call（三）：ReAct 模式——Thought、Action、Observation | 陌忆的博客</title>
+  
+
+
+
+
+
+
+
+
+  
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/animejs/3.2.1/anime.min.js" integrity="sha256-XL2inqUJaslATFnHdJOi9GfQ60on8Wx1C2H8DYiN1xY=" crossorigin="anonymous" defer></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/lozad.js/1.16.0/lozad.min.js" integrity="sha256-mOFREFhqmHeQbXpK2lp4nA3qooVgACfh88fpJftLBbc=" crossorigin="anonymous" defer></script>
+<script src="/js/utils.js" defer></script><script src="/js/sidebar.js" defer></script><script src="/js/next-boot.js" defer></script>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/hexo-generator-searchdb/1.5.0/search.js" integrity="sha256-xFC6PJ82SL9b3WkGjFavNiA9gm5z6UBxWPiu4CYjptg=" crossorigin="anonymous" defer></script>
+<script src="/js/third-party/search/local-search.js" defer></script>
+
+
+
+
+
+
+
+  
+
+
+
+
+  
+
+  <script class="next-config" data-name="enableMath" type="application/json">false</script><link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/katex.min.css" integrity="sha256-UF1fgpAiu3tPJN/uCqEUHNe7pnr+QR0SQDNfgglgtcM=" crossorigin="anonymous">
+
+
+<link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
+
+
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"WebSite","name":"陌忆的博客","url":"https://moyi-math.github.io","description":"记录 RAG、Agent、MCP、算法与软件工程实践，按专栏整理可复用的技术笔记。","inLanguage":"zh-CN","author":{"@type":"Person","name":"陌忆"}}</script>
+
+
+
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"Article","headline":"从零实践 Function Call（三）：ReAct 模式——Thought、Action、Observation","description":"用 Thought、Action、Observation 三步循环解释 ReAct，让 Agent 的决策、执行和反馈过程可观察。","datePublished":"2026-07-30T07:10:00.000Z","dateModified":"2026-08-20T14:47:37.221Z","inLanguage":"zh-CN","mainEntityOfPage":{"@type":"WebPage","@id":"https://moyi-math.github.io/2026/07/30/%E4%BB%8E%E9%9B%B6%E5%AE%9E%E8%B7%B5-Function-Call-3-ReAct-%E6%A8%A1%E5%BC%8F/index.html"},"author":{"@type":"Person","name":"陌忆"}}</script>
+<meta name="author" content="陌忆">
+
+
+  <noscript>
+    <link rel="stylesheet" href="/css/noscript.css">
+  </noscript>
+<!-- hexo injector head_end start --><link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/katex.min.css" integrity="sha512-fHwaWebuwA7NSF5Qg/af4UeDx9XqUpYpOGgubo3yWu+b2IQR4UeQwbb42Ti7gVAjNtVoI/I9TEoYeu9omwcC6g==" crossorigin="anonymous" referrerpolicy="no-referrer" /><!-- hexo injector head_end end --><link rel="alternate" href="/atom.xml" title="陌忆的博客" type="application/atom+xml">
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage">
+  <div class="headband"></div>
+
+  <main class="main">
+    <div class="column">
+      <header class="header" itemscope itemtype="http://schema.org/WPHeader"><div class="site-brand-container">
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="切换导航栏" role="button">
+        <span class="toggle-line"></span>
+        <span class="toggle-line"></span>
+        <span class="toggle-line"></span>
+    </div>
+  </div>
+
+  <div class="site-meta">
+
+    <a href="/" class="brand" rel="start">
+      <i class="logo-line"></i>
+      <p class="site-title">陌忆的博客</p>
+      <i class="logo-line"></i>
+    </a>
+      <p class="site-subtitle" itemprop="description">数据库无法得出结论</p>
+  </div>
+
+  <div class="site-nav-right">
+    <div class="toggle popup-trigger" aria-label="搜索" role="button">
+        <i class="fa fa-search fa-fw fa-lg"></i>
+    </div>
+  </div>
+</div>
+
+
+
+<nav class="site-nav">
+  <ul class="main-menu menu"><li class="menu-item menu-item-home"><a href="/" rel="section"><i class="fa fa-home fa-fw"></i>首页</a></li><li class="menu-item menu-item-about"><a href="/about/" rel="section"><i class="fa fa-user fa-fw"></i>关于</a></li><li class="menu-item menu-item-tags"><a href="/tags/" rel="section"><i class="fa fa-tags fa-fw"></i>标签</a></li><li class="menu-item menu-item-categories"><a href="/categories/" rel="section"><i class="fa fa-th fa-fw"></i>分类</a></li><li class="menu-item menu-item-archives"><a href="/archives/" rel="section"><i class="fa fa-archive fa-fw"></i>归档</a></li>
+      <li class="menu-item menu-item-search">
+        <a role="button" class="popup-trigger"><i class="fa fa-search fa-fw"></i>搜索
+        </a>
+      </li>
+  </ul>
+</nav>
+
+
+
+  <div class="search-pop-overlay">
+    <div class="popup search-popup">
+      <div class="search-header">
+        <span class="search-icon">
+          <i class="fa fa-search"></i>
+        </span>
+        <div class="search-input-container">
+          <input autocomplete="off" autocapitalize="off" maxlength="80"
+                placeholder="搜索..." spellcheck="false"
+                type="search" class="search-input">
+        </div>
+        <span class="popup-btn-close" role="button">
+          <i class="fa fa-times-circle"></i>
+        </span>
+      </div>
+      <div class="search-result-container">
+        <div class="search-result-icon">
+          <i class="fa fa-spinner fa-pulse fa-5x"></i>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</header>
+        
+  
+  <aside class="sidebar">
+
+    <div class="sidebar-inner sidebar-nav-active sidebar-toc-active">
+      <ul class="sidebar-nav">
+        <li class="sidebar-nav-toc">
+          文章目录
+        </li>
+        <li class="sidebar-nav-overview">
+          站点概览
+        </li>
+      </ul>
+
+      <div class="sidebar-panel-container">
+        <!--noindex-->
+        <div class="post-toc-wrap sidebar-panel">
+            <div class="post-toc animated"><ol class="nav"><li class="nav-item nav-level-2"><a class="nav-link" href="#%E4%B8%80%E3%80%81%E5%BC%95%E8%A8%80"><span class="nav-text">一、引言</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E4%BA%8C%E3%80%81%E4%BB%8E%E2%80%9D%E5%8D%95%E6%AC%A1%E8%B0%83%E7%94%A8%E2%80%9D%E5%88%B0%E2%80%9D%E5%BE%AA%E7%8E%AF%E2%80%9D%E7%9A%84%E9%A3%9E%E8%B7%83"><span class="nav-text">二、从”单次调用”到”循环”的飞跃</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E4%B8%89%E3%80%81ReAct-%E6%A8%A1%E5%BC%8F%E8%AF%A6%E8%A7%A3"><span class="nav-text">三、ReAct 模式详解</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#%E4%B8%89%E4%B8%AA%E8%A6%81%E7%B4%A0"><span class="nav-text">三个要素</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E7%94%A8%E7%9C%9F%E5%AE%9E%E9%97%AE%E9%A2%98%E6%BC%94%E7%A4%BA"><span class="nav-text">用真实问题演示</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%9B%9B%E3%80%81%E4%BB%A3%E7%A0%81%E5%AE%9E%E7%8E%B0%EF%BC%9AReAct-%E5%BE%AA%E7%8E%AF"><span class="nav-text">四、代码实现：ReAct 循环</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#%E8%BF%99%E4%B8%AA%E5%BE%AA%E7%8E%AF%E7%9A%84%E5%85%B3%E9%94%AE%E8%AE%BE%E8%AE%A1"><span class="nav-text">这个循环的关键设计</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E4%BA%94%E3%80%81%E5%AF%B9%E6%AF%94%EF%BC%9A%E7%BA%AF-LLM-%E6%8E%A8%E7%90%86-vs-ReAct"><span class="nav-text">五、对比：纯 LLM 推理 vs ReAct</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%85%AD%E3%80%81Function-Call-%E7%9A%84%E4%B8%A4%E4%B8%AA%E6%96%B9%E5%90%91%EF%BC%9A%E8%AF%BB%E4%B8%8E%E5%86%99"><span class="nav-text">六、Function Call 的两个方向：读与写</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#%E8%AF%BB%E6%93%8D%E4%BD%9C%EF%BC%88Query%EF%BC%89"><span class="nav-text">读操作（Query）</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E5%86%99%E6%93%8D%E4%BD%9C%EF%BC%88Side-Effect%EF%BC%89"><span class="nav-text">写操作（Side Effect）</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E4%B8%83%E3%80%81%E4%BB%8E-ReAct-%E5%88%B0%E7%94%9F%E4%BA%A7%E7%BA%A7-Agent"><span class="nav-text">七、从 ReAct 到生产级 Agent</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%85%AB%E3%80%81%E6%80%BB%E7%BB%93%EF%BC%9A%E4%B8%89%E6%9D%A1%E6%A0%B8%E5%BF%83%E5%85%AC%E5%BC%8F"><span class="nav-text">八、总结：三条核心公式</span></a></li></ol></div>
+        </div>
+        <!--/noindex-->
+
+        <div class="site-overview-wrap sidebar-panel">
+          <div class="site-author animated" itemprop="author" itemscope itemtype="http://schema.org/Person">
+    <img class="site-author-image" itemprop="image" alt="陌忆"
+      src="/images/avatar.webp">
+  <p class="site-author-name" itemprop="name">陌忆</p>
+  <div class="site-description" itemprop="description">记录 RAG、Agent、MCP、算法与软件工程实践，按专栏整理可复用的技术笔记。</div>
+</div>
+<div class="site-state-wrap animated">
+  <nav class="site-state">
+      <div class="site-state-item site-state-posts">
+        <a href="/archives/">
+          <span class="site-state-item-count">50</span>
+          <span class="site-state-item-name">日志</span>
+        </a>
+      </div>
+      <div class="site-state-item site-state-categories">
+          <a href="/categories/">
+        <span class="site-state-item-count">10</span>
+        <span class="site-state-item-name">分类</span></a>
+      </div>
+      <div class="site-state-item site-state-tags">
+          <a href="/tags/">
+        <span class="site-state-item-count">172</span>
+        <span class="site-state-item-name">标签</span></a>
+      </div>
+  </nav>
+</div>
+  <div class="links-of-author animated">
+      <span class="links-of-author-item">
+        <a href="https://github.com/moyi-math" title="GitHub → https:&#x2F;&#x2F;github.com&#x2F;moyi-math" rel="noopener me" target="_blank"><i class="fab fa-github fa-fw"></i>GitHub</a>
+      </span>
+  </div>
+  <div class="cc-license animated" itemprop="license">
+    <a href="https://creativecommons.org/licenses/by-nc-sa/4.0/" class="cc-opacity" rel="noopener" target="_blank"><img src="https://cdnjs.cloudflare.com/ajax/libs/creativecommons-vocabulary/2020.11.3/assets/license_badges/small/by_nc_sa.svg" alt="Creative Commons"></a>
+  </div>
+
+        </div>
+      </div>
+    </div>
+
+    
+  </aside>
+
+
+    </div>
+
+    <div class="main-inner post posts-expand">
+
+
+  
+
+
+<div class="post-block">
+  
+  
+
+  <article itemscope itemtype="http://schema.org/Article" class="post-content" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="https://moyi-math.github.io/2026/07/30/%E4%BB%8E%E9%9B%B6%E5%AE%9E%E8%B7%B5-Function-Call-3-ReAct-%E6%A8%A1%E5%BC%8F/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.webp">
+      <meta itemprop="name" content="陌忆">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="陌忆的博客">
+      <meta itemprop="description" content="记录 RAG、Agent、MCP、算法与软件工程实践，按专栏整理可复用的技术笔记。">
+    </span>
+
+    <span hidden itemprop="post" itemscope itemtype="http://schema.org/CreativeWork">
+      <meta itemprop="name" content="从零实践 Function Call（三）：ReAct 模式——Thought、Action、Observation | 陌忆的博客">
+      <meta itemprop="description" content="用 Thought、Action、Observation 三步循环解释 ReAct，让 Agent 的决策、执行和反馈过程可观察。">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          从零实践 Function Call（三）：ReAct 模式——Thought、Action、Observation
+        </h1>
+
+        <div class="post-meta-container">
+          <div class="post-meta">
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-calendar"></i>
+      </span>
+      <span class="post-meta-item-text">发表于</span>
+
+      <time title="创建时间：2026-07-30 15:10:00" itemprop="dateCreated datePublished" datetime="2026-07-30T15:10:00+08:00">2026-07-30</time>
+    </span>
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-calendar-check"></i>
+      </span>
+      <span class="post-meta-item-text">更新于</span>
+      <time title="修改时间：2026-08-20 22:47:37" itemprop="dateModified" datetime="2026-08-20T22:47:37+08:00">2026-08-20</time>
+    </span>
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-folder"></i>
+      </span>
+      <span class="post-meta-item-text">分类于</span>
+        <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+          <a href="/categories/%E4%BB%8E%E9%9B%B6%E5%AE%9E%E8%B7%B5-Function-Call/" itemprop="url" rel="index"><span itemprop="name">从零实践 Function Call</span></a>
+        </span>
+    </span>
+
+  
+    <span class="post-meta-break"></span>
+    <span class="post-meta-item" title="本文字数">
+      <span class="post-meta-item-icon">
+        <i class="far fa-file-word"></i>
+      </span>
+      <span class="post-meta-item-text">本文字数：</span>
+      <span>1.5k</span>
+    </span>
+    <span class="post-meta-item" title="阅读时长">
+      <span class="post-meta-item-icon">
+        <i class="far fa-clock"></i>
+      </span>
+      <span class="post-meta-item-text">阅读时长 &asymp;</span>
+      <span>5 分钟</span>
+    </span>
+</div>
+
+            <div class="post-description">用 Thought、Action、Observation 三步循环解释 ReAct，让 Agent 的决策、执行和反馈过程可观察。</div>
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody"><span id="more"></span>
+
+<h2 id="一、引言"><a href="#一、引言" class="headerlink" title="一、引言"></a>一、引言</h2><p>前两篇文章我们完成了：</p>
+<ol>
+<li><strong>Function Call 入门</strong>：理解工具定义的三要素和 LLM 调用工具的 4 步机制</li>
+<li><strong>System Prompt 的艺术</strong>：学会用 Prompt 控制 LLM 行为，看清纯推理的边界</li>
+</ol>
+<p>现在我们把这两者组合起来，再加上一个<strong>循环</strong>——这就是 Agent 的完整形态。</p>
+<h2 id="二、从”单次调用”到”循环”的飞跃"><a href="#二、从”单次调用”到”循环”的飞跃" class="headerlink" title="二、从”单次调用”到”循环”的飞跃"></a>二、从”单次调用”到”循环”的飞跃</h2><p>之前我们看到的 Agent 都是一次交互：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">用户提问 -&gt; LLM 调用工具 -&gt; 输出结果 -&gt; 结束</span><br></pre></td></tr></table></figure>
+
+<p>但现实世界的问题往往需要<strong>多步推理</strong>。比如：</p>
+<p>“商店周一卖 15 件、周二卖 20 件、周三卖 10 件，每件 <span class="katex"><span class="katex-mathml"><math xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mn>8</mn><mtext>。平均每天卖多少件？总收入多少？</mtext><mi mathvariant="normal">&quot;</mi></mrow><annotation encoding="application/x-tex">8。平均每天卖多少件？总收入多少？&quot;</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height:0.6944em;"></span><span class="mord">8</span><span class="mord cjk_fallback">。平均每天卖多少件？总收入多少？</span><span class="mord">&quot;</span></span></span></span><br>这个问题无法一步解决。你需要：</p>
+<ol>
+<li>算周一的收入（15 x 8）</li>
+<li>算周二的收入（20 x 8）</li>
+<li>算周三的收入（10 x 8）</li>
+<li>加总得到总收入</li>
+<li>算平均每天销量（15 + 20 + 10）&#x2F; 3</li>
+<li>给出答案</li>
+</ol>
+<p><strong>这需要 LLM 不是只调用一次工具，而是一次又一次地调用，直到问题解决。</strong></p>
+<h2 id="三、ReAct-模式详解"><a href="#三、ReAct-模式详解" class="headerlink" title="三、ReAct 模式详解"></a>三、ReAct 模式详解</h2><p><strong>ReAct &#x3D; Rea + Act（Reasoning + Acting）</strong></p>
+<p>核心思想：LLM 在”思考”和”行动”之间交替进行，形成一个循环。</p>
+<h3 id="三个要素"><a href="#三个要素" class="headerlink" title="三个要素"></a>三个要素</h3><figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">Thought（思考）     -&gt;  &quot;我下一步需要算什么？为什么？&quot;</span><br><span class="line">Action（行动）      -&gt;  &quot;调用具体工具，带具体参数&quot;</span><br><span class="line">Observation（观察） -&gt;  &quot;工具返回了什么结果？&quot;</span><br></pre></td></tr></table></figure>
+
+<h3 id="用真实问题演示"><a href="#用真实问题演示" class="headerlink" title="用真实问题演示"></a>用真实问题演示</h3><figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br></pre></td><td class="code"><pre><span class="line">问题：A store sells 15 items on Monday at $8 each,</span><br><span class="line">      20 items on Tuesday at $8 each, and 10 items on Wednesday at $8 each.</span><br><span class="line">      What is the average items sold per day and total revenue?</span><br><span class="line"></span><br><span class="line">Iteration 1:</span><br><span class="line">  Thought: I need to calculate Monday revenue first</span><br><span class="line">  Action: multiply(15, 8)</span><br><span class="line">  Observation: 120</span><br><span class="line"></span><br><span class="line">Iteration 2:</span><br><span class="line">  Thought: Now Tuesday revenue</span><br><span class="line">  Action: multiply(20, 8)</span><br><span class="line">  Observation: 160</span><br><span class="line"></span><br><span class="line">Iteration 3:</span><br><span class="line">  Thought: Now Wednesday revenue</span><br><span class="line">  Action: multiply(10, 8)</span><br><span class="line">  Observation: 80</span><br><span class="line"></span><br><span class="line">Iteration 4:</span><br><span class="line">  Thought: Add all revenues for total</span><br><span class="line">  Action: add(120, 160)</span><br><span class="line">  Observation: 280</span><br><span class="line">  Action: add(280, 80)</span><br><span class="line">  Observation: 360</span><br><span class="line"></span><br><span class="line">Iteration 5:</span><br><span class="line">  Thought: Calculate average items per day</span><br><span class="line">  Action: add(15, 20)</span><br><span class="line">  Observation: 35</span><br><span class="line">  Action: add(35, 10)</span><br><span class="line">  Observation: 45</span><br><span class="line">  Action: divide(45, 3)</span><br><span class="line">  Observation: 15</span><br><span class="line"></span><br><span class="line">Iteration 6:</span><br><span class="line">  Thought: I have both results</span><br><span class="line">  Answer: Average 15 items/day, total revenue $360</span><br></pre></td></tr></table></figure>
+
+<h2 id="四、代码实现：ReAct-循环"><a href="#四、代码实现：ReAct-循环" class="headerlink" title="四、代码实现：ReAct 循环"></a>四、代码实现：ReAct 循环</h2><p>下面这段代码展示了 ReAct 模式的核心循环：</p>
+<figure class="highlight javascript"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">async</span> <span class="keyword">function</span> <span class="title function_">reactAgent</span>(<span class="params">userPrompt, maxIterations = <span class="number">10</span></span>) &#123;</span><br><span class="line">    <span class="keyword">let</span> fullResponse = <span class="string">&quot;&quot;</span>;</span><br><span class="line">    <span class="keyword">let</span> iteration = <span class="number">0</span>;</span><br><span class="line"></span><br><span class="line">    <span class="keyword">while</span> (iteration &lt; maxIterations) &#123;</span><br><span class="line">        iteration++;</span><br><span class="line"></span><br><span class="line">        <span class="keyword">const</span> response = <span class="keyword">await</span> session.<span class="title function_">prompt</span>(</span><br><span class="line">            iteration === <span class="number">1</span></span><br><span class="line">                ? userPrompt                          <span class="comment">// 第一次：用户原问题</span></span><br><span class="line">                : <span class="string">&quot;Continue your reasoning. What is the next step?&quot;</span>,  <span class="comment">// 后续：继续</span></span><br><span class="line">            &#123;</span><br><span class="line">                functions,       <span class="comment">// 注册的所有工具</span></span><br><span class="line">                <span class="attr">maxTokens</span>: <span class="number">300</span>,  <span class="comment">// 每次输出上限</span></span><br><span class="line">                <span class="attr">onTextChunk</span>: <span class="function">(<span class="params">chunk</span>) =&gt;</span> &#123;</span><br><span class="line">                    process.<span class="property">stdout</span>.<span class="title function_">write</span>(chunk);   <span class="comment">// 流式输出</span></span><br><span class="line">                    currentChunk += chunk;</span><br><span class="line">                &#125;</span><br><span class="line">            &#125;</span><br><span class="line">        );</span><br><span class="line"></span><br><span class="line">        fullResponse += currentChunk;</span><br><span class="line"></span><br><span class="line">        <span class="comment">// 检测是否已经完成</span></span><br><span class="line">        <span class="keyword">if</span> (response.<span class="title function_">toLowerCase</span>().<span class="title function_">includes</span>(<span class="string">&quot;answer:&quot;</span>)) &#123;</span><br><span class="line">            <span class="keyword">return</span> fullResponse;</span><br><span class="line">        &#125;</span><br><span class="line">    &#125;</span><br><span class="line">    <span class="comment">// 超过最大迭代次数，强制终止</span></span><br><span class="line">    <span class="keyword">return</span> fullResponse || <span class="string">&quot;Could not complete within iteration limit.&quot;</span>;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<h3 id="这个循环的关键设计"><a href="#这个循环的关键设计" class="headerlink" title="这个循环的关键设计"></a>这个循环的关键设计</h3><p><strong>1. 第一次 vs 后续的 Prompt 策略</strong></p>
+<p>第一次用用户原问题，后续用”Continue your reasoning”——因为所有上下文都在对话历史里了，不需要重复问题。</p>
+<p><strong>2. maxTokens &#x3D; 300</strong></p>
+<p>每次只生成 300 token，防止一次生成太多导致失控。这也是为什么需要循环——每一步只做一小件事。</p>
+<p><strong>3. “Answer:” 作为终止信号</strong></p>
+<p>System Prompt 被训练成：当模型确信已经得到最终答案时，输出 “Answer:” 然后停止。检测到这个信号就退出循环。</p>
+<p><strong>4. maxIterations 安全网</strong></p>
+<figure class="highlight javascript"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line"><span class="title function_">reactAgent</span>(problem, <span class="number">3</span>);  <span class="comment">// 最多迭代 3 次</span></span><br></pre></td></tr></table></figure>
+
+<p>这是<strong>最重要的安全机制</strong>。没有这个上限，LLM 可能在循环里无限运行，消耗大量 token 和时间。生产环境中通常设置 10-30 次的上限。</p>
+<h2 id="五、对比：纯-LLM-推理-vs-ReAct"><a href="#五、对比：纯-LLM-推理-vs-ReAct" class="headerlink" title="五、对比：纯 LLM 推理 vs ReAct"></a>五、对比：纯 LLM 推理 vs ReAct</h2><table>
+<thead>
+<tr>
+<th>维度</th>
+<th>纯 LLM 推理（04_think）</th>
+<th>ReAct Agent（09_react-agent）</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>计算方式</td>
+<td>模型内部”心算”</td>
+<td>工具精确计算</td>
+</tr>
+<tr>
+<td>步骤可见性</td>
+<td>黑盒，只看得到结果</td>
+<td>白盒，每步 Thought 都可见</td>
+</tr>
+<tr>
+<td>错误定位</td>
+<td>错了不知道在哪步</td>
+<td>可以定位到具体 Action&#x2F;Observation</td>
+</tr>
+<tr>
+<td>回退机制</td>
+<td>无</td>
+<td>可以重新调用工具</td>
+</tr>
+<tr>
+<td>可靠性</td>
+<td>概率性的</td>
+<td>工具保证确定性结果</td>
+</tr>
+</tbody></table>
+<h2 id="六、Function-Call-的两个方向：读与写"><a href="#六、Function-Call-的两个方向：读与写" class="headerlink" title="六、Function Call 的两个方向：读与写"></a>六、Function Call 的两个方向：读与写</h2><p>在整个系列中，我们看到了 Function Call 的两种不同类型：</p>
+<h3 id="读操作（Query）"><a href="#读操作（Query）" class="headerlink" title="读操作（Query）"></a>读操作（Query）</h3><figure class="highlight javascript"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">const</span> getCurrentTime = <span class="title function_">defineChatSessionFunction</span>(&#123;</span><br><span class="line">    <span class="title function_">handler</span>(<span class="params"></span>) &#123;</span><br><span class="line">        <span class="keyword">return</span> <span class="keyword">new</span> <span class="title class_">Date</span>().<span class="title function_">toLocaleTimeString</span>();  <span class="comment">// 读取系统时间</span></span><br><span class="line">    &#125;</span><br><span class="line">&#125;);</span><br></pre></td></tr></table></figure>
+
+<p>工具从外部世界<strong>读取</strong>信息，返回给 LLM。LLM 再用这些信息生成回答。</p>
+<h3 id="写操作（Side-Effect）"><a href="#写操作（Side-Effect）" class="headerlink" title="写操作（Side Effect）"></a>写操作（Side Effect）</h3><figure class="highlight javascript"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">const</span> saveMemory = <span class="title function_">defineChatSessionFunction</span>(&#123;</span><br><span class="line">    <span class="attr">params</span>: &#123;</span><br><span class="line">        <span class="attr">type</span>: <span class="string">&quot;object&quot;</span>,</span><br><span class="line">        <span class="attr">properties</span>: &#123;</span><br><span class="line">            <span class="attr">type</span>: &#123; <span class="attr">type</span>: <span class="string">&quot;string&quot;</span>, <span class="attr">enum</span>: [<span class="string">&quot;fact&quot;</span>, <span class="string">&quot;preference&quot;</span>] &#125;,</span><br><span class="line">            <span class="attr">key</span>: &#123; <span class="attr">type</span>: <span class="string">&quot;string&quot;</span> &#125;,</span><br><span class="line">            <span class="attr">value</span>: &#123; <span class="attr">type</span>: <span class="string">&quot;string&quot;</span> &#125;</span><br><span class="line">        &#125;,</span><br><span class="line">        <span class="attr">required</span>: [<span class="string">&quot;type&quot;</span>, <span class="string">&quot;key&quot;</span>, <span class="string">&quot;value&quot;</span>]</span><br><span class="line">    &#125;,</span><br><span class="line">    <span class="keyword">async</span> <span class="title function_">handler</span>(<span class="params">&#123; type, key, value &#125;</span>) &#123;</span><br><span class="line">        <span class="keyword">await</span> memoryManager.<span class="title function_">addMemory</span>(&#123; type, key, value &#125;);</span><br><span class="line">        <span class="keyword">return</span> <span class="string">`Memory saved: <span class="subst">$&#123;key&#125;</span> = <span class="subst">$&#123;value&#125;</span>`</span>;</span><br><span class="line">    &#125;</span><br><span class="line">&#125;);</span><br></pre></td></tr></table></figure>
+
+<p>工具<strong>改变</strong>外部系统的状态（写入 JSON 文件），LLM 通过这副”手”来影响世界。</p>
+<p>这两种类型覆盖了 Agent 的大部分应用场景。</p>
+<h2 id="七、从-ReAct-到生产级-Agent"><a href="#七、从-ReAct-到生产级-Agent" class="headerlink" title="七、从 ReAct 到生产级 Agent"></a>七、从 ReAct 到生产级 Agent</h2><p>ReAct 模式是所有现代 Agent 框架的底层模式。你可以在以下产品中看到它的身影：</p>
+<ul>
+<li><strong>LangChain AgentExecutor</strong>：ReAct 循环的封装版本</li>
+<li><strong>AutoGPT</strong>：自主任务的 ReAct 实现</li>
+<li><strong>ChatGPT Plugins</strong>：OpenAI 的托管版 Function Call + 循环</li>
+<li><strong>Claude Tools</strong>：Anthropic 的工具使用实现</li>
+</ul>
+<p>但 ReAct 只是一个起点。生产级的 Agent 还需要：</p>
+<ul>
+<li><strong>错误处理</strong>：工具调用失败时重试、降级（第 11 章）</li>
+<li><strong>工具路由</strong>：当有几十上百个工具时，用 Embedding 预筛选（第 15 章）</li>
+<li><strong>记忆管理</strong>：压缩、过期、重要性评分（第 8 章扩展）</li>
+<li><strong>规划</strong>：先生成完整计划再执行（第 10 章 AoT）</li>
+</ul>
+<h2 id="八、总结：三条核心公式"><a href="#八、总结：三条核心公式" class="headerlink" title="八、总结：三条核心公式"></a>八、总结：三条核心公式</h2><p>回顾整个系列，我们可以用三条公式来总结：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line">1. Agent = LLM + 工具 + System Prompt + 循环</span><br><span class="line"></span><br><span class="line">2. System Prompt = 角色 + 任务 + 规则 + 约束</span><br><span class="line"></span><br><span class="line">3. ReAct 循环 = Thought -&gt; Action -&gt; Observation -&gt; (重复) -&gt; Answer</span><br></pre></td></tr></table></figure>
+
+<p>从最初的 30 行纯文本 LLM 调用，到 150 行的 ReAct Agent，我们完成了从”只能说的语言模型”到”能做事的 Agent”的完整进化路径。</p>
+<p>关键洞见只有一个：</p>
+<blockquote>
+<p><strong>LLM 应该负责它最擅长的——决策和规划。把精确计算、实时信息、外部操作交给工具。</strong><br>工具是 LLM 的”感官”和”手”，System Prompt 是”操作手册”，循环是”工作流程”。<br>三者结合，就是 Agent。</p>
+</blockquote>
+
+    </div>
+
+    
+    
+    
+
+    <footer class="post-footer">
+          
+
+<div class="post-copyright">
+<ul>
+  <li class="post-copyright-author">
+      <strong>本文作者： </strong>陌忆
+  </li>
+  <li class="post-copyright-link">
+      <strong>本文链接：</strong>
+      <a href="https://moyi-math.github.io/2026/07/30/%E4%BB%8E%E9%9B%B6%E5%AE%9E%E8%B7%B5-Function-Call-3-ReAct-%E6%A8%A1%E5%BC%8F/" title="从零实践 Function Call（三）：ReAct 模式——Thought、Action、Observation">https://moyi-math.github.io/2026/07/30/从零实践-Function-Call-3-ReAct-模式/</a>
+  </li>
+  <li class="post-copyright-license">
+      <strong>版权声明： </strong>本博客所有文章除特别声明外，均采用 <a href="https://creativecommons.org/licenses/by-nc-sa/4.0/" rel="noopener" target="_blank"><i class="fab fa-fw fa-creative-commons"></i>BY-NC-SA</a> 许可协议。转载请注明出处！
+  </li>
+</ul>
+</div>
+
+          <div class="post-tags">
+              <a href="/tags/Agent/" rel="tag"># Agent</a>
+              <a href="/tags/LLM/" rel="tag"># LLM</a>
+              <a href="/tags/Tool-Use/" rel="tag"># Tool Use</a>
+              <a href="/tags/Function-Call/" rel="tag"># Function Call</a>
+              <a href="/tags/ReAct/" rel="tag"># ReAct</a>
+          </div>
+
+        
+
+          <div class="post-nav">
+            <div class="post-nav-item">
+                <a href="/2026/07/30/%E4%BB%8E%E9%9B%B6%E5%AE%9E%E8%B7%B5-Function-Call-2-System-Prompt-%E4%B8%8E%E6%8E%A8%E7%90%86%E8%BE%B9%E7%95%8C/" rel="prev" title="从零实践 Function Call（二）：System Prompt 的艺术与纯推理的边界">
+                  <i class="fa fa-angle-left"></i> 从零实践 Function Call（二）：System Prompt 的艺术与纯推理的边界
+                </a>
+            </div>
+            <div class="post-nav-item">
+                <a href="/2026/07/30/%E4%BB%8E%E9%9B%B6%E5%AE%9E%E8%B7%B5-Function-Call-4-AoT-%E5%85%88%E8%AE%A1%E5%88%92%E5%86%8D%E6%89%A7%E8%A1%8C/" rel="next" title="从零实践 Function Call（四）：AoT——先计划再执行，让 LLM 只负责&quot;想&quot;">
+                  从零实践 Function Call（四）：AoT——先计划再执行，让 LLM 只负责"想" <i class="fa fa-angle-right"></i>
+                </a>
+            </div>
+          </div>
+    </footer>
+  </article>
+</div>
+
+
+
+
+
+
+</div>
+  </main>
+
+  <footer class="footer">
+    <div class="footer-inner">
+
+  <div class="copyright">
+    &copy; 
+    <span itemprop="copyrightYear">2026</span>
+    <span class="with-love">
+      <i class="fab fa-osi"></i>
+    </span>
+    <span class="author" itemprop="copyrightHolder">陌忆</span>
+  </div>
+<div class="wordcount">
+  <span class="post-meta-item">
+    <span class="post-meta-item-icon">
+      <i class="fa fa-chart-line"></i>
+    </span>
+    <span title="站点总字数">106k</span>
+  </span>
+  <span class="post-meta-item">
+    <span class="post-meta-item-icon">
+      <i class="fa fa-coffee"></i>
+    </span>
+    <span title="站点阅读时长">6:24</span>
+  </span>
+</div>
+  <div class="powered-by">由 <a href="https://hexo.io/" rel="noopener" target="_blank">Hexo</a> & <a href="https://theme-next.js.org/" rel="noopener" target="_blank">NexT.Gemini</a> 强力驱动
+  </div>
+
+    </div>
+  </footer>
+
+  
+  <div class="toggle sidebar-toggle" role="button">
+    <span class="toggle-line"></span>
+    <span class="toggle-line"></span>
+    <span class="toggle-line"></span>
+  </div>
+  <div class="sidebar-dimmer"></div>
+  <div class="back-to-top" role="button" aria-label="返回顶部">
+    <i class="fa fa-arrow-up fa-lg"></i>
+    <span>0%</span>
+  </div>
+
+<noscript>
+  <div class="noscript-warning">Theme NexT works best with JavaScript enabled</div>
+</noscript>
+<!-- Site running time -->
+<span id="timeDate" aria-live="off"></span>
+<script>
+(function() {
+  var start = new Date("2022-11-17T08:00:00+08:00");
+  function pad(n) { return n < 10 ? "0" + n : "" + n; }
+  function tick() {
+    var diff = Date.now() - start.getTime();
+    if (diff < 0) return;
+    var d = Math.floor(diff / 86400000);
+    var h = Math.floor((diff % 86400000) / 3600000);
+    var m = Math.floor((diff % 3600000) / 60000);
+    var timeDate = document.getElementById("timeDate");
+    if (!timeDate) return;
+    timeDate.textContent =
+      "\u672C\u7AD9\u5DF2\u5B89\u5168\u8FD0\u884C " + d + " \u5929 " + pad(h) + " \u5C0F\u65F6 " + pad(m) + " \u5206";
+  }
+  tick();
+  setInterval(tick, 60000);
+})();
+</script>
+
+</body>
+</html>

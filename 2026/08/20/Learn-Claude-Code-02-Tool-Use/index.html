@@ -1,0 +1,559 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width">
+<meta name="theme-color" content="#222" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#222" media="(prefers-color-scheme: dark)"><meta name="generator" content="Hexo 7.3.0">
+<link rel="preconnect" href="https://cdnjs.cloudflare.com" crossorigin>
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon-next.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32-next.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next.png">
+  <link rel="mask-icon" href="/images/logo.svg" color="#222">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/7.0.0/css/all.min.css" integrity="sha256-VHqXKFhhMxcpubYf9xiWdCiojEbY9NexQ4jh8AxbvcM=" crossorigin="anonymous">
+
+<script class="next-config" data-name="main" type="application/json">{"hostname":"moyi-math.github.io","root":"/","images":"/images","scheme":"Gemini","darkmode":true,"version":"8.28.0","exturl":false,"sidebar":{"position":"left","width_expanded":320,"width_dual_column":240,"display":"post","padding":18,"offset":12},"hljswrap":true,"codeblock":{"theme":{"light":"default","dark":"stackoverflow-dark"},"prism":{"light":"prism","dark":"prism-dark"},"copy_button":{"enable":true,"style":null},"fold":{"enable":false,"height":500},"language":false},"bookmark":{"enable":false,"color":"#222","save":"auto"},"mediumzoom":false,"lazyload":true,"pangu":false,"comments":{"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},"stickytabs":false,"motion":{"enable":false,"async":false,"duration":200,"transition":{"menu_item":"fadeInDown","post_block":"fadeIn","post_header":"fadeInDown","post_body":"fadeInDown","coll_header":"fadeInLeft","sidebar":"fadeInUp"}},"prism":false,"i18n":{"placeholder":"搜索...","empty":"没有找到任何搜索结果：${query}","hits_time":"找到 ${hits} 个搜索结果（用时 ${time} 毫秒）","hits":"找到 ${hits} 个搜索结果"},"path":"/search.json","localsearch":{"enable":true,"top_n_per_article":1,"unescape":false,"preload":false}}</script><script src="/js/config.js" defer></script>
+
+    <meta name="description" content="从单一 Bash 工具扩展到文件读写与搜索，理解工具 Schema、Handler、分发表、调用顺序和并发安全之间的关系。">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Learn Claude Code 02：Tool Use——用分发表扩展 Agent 的能力">
+<meta property="og:url" content="https://moyi-math.github.io/2026/08/20/Learn-Claude-Code-02-Tool-Use/index.html">
+<meta property="og:site_name" content="陌忆的博客">
+<meta property="og:description" content="从单一 Bash 工具扩展到文件读写与搜索，理解工具 Schema、Handler、分发表、调用顺序和并发安全之间的关系。">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:image" content="https://moyi-math.github.io/images/background.webp">
+<meta property="article:published_time" content="2026-08-20T02:10:00.000Z">
+<meta property="article:modified_time" content="2026-08-20T14:47:37.219Z">
+<meta property="article:author" content="陌忆">
+<meta property="article:tag" content="Agent">
+<meta property="article:tag" content="Claude Code">
+<meta property="article:tag" content="Tool Use">
+<meta property="article:tag" content="Function Calling">
+<meta property="article:tag" content="并发">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:image" content="https://moyi-math.github.io/images/background.webp">
+
+
+<link rel="canonical" href="https://moyi-math.github.io/2026/08/20/Learn-Claude-Code-02-Tool-Use/">
+
+
+<script class="next-config" data-name="page" type="application/json">{"sidebar":"","isHome":false,"isPost":true,"lang":"zh-CN","comments":true,"permalink":"https://moyi-math.github.io/2026/08/20/Learn-Claude-Code-02-Tool-Use/","path":"2026/08/20/Learn-Claude-Code-02-Tool-Use/","title":"Learn Claude Code 02：Tool Use——用分发表扩展 Agent 的能力"}</script>
+
+<script class="next-config" data-name="calendar" type="application/json">""</script>
+<title>Learn Claude Code 02：Tool Use——用分发表扩展 Agent 的能力 | 陌忆的博客</title>
+  
+
+
+
+
+
+
+
+
+  
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/animejs/3.2.1/anime.min.js" integrity="sha256-XL2inqUJaslATFnHdJOi9GfQ60on8Wx1C2H8DYiN1xY=" crossorigin="anonymous" defer></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/lozad.js/1.16.0/lozad.min.js" integrity="sha256-mOFREFhqmHeQbXpK2lp4nA3qooVgACfh88fpJftLBbc=" crossorigin="anonymous" defer></script>
+<script src="/js/utils.js" defer></script><script src="/js/sidebar.js" defer></script><script src="/js/next-boot.js" defer></script>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/hexo-generator-searchdb/1.5.0/search.js" integrity="sha256-xFC6PJ82SL9b3WkGjFavNiA9gm5z6UBxWPiu4CYjptg=" crossorigin="anonymous" defer></script>
+<script src="/js/third-party/search/local-search.js" defer></script>
+
+
+
+
+
+
+
+  
+
+
+
+
+  
+
+  <script class="next-config" data-name="enableMath" type="application/json">false</script><link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/katex.min.css" integrity="sha256-UF1fgpAiu3tPJN/uCqEUHNe7pnr+QR0SQDNfgglgtcM=" crossorigin="anonymous">
+
+
+<link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
+
+
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"WebSite","name":"陌忆的博客","url":"https://moyi-math.github.io","description":"记录 RAG、Agent、MCP、算法与软件工程实践，按专栏整理可复用的技术笔记。","inLanguage":"zh-CN","author":{"@type":"Person","name":"陌忆"}}</script>
+
+
+
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"Article","headline":"Learn Claude Code 02：Tool Use——用分发表扩展 Agent 的能力","description":"从单一 Bash 工具扩展到文件读写与搜索，理解工具 Schema、Handler、分发表、调用顺序和并发安全之间的关系。","datePublished":"2026-08-20T02:10:00.000Z","dateModified":"2026-08-20T14:47:37.219Z","inLanguage":"zh-CN","mainEntityOfPage":{"@type":"WebPage","@id":"https://moyi-math.github.io/2026/08/20/Learn-Claude-Code-02-Tool-Use/index.html"},"author":{"@type":"Person","name":"陌忆"}}</script>
+<meta name="author" content="陌忆">
+
+
+  <noscript>
+    <link rel="stylesheet" href="/css/noscript.css">
+  </noscript>
+<!-- hexo injector head_end start --><link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/katex.min.css" integrity="sha512-fHwaWebuwA7NSF5Qg/af4UeDx9XqUpYpOGgubo3yWu+b2IQR4UeQwbb42Ti7gVAjNtVoI/I9TEoYeu9omwcC6g==" crossorigin="anonymous" referrerpolicy="no-referrer" /><!-- hexo injector head_end end --><link rel="alternate" href="/atom.xml" title="陌忆的博客" type="application/atom+xml">
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage">
+  <div class="headband"></div>
+
+  <main class="main">
+    <div class="column">
+      <header class="header" itemscope itemtype="http://schema.org/WPHeader"><div class="site-brand-container">
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="切换导航栏" role="button">
+        <span class="toggle-line"></span>
+        <span class="toggle-line"></span>
+        <span class="toggle-line"></span>
+    </div>
+  </div>
+
+  <div class="site-meta">
+
+    <a href="/" class="brand" rel="start">
+      <i class="logo-line"></i>
+      <p class="site-title">陌忆的博客</p>
+      <i class="logo-line"></i>
+    </a>
+      <p class="site-subtitle" itemprop="description">数据库无法得出结论</p>
+  </div>
+
+  <div class="site-nav-right">
+    <div class="toggle popup-trigger" aria-label="搜索" role="button">
+        <i class="fa fa-search fa-fw fa-lg"></i>
+    </div>
+  </div>
+</div>
+
+
+
+<nav class="site-nav">
+  <ul class="main-menu menu"><li class="menu-item menu-item-home"><a href="/" rel="section"><i class="fa fa-home fa-fw"></i>首页</a></li><li class="menu-item menu-item-about"><a href="/about/" rel="section"><i class="fa fa-user fa-fw"></i>关于</a></li><li class="menu-item menu-item-tags"><a href="/tags/" rel="section"><i class="fa fa-tags fa-fw"></i>标签</a></li><li class="menu-item menu-item-categories"><a href="/categories/" rel="section"><i class="fa fa-th fa-fw"></i>分类</a></li><li class="menu-item menu-item-archives"><a href="/archives/" rel="section"><i class="fa fa-archive fa-fw"></i>归档</a></li>
+      <li class="menu-item menu-item-search">
+        <a role="button" class="popup-trigger"><i class="fa fa-search fa-fw"></i>搜索
+        </a>
+      </li>
+  </ul>
+</nav>
+
+
+
+  <div class="search-pop-overlay">
+    <div class="popup search-popup">
+      <div class="search-header">
+        <span class="search-icon">
+          <i class="fa fa-search"></i>
+        </span>
+        <div class="search-input-container">
+          <input autocomplete="off" autocapitalize="off" maxlength="80"
+                placeholder="搜索..." spellcheck="false"
+                type="search" class="search-input">
+        </div>
+        <span class="popup-btn-close" role="button">
+          <i class="fa fa-times-circle"></i>
+        </span>
+      </div>
+      <div class="search-result-container">
+        <div class="search-result-icon">
+          <i class="fa fa-spinner fa-pulse fa-5x"></i>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</header>
+        
+  
+  <aside class="sidebar">
+
+    <div class="sidebar-inner sidebar-nav-active sidebar-toc-active">
+      <ul class="sidebar-nav">
+        <li class="sidebar-nav-toc">
+          文章目录
+        </li>
+        <li class="sidebar-nav-overview">
+          站点概览
+        </li>
+      </ul>
+
+      <div class="sidebar-panel-container">
+        <!--noindex-->
+        <div class="post-toc-wrap sidebar-panel">
+            <div class="post-toc animated"><ol class="nav"><li class="nav-item nav-level-2"><a class="nav-link" href="#%E4%B8%80%E3%80%81%E5%8F%AA%E6%9C%89-Bash%EF%BC%8C%E8%83%BD%E7%94%A8%E4%BD%86%E4%B8%8D%E5%A5%BD%E7%94%A8"><span class="nav-text">一、只有 Bash，能用但不好用</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E4%BA%8C%E3%80%81%E4%B8%80%E4%B8%AA%E5%B7%A5%E5%85%B7%E5%85%B6%E5%AE%9E%E6%9C%89%E4%B8%A4%E4%B8%AA%E9%9D%A2"><span class="nav-text">二、一个工具其实有两个面</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E4%B8%89%E3%80%81%E5%88%86%E5%8F%91%E8%A1%A8%E8%AE%A9%E6%A0%B8%E5%BF%83%E5%BE%AA%E7%8E%AF%E4%BF%9D%E6%8C%81%E7%A8%B3%E5%AE%9A"><span class="nav-text">三、分发表让核心循环保持稳定</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%9B%9B%E3%80%81%E4%B8%BA%E4%BB%80%E4%B9%88%E4%B8%93%E7%94%A8%E5%B7%A5%E5%85%B7%E6%AF%94-Bash-%E6%9B%B4%E9%80%82%E5%90%88-Agent"><span class="nav-text">四、为什么专用工具比 Bash 更适合 Agent</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E4%BA%94%E3%80%81%E4%B8%80%E6%AC%A1%E8%BF%94%E5%9B%9E%E5%A4%9A%E4%B8%AA%E5%B7%A5%E5%85%B7%E8%B0%83%E7%94%A8%E6%80%8E%E4%B9%88%E5%8A%9E"><span class="nav-text">五、一次返回多个工具调用怎么办</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%85%AD%E3%80%81%E4%BB%8E%E6%95%99%E5%AD%A6%E7%89%88%E8%B5%B0%E5%90%91%E7%94%9F%E4%BA%A7%E7%89%88%EF%BC%8C%E8%BF%98%E5%B7%AE%E4%B8%80%E6%9D%A1%E9%AA%8C%E8%AF%81%E7%AE%A1%E7%BA%BF"><span class="nav-text">六、从教学版走向生产版，还差一条验证管线</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E4%B8%83%E3%80%81%E8%BF%99%E4%B8%80%E7%AF%87%E7%9C%9F%E6%AD%A3%E9%9C%80%E8%A6%81%E8%AE%B0%E4%BD%8F%E4%BB%80%E4%B9%88"><span class="nav-text">七、这一篇真正需要记住什么</span></a></li></ol></div>
+        </div>
+        <!--/noindex-->
+
+        <div class="site-overview-wrap sidebar-panel">
+          <div class="site-author animated" itemprop="author" itemscope itemtype="http://schema.org/Person">
+    <img class="site-author-image" itemprop="image" alt="陌忆"
+      src="/images/avatar.webp">
+  <p class="site-author-name" itemprop="name">陌忆</p>
+  <div class="site-description" itemprop="description">记录 RAG、Agent、MCP、算法与软件工程实践，按专栏整理可复用的技术笔记。</div>
+</div>
+<div class="site-state-wrap animated">
+  <nav class="site-state">
+      <div class="site-state-item site-state-posts">
+        <a href="/archives/">
+          <span class="site-state-item-count">50</span>
+          <span class="site-state-item-name">日志</span>
+        </a>
+      </div>
+      <div class="site-state-item site-state-categories">
+          <a href="/categories/">
+        <span class="site-state-item-count">10</span>
+        <span class="site-state-item-name">分类</span></a>
+      </div>
+      <div class="site-state-item site-state-tags">
+          <a href="/tags/">
+        <span class="site-state-item-count">172</span>
+        <span class="site-state-item-name">标签</span></a>
+      </div>
+  </nav>
+</div>
+  <div class="links-of-author animated">
+      <span class="links-of-author-item">
+        <a href="https://github.com/moyi-math" title="GitHub → https:&#x2F;&#x2F;github.com&#x2F;moyi-math" rel="noopener me" target="_blank"><i class="fab fa-github fa-fw"></i>GitHub</a>
+      </span>
+  </div>
+  <div class="cc-license animated" itemprop="license">
+    <a href="https://creativecommons.org/licenses/by-nc-sa/4.0/" class="cc-opacity" rel="noopener" target="_blank"><img src="https://cdnjs.cloudflare.com/ajax/libs/creativecommons-vocabulary/2020.11.3/assets/license_badges/small/by_nc_sa.svg" alt="Creative Commons"></a>
+  </div>
+
+        </div>
+      </div>
+    </div>
+
+    
+  </aside>
+
+
+    </div>
+
+    <div class="main-inner post posts-expand">
+
+
+  
+
+
+<div class="post-block">
+  
+  
+
+  <article itemscope itemtype="http://schema.org/Article" class="post-content" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="https://moyi-math.github.io/2026/08/20/Learn-Claude-Code-02-Tool-Use/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.webp">
+      <meta itemprop="name" content="陌忆">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="陌忆的博客">
+      <meta itemprop="description" content="记录 RAG、Agent、MCP、算法与软件工程实践，按专栏整理可复用的技术笔记。">
+    </span>
+
+    <span hidden itemprop="post" itemscope itemtype="http://schema.org/CreativeWork">
+      <meta itemprop="name" content="Learn Claude Code 02：Tool Use——用分发表扩展 Agent 的能力 | 陌忆的博客">
+      <meta itemprop="description" content="从单一 Bash 工具扩展到文件读写与搜索，理解工具 Schema、Handler、分发表、调用顺序和并发安全之间的关系。">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          Learn Claude Code 02：Tool Use——用分发表扩展 Agent 的能力
+        </h1>
+
+        <div class="post-meta-container">
+          <div class="post-meta">
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-calendar"></i>
+      </span>
+      <span class="post-meta-item-text">发表于</span>
+      
+
+      <time title="创建时间：2026-08-20 10:10:00 / 修改时间：22:47:37" itemprop="dateCreated datePublished" datetime="2026-08-20T10:10:00+08:00">2026-08-20</time>
+    </span>
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-folder"></i>
+      </span>
+      <span class="post-meta-item-text">分类于</span>
+        <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+          <a href="/categories/Learn-Claude-Code/" itemprop="url" rel="index"><span itemprop="name">Learn Claude Code</span></a>
+        </span>
+    </span>
+
+  
+    <span class="post-meta-break"></span>
+    <span class="post-meta-item" title="本文字数">
+      <span class="post-meta-item-icon">
+        <i class="far fa-file-word"></i>
+      </span>
+      <span class="post-meta-item-text">本文字数：</span>
+      <span>1.9k</span>
+    </span>
+    <span class="post-meta-item" title="阅读时长">
+      <span class="post-meta-item-icon">
+        <i class="far fa-clock"></i>
+      </span>
+      <span class="post-meta-item-text">阅读时长 &asymp;</span>
+      <span>7 分钟</span>
+    </span>
+</div>
+
+            <div class="post-description">从单一 Bash 工具扩展到文件读写与搜索，理解工具 Schema、Handler、分发表、调用顺序和并发安全之间的关系。</div>
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody"><span id="more"></span>
+
+<blockquote>
+<p><strong>系列定位：</strong> 上一篇用 Agent Loop 打通了“模型决策—工具执行—结果回传”的闭环。本文保持循环不变，专门解决另一个问题：Agent 增加新能力时，怎样避免把核心循环改成一堆 <code>if/elif</code>？</p>
+</blockquote>
+<h2 id="一、只有-Bash，能用但不好用"><a href="#一、只有-Bash，能用但不好用" class="headerlink" title="一、只有 Bash，能用但不好用"></a>一、只有 Bash，能用但不好用</h2><p>理论上，一个 Bash 工具几乎可以完成所有本地开发任务：</p>
+<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line">读文件    → cat app.py</span><br><span class="line">写文件    → printf ... &gt; app.py</span><br><span class="line">替换文本  → sed ...</span><br><span class="line">查找文件  → find . -name &#x27;*.py&#x27;</span><br></pre></td></tr></table></figure>
+
+<p>但“能做”不等于“适合作为 Agent 工具”。当模型想表达“读取文件”时，它还得把意图翻译成某个操作系统上的命令，处理引号、编码、路径和 Shell 差异。这会带来三个问题：</p>
+<ul>
+<li><strong>额外推理成本：</strong> 模型需要先选择并拼接命令；</li>
+<li><strong>不稳定：</strong> 同一个意图可能生成多种命令，边界行为难以预测；</li>
+<li><strong>权限过大：</strong> 读一个文件与删除整个目录都经过同一个执行入口。</li>
+</ul>
+<p>更合理的做法，是为高频动作提供语义明确的专用工具，例如 <code>read_file</code>、<code>write_file</code>、<code>edit_file</code> 和 <code>glob</code>。模型直接表达意图，运行框架再负责平台细节和安全边界。</p>
+<h2 id="二、一个工具其实有两个面"><a href="#二、一个工具其实有两个面" class="headerlink" title="二、一个工具其实有两个面"></a>二、一个工具其实有两个面</h2><p>注册工具需要同时面向模型和程序：</p>
+<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line">            工具名：read_file</span><br><span class="line">            /               \</span><br><span class="line">           /                 \</span><br><span class="line">Schema（给模型看）       Handler（给程序执行）</span><br><span class="line">描述用途与参数结构         接收参数并返回结果</span><br></pre></td></tr></table></figure>
+
+<p>Schema 决定模型能否正确选择工具、生成合法参数；Handler 决定调用产生什么现实效果。两者共享同一个工具名，但职责完全不同。</p>
+<p>一个文件读取工具的定义可以是：</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br></pre></td><td class="code"><pre><span class="line">TOOLS = [&#123;</span><br><span class="line">    <span class="string">&quot;name&quot;</span>: <span class="string">&quot;read_file&quot;</span>,</span><br><span class="line">    <span class="string">&quot;description&quot;</span>: <span class="string">&quot;Read a UTF-8 text file inside the workspace.&quot;</span>,</span><br><span class="line">    <span class="string">&quot;input_schema&quot;</span>: &#123;</span><br><span class="line">        <span class="string">&quot;type&quot;</span>: <span class="string">&quot;object&quot;</span>,</span><br><span class="line">        <span class="string">&quot;properties&quot;</span>: &#123;</span><br><span class="line">            <span class="string">&quot;path&quot;</span>: &#123;</span><br><span class="line">                <span class="string">&quot;type&quot;</span>: <span class="string">&quot;string&quot;</span>,</span><br><span class="line">                <span class="string">&quot;description&quot;</span>: <span class="string">&quot;Path relative to the workspace&quot;</span>,</span><br><span class="line">            &#125;,</span><br><span class="line">            <span class="string">&quot;limit&quot;</span>: &#123;</span><br><span class="line">                <span class="string">&quot;type&quot;</span>: <span class="string">&quot;integer&quot;</span>,</span><br><span class="line">                <span class="string">&quot;minimum&quot;</span>: <span class="number">1</span>,</span><br><span class="line">                <span class="string">&quot;description&quot;</span>: <span class="string">&quot;Optional maximum number of lines&quot;</span>,</span><br><span class="line">            &#125;,</span><br><span class="line">        &#125;,</span><br><span class="line">        <span class="string">&quot;required&quot;</span>: [<span class="string">&quot;path&quot;</span>],</span><br><span class="line">    &#125;,</span><br><span class="line">&#125;]</span><br></pre></td></tr></table></figure>
+
+<p>对应的实现函数则是普通 Python 代码：</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">from</span> pathlib <span class="keyword">import</span> Path</span><br><span class="line"></span><br><span class="line">WORKDIR = Path.cwd().resolve()</span><br><span class="line"></span><br><span class="line"></span><br><span class="line"><span class="keyword">def</span> <span class="title function_">safe_path</span>(<span class="params">relative_path: <span class="built_in">str</span></span>) -&gt; Path:</span><br><span class="line">    target = (WORKDIR / relative_path).resolve()</span><br><span class="line">    <span class="keyword">if</span> target != WORKDIR <span class="keyword">and</span> WORKDIR <span class="keyword">not</span> <span class="keyword">in</span> target.parents:</span><br><span class="line">        <span class="keyword">raise</span> ValueError(<span class="string">&quot;Path escapes the workspace&quot;</span>)</span><br><span class="line">    <span class="keyword">return</span> target</span><br><span class="line"></span><br><span class="line"></span><br><span class="line"><span class="keyword">def</span> <span class="title function_">run_read_file</span>(<span class="params">path: <span class="built_in">str</span>, limit: <span class="built_in">int</span> | <span class="literal">None</span> = <span class="literal">None</span></span>) -&gt; <span class="built_in">str</span>:</span><br><span class="line">    lines = safe_path(path).read_text(encoding=<span class="string">&quot;utf-8&quot;</span>).splitlines()</span><br><span class="line">    selected = lines[:limit] <span class="keyword">if</span> limit <span class="keyword">is</span> <span class="keyword">not</span> <span class="literal">None</span> <span class="keyword">else</span> lines</span><br><span class="line">    <span class="keyword">return</span> <span class="string">&quot;\n&quot;</span>.join(selected)</span><br></pre></td></tr></table></figure>
+
+<p>这里有一个容易忽略的边界：不能只检查路径字符串是否以工作目录开头，<code>../</code> 和符号链接都可能绕过字符串判断。应先 <code>resolve()</code> 得到规范化绝对路径，再确认目标确实位于工作区之内。</p>
+<h2 id="三、分发表让核心循环保持稳定"><a href="#三、分发表让核心循环保持稳定" class="headerlink" title="三、分发表让核心循环保持稳定"></a>三、分发表让核心循环保持稳定</h2><p>如果每增加一个工具就在循环里增加分支，很快会变成这样：</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">if</span> call.name == <span class="string">&quot;bash&quot;</span>:</span><br><span class="line">    ...</span><br><span class="line"><span class="keyword">elif</span> call.name == <span class="string">&quot;read_file&quot;</span>:</span><br><span class="line">    ...</span><br><span class="line"><span class="keyword">elif</span> call.name == <span class="string">&quot;write_file&quot;</span>:</span><br><span class="line">    ...</span><br></pre></td></tr></table></figure>
+
+<p>更好的结构是建立“工具名 → 处理函数”的分发表：</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line">TOOL_HANDLERS = &#123;</span><br><span class="line">    <span class="string">&quot;bash&quot;</span>: run_bash,</span><br><span class="line">    <span class="string">&quot;read_file&quot;</span>: run_read_file,</span><br><span class="line">    <span class="string">&quot;write_file&quot;</span>: run_write_file,</span><br><span class="line">    <span class="string">&quot;edit_file&quot;</span>: run_edit_file,</span><br><span class="line">    <span class="string">&quot;glob&quot;</span>: run_glob,</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>于是 Agent Loop 的执行部分不再关心具体工具：</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">for</span> call <span class="keyword">in</span> tool_calls:</span><br><span class="line">    handler = TOOL_HANDLERS.get(call.name)</span><br><span class="line">    <span class="keyword">if</span> handler <span class="keyword">is</span> <span class="literal">None</span>:</span><br><span class="line">        output = <span class="string">f&quot;Error: unknown tool <span class="subst">&#123;call.name&#125;</span>&quot;</span></span><br><span class="line">    <span class="keyword">else</span>:</span><br><span class="line">        <span class="keyword">try</span>:</span><br><span class="line">            output = handler(**call.<span class="built_in">input</span>)</span><br><span class="line">        <span class="keyword">except</span> Exception <span class="keyword">as</span> exc:</span><br><span class="line">            output = <span class="string">f&quot;Error: <span class="subst">&#123;<span class="built_in">type</span>(exc).__name__&#125;</span>: <span class="subst">&#123;exc&#125;</span>&quot;</span></span><br><span class="line"></span><br><span class="line">    results.append(&#123;</span><br><span class="line">        <span class="string">&quot;type&quot;</span>: <span class="string">&quot;tool_result&quot;</span>,</span><br><span class="line">        <span class="string">&quot;tool_use_id&quot;</span>: call.<span class="built_in">id</span>,</span><br><span class="line">        <span class="string">&quot;content&quot;</span>: output,</span><br><span class="line">    &#125;)</span><br></pre></td></tr></table></figure>
+
+<p>现在，增加能力只需要完成两件事：</p>
+<ol>
+<li>向 <code>TOOLS</code> 添加 Schema，让模型知道它能调用什么；</li>
+<li>向 <code>TOOL_HANDLERS</code> 注册 Handler，让运行框架知道怎样执行。</li>
+</ol>
+<p>循环的控制流完全不需要变化。这是分发表最重要的价值：<strong>把稳定的编排机制与持续增长的能力集合分离。</strong></p>
+<h2 id="四、为什么专用工具比-Bash-更适合-Agent"><a href="#四、为什么专用工具比-Bash-更适合-Agent" class="headerlink" title="四、为什么专用工具比 Bash 更适合 Agent"></a>四、为什么专用工具比 Bash 更适合 Agent</h2><p>以“把配置文件中的端口从 3000 改成 8080”为例。</p>
+<p>Bash 工具的输入可能是：</p>
+<figure class="highlight json"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line"><span class="punctuation">&#123;</span><span class="attr">&quot;command&quot;</span><span class="punctuation">:</span> <span class="string">&quot;sed -i &#x27;s/3000/8080/&#x27; config.toml&quot;</span><span class="punctuation">&#125;</span></span><br></pre></td></tr></table></figure>
+
+<p>专用编辑工具的输入则可以是：</p>
+<figure class="highlight json"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line"><span class="punctuation">&#123;</span></span><br><span class="line">  <span class="attr">&quot;path&quot;</span><span class="punctuation">:</span> <span class="string">&quot;config.toml&quot;</span><span class="punctuation">,</span></span><br><span class="line">  <span class="attr">&quot;old_text&quot;</span><span class="punctuation">:</span> <span class="string">&quot;port = 3000&quot;</span><span class="punctuation">,</span></span><br><span class="line">  <span class="attr">&quot;new_text&quot;</span><span class="punctuation">:</span> <span class="string">&quot;port = 8080&quot;</span></span><br><span class="line"><span class="punctuation">&#125;</span></span><br></pre></td></tr></table></figure>
+
+<p>后者保留了更多语义，因此运行框架可以做更可靠的检查：</p>
+<ul>
+<li>路径必须位于工作区；</li>
+<li><code>old_text</code> 必须存在且只替换一次；</li>
+<li>修改前可以生成 diff；</li>
+<li>修改操作可以单独请求用户批准；</li>
+<li>审计日志能直接记录“编辑了哪个文件”，不必解析 Shell。</li>
+</ul>
+<p>工具设计的本质不是给现有函数套一层 JSON，而是为模型设计一组<strong>清晰、有限、可验证的动作原语</strong>。</p>
+<h2 id="五、一次返回多个工具调用怎么办"><a href="#五、一次返回多个工具调用怎么办" class="headerlink" title="五、一次返回多个工具调用怎么办"></a>五、一次返回多个工具调用怎么办</h2><p>模型可能在一轮响应中同时请求多个工具。例如：</p>
+<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">read_file(&quot;src/a.py&quot;)</span><br><span class="line">read_file(&quot;src/b.py&quot;)</span><br><span class="line">glob(&quot;tests/**/*.py&quot;)</span><br></pre></td></tr></table></figure>
+
+<p>最简单、最容易验证的做法，是按响应中的原始顺序逐个执行。这能保证语义稳定，却没有利用三个只读操作之间的并行性。</p>
+<p>生产系统可以根据工具及其具体输入判断是否允许并发：</p>
+<table>
+<thead>
+<tr>
+<th>调用</th>
+<th align="right">是否只读</th>
+<th align="right">是否适合并发</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>读取 <code>a.py</code></td>
+<td align="right">是</td>
+<td align="right">是</td>
+</tr>
+<tr>
+<td>搜索 <code>*.py</code></td>
+<td align="right">是</td>
+<td align="right">是</td>
+</tr>
+<tr>
+<td>执行 <code>git status</code></td>
+<td align="right">是</td>
+<td align="right">通常是</td>
+</tr>
+<tr>
+<td>覆盖写入 <code>a.py</code></td>
+<td align="right">否</td>
+<td align="right">否</td>
+</tr>
+<tr>
+<td>删除文件</td>
+<td align="right">否</td>
+<td align="right">否</td>
+</tr>
+<tr>
+<td>创建相互独立的任务记录</td>
+<td align="right">否</td>
+<td align="right">可能是</td>
+</tr>
+</tbody></table>
+<p>这里不能简单地把工具永久标记为“并发”或“串行”。同一个 Bash 工具执行 <code>ls</code> 时通常安全，执行修改命令时却需要独占；是否并发往往取决于<strong>本次输入会读写哪些资源</strong>。</p>
+<p>一种实用策略是按原始顺序切成连续批次：</p>
+<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">[读取 A, 读取 B, 搜索 *.py, 修改 A, 读取 C]</span><br><span class="line">        │并发安全批次│   │独占│  │并发安全批次│</span><br></pre></td></tr></table></figure>
+
+<p>批次内部并发执行，批次之间保持严格顺序。这样既减少只读 I&#x2F;O 的等待，又不会让后面的读取越过前面的写入。</p>
+<h2 id="六、从教学版走向生产版，还差一条验证管线"><a href="#六、从教学版走向生产版，还差一条验证管线" class="headerlink" title="六、从教学版走向生产版，还差一条验证管线"></a>六、从教学版走向生产版，还差一条验证管线</h2><p>分发表解决了“调用谁”，但没有完整解决“能不能调用”。一个生产级工具请求通常要经过以下阶段：</p>
+<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br></pre></td><td class="code"><pre><span class="line">模型生成参数</span><br><span class="line">    ↓</span><br><span class="line">Schema 校验：类型、必填字段、基本结构</span><br><span class="line">    ↓</span><br><span class="line">语义校验：路径、范围、资源是否存在</span><br><span class="line">    ↓</span><br><span class="line">PreToolUse Hook：记录、修改或阻断调用</span><br><span class="line">    ↓</span><br><span class="line">权限判断：自动允许 / 拒绝 / 询问用户</span><br><span class="line">    ↓</span><br><span class="line">Handler 执行</span><br><span class="line">    ↓</span><br><span class="line">结果裁剪、持久化或摘要</span><br></pre></td></tr></table></figure>
+
+<p>这条管线把模型生成的“请求”转换成系统愿意执行的“动作”。模型输出永远只能被视为不可信输入，Schema 合法也不代表操作安全：<code>&#123;&quot;path&quot;: &quot;../../private.key&quot;&#125;</code> 完全可能通过类型检查，却不应该通过路径校验。</p>
+<p>工具输出也需要边界。搜索日志可能返回几十 MB 内容，如果原样塞回消息历史，会迅速耗尽上下文窗口。常见做法是设置结果大小上限：小结果直接返回，大结果落盘，只把摘要、预览和文件位置交给模型。</p>
+<h2 id="七、这一篇真正需要记住什么"><a href="#七、这一篇真正需要记住什么" class="headerlink" title="七、这一篇真正需要记住什么"></a>七、这一篇真正需要记住什么</h2><ol>
+<li><strong>一个工具包含 Schema 和 Handler。</strong> 前者服务模型决策，后者负责真实执行。</li>
+<li><strong>分发表隔离能力与编排。</strong> 新增工具时注册定义和实现，Agent Loop 无需跟着修改。</li>
+<li><strong>专用工具提供更强的语义。</strong> 语义越明确，参数验证、权限控制和审计越可靠。</li>
+<li><strong>并发安全取决于具体输入。</strong> 连续的安全调用可成批并发，写操作与有依赖的调用必须保序。</li>
+<li><strong>模型调用只是请求，不是授权。</strong> Schema、语义校验、Hooks 和权限检查都应位于 Handler 之前。</li>
+</ol>
+<p>至此，我们已经有了一个能循环、能扩展的 Agent，但它仍然可能执行危险命令。下一篇将进入 Permission：在模型决定“我要做什么”和系统真正执行之间，加上一道明确的安全门。</p>
+
+    </div>
+
+    
+    
+    
+
+    <footer class="post-footer">
+          
+
+<div class="post-copyright">
+<ul>
+  <li class="post-copyright-author">
+      <strong>本文作者： </strong>陌忆
+  </li>
+  <li class="post-copyright-link">
+      <strong>本文链接：</strong>
+      <a href="https://moyi-math.github.io/2026/08/20/Learn-Claude-Code-02-Tool-Use/" title="Learn Claude Code 02：Tool Use——用分发表扩展 Agent 的能力">https://moyi-math.github.io/2026/08/20/Learn-Claude-Code-02-Tool-Use/</a>
+  </li>
+  <li class="post-copyright-license">
+      <strong>版权声明： </strong>本博客所有文章除特别声明外，均采用 <a href="https://creativecommons.org/licenses/by-nc-sa/4.0/" rel="noopener" target="_blank"><i class="fab fa-fw fa-creative-commons"></i>BY-NC-SA</a> 许可协议。转载请注明出处！
+  </li>
+</ul>
+</div>
+
+          <div class="post-tags">
+              <a href="/tags/Agent/" rel="tag"># Agent</a>
+              <a href="/tags/Claude-Code/" rel="tag"># Claude Code</a>
+              <a href="/tags/Tool-Use/" rel="tag"># Tool Use</a>
+              <a href="/tags/Function-Calling/" rel="tag"># Function Calling</a>
+              <a href="/tags/%E5%B9%B6%E5%8F%91/" rel="tag"># 并发</a>
+          </div>
+
+        
+
+          <div class="post-nav">
+            <div class="post-nav-item">
+                <a href="/2026/08/20/Learn-Claude-Code-01-Agent-Loop/" rel="prev" title="Learn Claude Code 01：Agent Loop——一个循环如何让 LLM 真正行动起来">
+                  <i class="fa fa-angle-left"></i> Learn Claude Code 01：Agent Loop——一个循环如何让 LLM 真正行动起来
+                </a>
+            </div>
+            <div class="post-nav-item">
+                <a href="/2026/08/20/Learn-Claude-Code-03-Permission/" rel="next" title="Learn Claude Code 03：Permission——在工具执行前加一道安全门">
+                  Learn Claude Code 03：Permission——在工具执行前加一道安全门 <i class="fa fa-angle-right"></i>
+                </a>
+            </div>
+          </div>
+    </footer>
+  </article>
+</div>
+
+
+
+
+
+
+</div>
+  </main>
+
+  <footer class="footer">
+    <div class="footer-inner">
+
+  <div class="copyright">
+    &copy; 
+    <span itemprop="copyrightYear">2026</span>
+    <span class="with-love">
+      <i class="fab fa-osi"></i>
+    </span>
+    <span class="author" itemprop="copyrightHolder">陌忆</span>
+  </div>
+<div class="wordcount">
+  <span class="post-meta-item">
+    <span class="post-meta-item-icon">
+      <i class="fa fa-chart-line"></i>
+    </span>
+    <span title="站点总字数">106k</span>
+  </span>
+  <span class="post-meta-item">
+    <span class="post-meta-item-icon">
+      <i class="fa fa-coffee"></i>
+    </span>
+    <span title="站点阅读时长">6:24</span>
+  </span>
+</div>
+  <div class="powered-by">由 <a href="https://hexo.io/" rel="noopener" target="_blank">Hexo</a> & <a href="https://theme-next.js.org/" rel="noopener" target="_blank">NexT.Gemini</a> 强力驱动
+  </div>
+
+    </div>
+  </footer>
+
+  
+  <div class="toggle sidebar-toggle" role="button">
+    <span class="toggle-line"></span>
+    <span class="toggle-line"></span>
+    <span class="toggle-line"></span>
+  </div>
+  <div class="sidebar-dimmer"></div>
+  <div class="back-to-top" role="button" aria-label="返回顶部">
+    <i class="fa fa-arrow-up fa-lg"></i>
+    <span>0%</span>
+  </div>
+
+<noscript>
+  <div class="noscript-warning">Theme NexT works best with JavaScript enabled</div>
+</noscript>
+<!-- Site running time -->
+<span id="timeDate" aria-live="off"></span>
+<script>
+(function() {
+  var start = new Date("2022-11-17T08:00:00+08:00");
+  function pad(n) { return n < 10 ? "0" + n : "" + n; }
+  function tick() {
+    var diff = Date.now() - start.getTime();
+    if (diff < 0) return;
+    var d = Math.floor(diff / 86400000);
+    var h = Math.floor((diff % 86400000) / 3600000);
+    var m = Math.floor((diff % 3600000) / 60000);
+    var timeDate = document.getElementById("timeDate");
+    if (!timeDate) return;
+    timeDate.textContent =
+      "\u672C\u7AD9\u5DF2\u5B89\u5168\u8FD0\u884C " + d + " \u5929 " + pad(h) + " \u5C0F\u65F6 " + pad(m) + " \u5206";
+  }
+  tick();
+  setInterval(tick, 60000);
+})();
+</script>
+
+</body>
+</html>

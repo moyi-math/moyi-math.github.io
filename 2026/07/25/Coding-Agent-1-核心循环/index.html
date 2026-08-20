@@ -1,0 +1,505 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width">
+<meta name="theme-color" content="#222" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#222" media="(prefers-color-scheme: dark)"><meta name="generator" content="Hexo 7.3.0">
+<link rel="preconnect" href="https://cdnjs.cloudflare.com" crossorigin>
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon-next.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32-next.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next.png">
+  <link rel="mask-icon" href="/images/logo.svg" color="#222">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/7.0.0/css/all.min.css" integrity="sha256-VHqXKFhhMxcpubYf9xiWdCiojEbY9NexQ4jh8AxbvcM=" crossorigin="anonymous">
+
+<script class="next-config" data-name="main" type="application/json">{"hostname":"moyi-math.github.io","root":"/","images":"/images","scheme":"Gemini","darkmode":true,"version":"8.28.0","exturl":false,"sidebar":{"position":"left","width_expanded":320,"width_dual_column":240,"display":"post","padding":18,"offset":12},"hljswrap":true,"codeblock":{"theme":{"light":"default","dark":"stackoverflow-dark"},"prism":{"light":"prism","dark":"prism-dark"},"copy_button":{"enable":true,"style":null},"fold":{"enable":false,"height":500},"language":false},"bookmark":{"enable":false,"color":"#222","save":"auto"},"mediumzoom":false,"lazyload":true,"pangu":false,"comments":{"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},"stickytabs":false,"motion":{"enable":false,"async":false,"duration":200,"transition":{"menu_item":"fadeInDown","post_block":"fadeIn","post_header":"fadeInDown","post_body":"fadeInDown","coll_header":"fadeInLeft","sidebar":"fadeInUp"}},"prism":false,"i18n":{"placeholder":"搜索...","empty":"没有找到任何搜索结果：${query}","hits_time":"找到 ${hits} 个搜索结果（用时 ${time} 毫秒）","hits":"找到 ${hits} 个搜索结果"},"path":"/search.json","localsearch":{"enable":true,"top_n_per_article":1,"unescape":false,"preload":false}}</script><script src="/js/config.js" defer></script>
+
+    <meta name="description" content="从推理、执行到观察，拆解 Coding Agent 如何通过循环把一次自然语言任务变成连续的行动。">
+<meta property="og:type" content="article">
+<meta property="og:title" content="入门 Coding Agent（一）：从 Prompt 到循环——Agent 的核心工作原理">
+<meta property="og:url" content="https://moyi-math.github.io/2026/07/25/Coding-Agent-1-%E6%A0%B8%E5%BF%83%E5%BE%AA%E7%8E%AF/index.html">
+<meta property="og:site_name" content="陌忆的博客">
+<meta property="og:description" content="从推理、执行到观察，拆解 Coding Agent 如何通过循环把一次自然语言任务变成连续的行动。">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:image" content="https://moyi-math.github.io/images/background.webp">
+<meta property="article:published_time" content="2026-07-25T15:00:00.000Z">
+<meta property="article:modified_time" content="2026-08-20T14:47:37.218Z">
+<meta property="article:author" content="陌忆">
+<meta property="article:tag" content="Agent">
+<meta property="article:tag" content="LLM">
+<meta property="article:tag" content="Coding Agent">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:image" content="https://moyi-math.github.io/images/background.webp">
+
+
+<link rel="canonical" href="https://moyi-math.github.io/2026/07/25/Coding-Agent-1-%E6%A0%B8%E5%BF%83%E5%BE%AA%E7%8E%AF/">
+
+
+<script class="next-config" data-name="page" type="application/json">{"sidebar":"","isHome":false,"isPost":true,"lang":"zh-CN","comments":true,"permalink":"https://moyi-math.github.io/2026/07/25/Coding-Agent-1-%E6%A0%B8%E5%BF%83%E5%BE%AA%E7%8E%AF/","path":"2026/07/25/Coding-Agent-1-核心循环/","title":"入门 Coding Agent（一）：从 Prompt 到循环——Agent 的核心工作原理"}</script>
+
+<script class="next-config" data-name="calendar" type="application/json">""</script>
+<title>入门 Coding Agent（一）：从 Prompt 到循环——Agent 的核心工作原理 | 陌忆的博客</title>
+  
+
+
+
+
+
+
+
+
+  
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/animejs/3.2.1/anime.min.js" integrity="sha256-XL2inqUJaslATFnHdJOi9GfQ60on8Wx1C2H8DYiN1xY=" crossorigin="anonymous" defer></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/lozad.js/1.16.0/lozad.min.js" integrity="sha256-mOFREFhqmHeQbXpK2lp4nA3qooVgACfh88fpJftLBbc=" crossorigin="anonymous" defer></script>
+<script src="/js/utils.js" defer></script><script src="/js/sidebar.js" defer></script><script src="/js/next-boot.js" defer></script>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/hexo-generator-searchdb/1.5.0/search.js" integrity="sha256-xFC6PJ82SL9b3WkGjFavNiA9gm5z6UBxWPiu4CYjptg=" crossorigin="anonymous" defer></script>
+<script src="/js/third-party/search/local-search.js" defer></script>
+
+
+
+
+
+
+
+  
+
+
+
+
+  
+
+  <script class="next-config" data-name="enableMath" type="application/json">false</script><link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/katex.min.css" integrity="sha256-UF1fgpAiu3tPJN/uCqEUHNe7pnr+QR0SQDNfgglgtcM=" crossorigin="anonymous">
+
+
+<link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
+
+
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"WebSite","name":"陌忆的博客","url":"https://moyi-math.github.io","description":"记录 RAG、Agent、MCP、算法与软件工程实践，按专栏整理可复用的技术笔记。","inLanguage":"zh-CN","author":{"@type":"Person","name":"陌忆"}}</script>
+
+
+
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"Article","headline":"入门 Coding Agent（一）：从 Prompt 到循环——Agent 的核心工作原理","description":"从推理、执行到观察，拆解 Coding Agent 如何通过循环把一次自然语言任务变成连续的行动。","datePublished":"2026-07-25T15:00:00.000Z","dateModified":"2026-08-20T14:47:37.218Z","inLanguage":"zh-CN","mainEntityOfPage":{"@type":"WebPage","@id":"https://moyi-math.github.io/2026/07/25/Coding-Agent-1-%E6%A0%B8%E5%BF%83%E5%BE%AA%E7%8E%AF/index.html"},"author":{"@type":"Person","name":"陌忆"}}</script>
+<meta name="author" content="陌忆">
+
+
+  <noscript>
+    <link rel="stylesheet" href="/css/noscript.css">
+  </noscript>
+<!-- hexo injector head_end start --><link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/katex.min.css" integrity="sha512-fHwaWebuwA7NSF5Qg/af4UeDx9XqUpYpOGgubo3yWu+b2IQR4UeQwbb42Ti7gVAjNtVoI/I9TEoYeu9omwcC6g==" crossorigin="anonymous" referrerpolicy="no-referrer" /><!-- hexo injector head_end end --><link rel="alternate" href="/atom.xml" title="陌忆的博客" type="application/atom+xml">
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage">
+  <div class="headband"></div>
+
+  <main class="main">
+    <div class="column">
+      <header class="header" itemscope itemtype="http://schema.org/WPHeader"><div class="site-brand-container">
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="切换导航栏" role="button">
+        <span class="toggle-line"></span>
+        <span class="toggle-line"></span>
+        <span class="toggle-line"></span>
+    </div>
+  </div>
+
+  <div class="site-meta">
+
+    <a href="/" class="brand" rel="start">
+      <i class="logo-line"></i>
+      <p class="site-title">陌忆的博客</p>
+      <i class="logo-line"></i>
+    </a>
+      <p class="site-subtitle" itemprop="description">数据库无法得出结论</p>
+  </div>
+
+  <div class="site-nav-right">
+    <div class="toggle popup-trigger" aria-label="搜索" role="button">
+        <i class="fa fa-search fa-fw fa-lg"></i>
+    </div>
+  </div>
+</div>
+
+
+
+<nav class="site-nav">
+  <ul class="main-menu menu"><li class="menu-item menu-item-home"><a href="/" rel="section"><i class="fa fa-home fa-fw"></i>首页</a></li><li class="menu-item menu-item-about"><a href="/about/" rel="section"><i class="fa fa-user fa-fw"></i>关于</a></li><li class="menu-item menu-item-tags"><a href="/tags/" rel="section"><i class="fa fa-tags fa-fw"></i>标签</a></li><li class="menu-item menu-item-categories"><a href="/categories/" rel="section"><i class="fa fa-th fa-fw"></i>分类</a></li><li class="menu-item menu-item-archives"><a href="/archives/" rel="section"><i class="fa fa-archive fa-fw"></i>归档</a></li>
+      <li class="menu-item menu-item-search">
+        <a role="button" class="popup-trigger"><i class="fa fa-search fa-fw"></i>搜索
+        </a>
+      </li>
+  </ul>
+</nav>
+
+
+
+  <div class="search-pop-overlay">
+    <div class="popup search-popup">
+      <div class="search-header">
+        <span class="search-icon">
+          <i class="fa fa-search"></i>
+        </span>
+        <div class="search-input-container">
+          <input autocomplete="off" autocapitalize="off" maxlength="80"
+                placeholder="搜索..." spellcheck="false"
+                type="search" class="search-input">
+        </div>
+        <span class="popup-btn-close" role="button">
+          <i class="fa fa-times-circle"></i>
+        </span>
+      </div>
+      <div class="search-result-container">
+        <div class="search-result-icon">
+          <i class="fa fa-spinner fa-pulse fa-5x"></i>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</header>
+        
+  
+  <aside class="sidebar">
+
+    <div class="sidebar-inner sidebar-nav-active sidebar-toc-active">
+      <ul class="sidebar-nav">
+        <li class="sidebar-nav-toc">
+          文章目录
+        </li>
+        <li class="sidebar-nav-overview">
+          站点概览
+        </li>
+      </ul>
+
+      <div class="sidebar-panel-container">
+        <!--noindex-->
+        <div class="post-toc-wrap sidebar-panel">
+            <div class="post-toc animated"><ol class="nav"><li class="nav-item nav-level-2"><a class="nav-link" href="#%E4%B8%80%E3%80%81%E4%BD%A0%E6%AF%8F%E5%A4%A9%E9%83%BD%E5%9C%A8%E7%94%A8%EF%BC%8C%E4%BD%86%E6%9C%AA%E5%BF%85%E4%BA%86%E8%A7%A3%E5%AE%83%E7%9A%84%E5%8E%9F%E7%90%86"><span class="nav-text">一、你每天都在用，但未必了解它的原理</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E4%BA%8C%E3%80%81Agent-%E7%9A%84%E6%A0%B8%E5%BF%83%E5%BE%AA%E7%8E%AF%EF%BC%9A%E6%8E%A8%E7%90%86-%E2%86%92-%E6%89%A7%E8%A1%8C-%E2%86%92-%E8%A7%82%E5%AF%9F"><span class="nav-text">二、Agent 的核心循环：推理 → 执行 → 观察</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E4%B8%89%E3%80%81%E5%AF%B9%E8%AF%9D%E5%8E%86%E5%8F%B2%E5%B0%B1%E6%98%AF-Agent-%E7%9A%84%E2%80%9D%E8%AE%B0%E5%BF%86%E2%80%9D"><span class="nav-text">三、对话历史就是 Agent 的”记忆”</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%9B%9B%E3%80%81%E6%99%AE%E9%80%9A%E8%81%8A%E5%A4%A9-vs-Agent-%E5%BE%AA%E7%8E%AF"><span class="nav-text">四、普通聊天 vs Agent 循环</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E4%BA%94%E3%80%81%E4%B8%80%E4%B8%AA%E5%85%B3%E9%94%AE%E9%97%AE%E9%A2%98%EF%BC%9A%E8%B0%81%E6%9D%A5%E5%96%8A%E5%81%9C%EF%BC%9F"><span class="nav-text">五、一个关键问题：谁来喊停？</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%85%AD%E3%80%81%E4%B8%8B%E4%B8%80%E7%AF%87%E9%A2%84%E5%91%8A"><span class="nav-text">六、下一篇预告</span></a></li></ol></div>
+        </div>
+        <!--/noindex-->
+
+        <div class="site-overview-wrap sidebar-panel">
+          <div class="site-author animated" itemprop="author" itemscope itemtype="http://schema.org/Person">
+    <img class="site-author-image" itemprop="image" alt="陌忆"
+      src="/images/avatar.webp">
+  <p class="site-author-name" itemprop="name">陌忆</p>
+  <div class="site-description" itemprop="description">记录 RAG、Agent、MCP、算法与软件工程实践，按专栏整理可复用的技术笔记。</div>
+</div>
+<div class="site-state-wrap animated">
+  <nav class="site-state">
+      <div class="site-state-item site-state-posts">
+        <a href="/archives/">
+          <span class="site-state-item-count">50</span>
+          <span class="site-state-item-name">日志</span>
+        </a>
+      </div>
+      <div class="site-state-item site-state-categories">
+          <a href="/categories/">
+        <span class="site-state-item-count">10</span>
+        <span class="site-state-item-name">分类</span></a>
+      </div>
+      <div class="site-state-item site-state-tags">
+          <a href="/tags/">
+        <span class="site-state-item-count">172</span>
+        <span class="site-state-item-name">标签</span></a>
+      </div>
+  </nav>
+</div>
+  <div class="links-of-author animated">
+      <span class="links-of-author-item">
+        <a href="https://github.com/moyi-math" title="GitHub → https:&#x2F;&#x2F;github.com&#x2F;moyi-math" rel="noopener me" target="_blank"><i class="fab fa-github fa-fw"></i>GitHub</a>
+      </span>
+  </div>
+  <div class="cc-license animated" itemprop="license">
+    <a href="https://creativecommons.org/licenses/by-nc-sa/4.0/" class="cc-opacity" rel="noopener" target="_blank"><img src="https://cdnjs.cloudflare.com/ajax/libs/creativecommons-vocabulary/2020.11.3/assets/license_badges/small/by_nc_sa.svg" alt="Creative Commons"></a>
+  </div>
+
+        </div>
+      </div>
+    </div>
+
+    
+  </aside>
+
+
+    </div>
+
+    <div class="main-inner post posts-expand">
+
+
+  
+
+
+<div class="post-block">
+  
+  
+
+  <article itemscope itemtype="http://schema.org/Article" class="post-content" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="https://moyi-math.github.io/2026/07/25/Coding-Agent-1-%E6%A0%B8%E5%BF%83%E5%BE%AA%E7%8E%AF/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.webp">
+      <meta itemprop="name" content="陌忆">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="陌忆的博客">
+      <meta itemprop="description" content="记录 RAG、Agent、MCP、算法与软件工程实践，按专栏整理可复用的技术笔记。">
+    </span>
+
+    <span hidden itemprop="post" itemscope itemtype="http://schema.org/CreativeWork">
+      <meta itemprop="name" content="入门 Coding Agent（一）：从 Prompt 到循环——Agent 的核心工作原理 | 陌忆的博客">
+      <meta itemprop="description" content="从推理、执行到观察，拆解 Coding Agent 如何通过循环把一次自然语言任务变成连续的行动。">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          入门 Coding Agent（一）：从 Prompt 到循环——Agent 的核心工作原理
+        </h1>
+
+        <div class="post-meta-container">
+          <div class="post-meta">
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-calendar"></i>
+      </span>
+      <span class="post-meta-item-text">发表于</span>
+
+      <time title="创建时间：2026-07-25 23:00:00" itemprop="dateCreated datePublished" datetime="2026-07-25T23:00:00+08:00">2026-07-25</time>
+    </span>
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-calendar-check"></i>
+      </span>
+      <span class="post-meta-item-text">更新于</span>
+      <time title="修改时间：2026-08-20 22:47:37" itemprop="dateModified" datetime="2026-08-20T22:47:37+08:00">2026-08-20</time>
+    </span>
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-folder"></i>
+      </span>
+      <span class="post-meta-item-text">分类于</span>
+        <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+          <a href="/categories/Coding-Agent-%E5%8E%9F%E7%90%86/" itemprop="url" rel="index"><span itemprop="name">Coding Agent 原理</span></a>
+        </span>
+    </span>
+
+  
+    <span class="post-meta-break"></span>
+    <span class="post-meta-item" title="本文字数">
+      <span class="post-meta-item-icon">
+        <i class="far fa-file-word"></i>
+      </span>
+      <span class="post-meta-item-text">本文字数：</span>
+      <span>1.1k</span>
+    </span>
+    <span class="post-meta-item" title="阅读时长">
+      <span class="post-meta-item-icon">
+        <i class="far fa-clock"></i>
+      </span>
+      <span class="post-meta-item-text">阅读时长 &asymp;</span>
+      <span>4 分钟</span>
+    </span>
+</div>
+
+            <div class="post-description">从推理、执行到观察，拆解 Coding Agent 如何通过循环把一次自然语言任务变成连续的行动。</div>
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody"><h2 id="一、你每天都在用，但未必了解它的原理"><a href="#一、你每天都在用，但未必了解它的原理" class="headerlink" title="一、你每天都在用，但未必了解它的原理"></a>一、你每天都在用，但未必了解它的原理</h2><p>如果你用过 Cursor、Copilot、Devin，或者任何能”自主编程”的 AI 工具，你已经在和 <strong>Coding Agent</strong> 打交道了。但大多数人对它的理解停留在”能写代码的 AI”这个层面。</p>
+<p>这篇文章会用最直白的方式，拆解一个 Coding Agent 到底是怎么工作的。</p>
+<p>我们从一个问题开始：<strong>Coding Agent 和普通 LLM 聊天的本质区别是什么？</strong></p>
+<p>和 LLM 聊天时，你问一句它答一句，对话是线性的。而 Coding Agent 做的事情不同——你给它一个任务后，<strong>它自己决定下一步做什么，拿到结果后再决定要不要继续</strong>。</p>
+<p>这个”自己决定”的能力，就是 Agent 和普通聊天的分水岭。</p>
+<h2 id="二、Agent-的核心循环：推理-→-执行-→-观察"><a href="#二、Agent-的核心循环：推理-→-执行-→-观察" class="headerlink" title="二、Agent 的核心循环：推理 → 执行 → 观察"></a>二、Agent 的核心循环：推理 → 执行 → 观察</h2><p>一个 Agent 的整个生命周期，就是在一个循环里打转：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">推理（LLM 决定下一步）→ 执行（跑命令）→ 观察（看结果）→ 再推理 → 再执行 → ...</span><br></pre></td></tr></table></figure>
+
+<p>这个循环的每一步都只做一件事：</p>
+<ol>
+<li><strong>推理</strong>：把到目前为止的完整对话历史发给 LLM，问它”下一步做什么”</li>
+<li><strong>执行</strong>：LLM 返回的不是文字答案，而是一个或多个<strong>动作（action）</strong>，比如”帮我跑一下 ls src&#x2F;“。Agent 把这些动作交给执行环境去跑</li>
+<li><strong>观察</strong>：执行环境返回结果（命令的输出、错误码等），Agent 把这个结果追加到对话历史里</li>
+<li><strong>回到第 1 步</strong>：LLM 现在看到了执行结果，再做下一步决策</li>
+</ol>
+<p>这个循环会一直持续，直到 LLM 觉得任务完成了。</p>
+<h2 id="三、对话历史就是-Agent-的”记忆”"><a href="#三、对话历史就是-Agent-的”记忆”" class="headerlink" title="三、对话历史就是 Agent 的”记忆”"></a>三、对话历史就是 Agent 的”记忆”</h2><p>Agent 不维护什么复杂的状态管理。它唯一的”记忆”就是一条不断增长的消息列表。格式大概是这样的：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br></pre></td><td class="code"><pre><span class="line">system: &quot;你是一个编程助手，你可以执行 bash 命令...&quot;</span><br><span class="line">user: &quot;修复这个 bug：...&quot;</span><br><span class="line">assistant: &quot;让我先看看代码&quot; → action: ls src/</span><br><span class="line">tool: &quot;main.py\nutils.py&quot; (命令执行结果)</span><br><span class="line">assistant: &quot;找到问题了，让我修改&quot; → action: sed -i ...</span><br><span class="line">tool: &quot;&quot; (修改成功)</span><br><span class="line">assistant: &quot;跑一下测试&quot; → action: pytest</span><br><span class="line">tool: &quot;3 passed, 0 failed&quot;</span><br><span class="line">assistant: &quot;修复完成&quot; → action: echo &quot;COMPLETE_TASK_AND_SUBMIT_FINAL_OUTPUT&quot;</span><br><span class="line">exit: 任务结束</span><br></pre></td></tr></table></figure>
+
+<p>每一次循环，消息列表都在增长。LLM 每次都看到全部历史，所以它能感知到上下文的变化——上一轮的命令有没有报错、测试有没有通过、环境发生了什么变化。</p>
+<p>这个设计的巧妙之处在于：<strong>Agent 不需要专门的状态管理，消息列表本身就是状态。</strong></p>
+<h2 id="四、普通聊天-vs-Agent-循环"><a href="#四、普通聊天-vs-Agent-循环" class="headerlink" title="四、普通聊天 vs Agent 循环"></a>四、普通聊天 vs Agent 循环</h2><table>
+<thead>
+<tr>
+<th></th>
+<th>普通 LLM 聊天</th>
+<th>Coding Agent</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>交互方式</td>
+<td>用户问一句，LLM 答一句</td>
+<td>Agent 自行决定下一步</td>
+</tr>
+<tr>
+<td>工具调用</td>
+<td>无，只能生成文字</td>
+<td>可以执行 shell 命令、修改文件、跑测试</td>
+</tr>
+<tr>
+<td>反馈机制</td>
+<td>用户的下一个问题</td>
+<td>执行环境的真实返回结果</td>
+</tr>
+<tr>
+<td>终止条件</td>
+<td>用户停止提问</td>
+<td>LLM 主动提交，或被硬边界截停</td>
+</tr>
+<tr>
+<td>状态管理</td>
+<td>用户维护上下文</td>
+<td>消息列表自动累积</td>
+</tr>
+</tbody></table>
+<h2 id="五、一个关键问题：谁来喊停？"><a href="#五、一个关键问题：谁来喊停？" class="headerlink" title="五、一个关键问题：谁来喊停？"></a>五、一个关键问题：谁来喊停？</h2><p>Agent 循环是 while True，那它怎么知道什么时候停下来？</p>
+<p>直觉上你会觉得”LLM 自己判断任务完成了”。这个判断是对的——<strong>正常退出确实依赖 LLM</strong>。但它不是”说”自己完成了，而是通过执行一个<strong>特殊动作</strong>来提交：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">echo &quot;COMPLETE_TASK_AND_SUBMIT_FINAL_OUTPUT&quot;</span><br><span class="line">修复完成，改动了 src/main.py 第 15 行</span><br></pre></td></tr></table></figure>
+
+<p>执行环境（Environment）检测到输出以 COMPLETE_TASK_AND_SUBMIT_FINAL_OUTPUT 开头，就触发退出信号。Agent 捕获到信号后退出循环。</p>
+<p>为什么绕这么一圈？因为<strong>LLM 是不可靠的</strong>。它可能说着说着就编造了不存在的东西，可能在一个死胡同里绕圈子，也可能”觉得”自己做完了但实际是错的。强制它通过一个<strong>结构化的动作</strong>来提交，比让它”说”我完成了更可靠。</p>
+<p>但依赖 LLM 来”主动提交”只是软退出。还有硬边界——这个话题我们放到第三篇详细讲。</p>
+<h2 id="六、下一篇预告"><a href="#六、下一篇预告" class="headerlink" title="六、下一篇预告"></a>六、下一篇预告</h2><p>这一篇我们理解了 Agent 的核心循环。下一篇会拆解这个循环里的三个核心角色：<strong>Agent（决策者）、Model（翻译官）、Environment（执行者）</strong>，看它们各自负责什么、怎么配合。</p>
+
+    </div>
+
+    
+    
+    
+
+    <footer class="post-footer">
+          
+
+<div class="post-copyright">
+<ul>
+  <li class="post-copyright-author">
+      <strong>本文作者： </strong>陌忆
+  </li>
+  <li class="post-copyright-link">
+      <strong>本文链接：</strong>
+      <a href="https://moyi-math.github.io/2026/07/25/Coding-Agent-1-%E6%A0%B8%E5%BF%83%E5%BE%AA%E7%8E%AF/" title="入门 Coding Agent（一）：从 Prompt 到循环——Agent 的核心工作原理">https://moyi-math.github.io/2026/07/25/Coding-Agent-1-核心循环/</a>
+  </li>
+  <li class="post-copyright-license">
+      <strong>版权声明： </strong>本博客所有文章除特别声明外，均采用 <a href="https://creativecommons.org/licenses/by-nc-sa/4.0/" rel="noopener" target="_blank"><i class="fab fa-fw fa-creative-commons"></i>BY-NC-SA</a> 许可协议。转载请注明出处！
+  </li>
+</ul>
+</div>
+
+          <div class="post-tags">
+              <a href="/tags/Agent/" rel="tag"># Agent</a>
+              <a href="/tags/LLM/" rel="tag"># LLM</a>
+              <a href="/tags/Coding-Agent/" rel="tag"># Coding Agent</a>
+          </div>
+
+        
+
+          <div class="post-nav">
+            <div class="post-nav-item">
+                <a href="/2026/07/25/LightRAG-2.0-%E5%88%86%E5%9D%97%E7%AD%96%E7%95%A5%E5%85%A8%E8%A7%A3%E6%9E%90%EF%BC%9A%E5%9B%9B%E7%A7%8D%E6%96%B9%E5%BC%8F%E6%80%8E%E4%B9%88%E9%80%89/" rel="prev" title="LightRAG 2.0：分块策略全解析——四种方式怎么选？">
+                  <i class="fa fa-angle-left"></i> LightRAG 2.0：分块策略全解析——四种方式怎么选？
+                </a>
+            </div>
+            <div class="post-nav-item">
+                <a href="/2026/07/25/Coding-Agent-2-%E4%B8%89%E4%BD%93%E6%9E%B6%E6%9E%84/" rel="next" title="入门 Coding Agent（二）：三体架构——Agent、Model、Environment 各司其职">
+                  入门 Coding Agent（二）：三体架构——Agent、Model、Environment 各司其职 <i class="fa fa-angle-right"></i>
+                </a>
+            </div>
+          </div>
+    </footer>
+  </article>
+</div>
+
+
+
+
+
+
+</div>
+  </main>
+
+  <footer class="footer">
+    <div class="footer-inner">
+
+  <div class="copyright">
+    &copy; 
+    <span itemprop="copyrightYear">2026</span>
+    <span class="with-love">
+      <i class="fab fa-osi"></i>
+    </span>
+    <span class="author" itemprop="copyrightHolder">陌忆</span>
+  </div>
+<div class="wordcount">
+  <span class="post-meta-item">
+    <span class="post-meta-item-icon">
+      <i class="fa fa-chart-line"></i>
+    </span>
+    <span title="站点总字数">106k</span>
+  </span>
+  <span class="post-meta-item">
+    <span class="post-meta-item-icon">
+      <i class="fa fa-coffee"></i>
+    </span>
+    <span title="站点阅读时长">6:24</span>
+  </span>
+</div>
+  <div class="powered-by">由 <a href="https://hexo.io/" rel="noopener" target="_blank">Hexo</a> & <a href="https://theme-next.js.org/" rel="noopener" target="_blank">NexT.Gemini</a> 强力驱动
+  </div>
+
+    </div>
+  </footer>
+
+  
+  <div class="toggle sidebar-toggle" role="button">
+    <span class="toggle-line"></span>
+    <span class="toggle-line"></span>
+    <span class="toggle-line"></span>
+  </div>
+  <div class="sidebar-dimmer"></div>
+  <div class="back-to-top" role="button" aria-label="返回顶部">
+    <i class="fa fa-arrow-up fa-lg"></i>
+    <span>0%</span>
+  </div>
+
+<noscript>
+  <div class="noscript-warning">Theme NexT works best with JavaScript enabled</div>
+</noscript>
+<!-- Site running time -->
+<span id="timeDate" aria-live="off"></span>
+<script>
+(function() {
+  var start = new Date("2022-11-17T08:00:00+08:00");
+  function pad(n) { return n < 10 ? "0" + n : "" + n; }
+  function tick() {
+    var diff = Date.now() - start.getTime();
+    if (diff < 0) return;
+    var d = Math.floor(diff / 86400000);
+    var h = Math.floor((diff % 86400000) / 3600000);
+    var m = Math.floor((diff % 3600000) / 60000);
+    var timeDate = document.getElementById("timeDate");
+    if (!timeDate) return;
+    timeDate.textContent =
+      "\u672C\u7AD9\u5DF2\u5B89\u5168\u8FD0\u884C " + d + " \u5929 " + pad(h) + " \u5C0F\u65F6 " + pad(m) + " \u5206";
+  }
+  tick();
+  setInterval(tick, 60000);
+})();
+</script>
+
+</body>
+</html>

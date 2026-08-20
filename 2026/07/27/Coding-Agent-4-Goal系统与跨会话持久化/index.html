@@ -1,0 +1,518 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width">
+<meta name="theme-color" content="#222" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#222" media="(prefers-color-scheme: dark)"><meta name="generator" content="Hexo 7.3.0">
+<link rel="preconnect" href="https://cdnjs.cloudflare.com" crossorigin>
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon-next.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32-next.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next.png">
+  <link rel="mask-icon" href="/images/logo.svg" color="#222">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/7.0.0/css/all.min.css" integrity="sha256-VHqXKFhhMxcpubYf9xiWdCiojEbY9NexQ4jh8AxbvcM=" crossorigin="anonymous">
+
+<script class="next-config" data-name="main" type="application/json">{"hostname":"moyi-math.github.io","root":"/","images":"/images","scheme":"Gemini","darkmode":true,"version":"8.28.0","exturl":false,"sidebar":{"position":"left","width_expanded":320,"width_dual_column":240,"display":"post","padding":18,"offset":12},"hljswrap":true,"codeblock":{"theme":{"light":"default","dark":"stackoverflow-dark"},"prism":{"light":"prism","dark":"prism-dark"},"copy_button":{"enable":true,"style":null},"fold":{"enable":false,"height":500},"language":false},"bookmark":{"enable":false,"color":"#222","save":"auto"},"mediumzoom":false,"lazyload":true,"pangu":false,"comments":{"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},"stickytabs":false,"motion":{"enable":false,"async":false,"duration":200,"transition":{"menu_item":"fadeInDown","post_block":"fadeIn","post_header":"fadeInDown","post_body":"fadeInDown","coll_header":"fadeInLeft","sidebar":"fadeInUp"}},"prism":false,"i18n":{"placeholder":"搜索...","empty":"没有找到任何搜索结果：${query}","hits_time":"找到 ${hits} 个搜索结果（用时 ${time} 毫秒）","hits":"找到 ${hits} 个搜索结果"},"path":"/search.json","localsearch":{"enable":true,"top_n_per_article":1,"unescape":false,"preload":false}}</script><script src="/js/config.js" defer></script>
+
+    <meta name="description" content="解释 Goal 系统如何保存未完成任务、跨越对话生命周期，并让 Coding Agent 恢复长期工作。">
+<meta property="og:type" content="article">
+<meta property="og:title" content="入门 Coding Agent（四）：当 Agent 醒来时——Goal 系统与跨会话持久化">
+<meta property="og:url" content="https://moyi-math.github.io/2026/07/27/Coding-Agent-4-Goal%E7%B3%BB%E7%BB%9F%E4%B8%8E%E8%B7%A8%E4%BC%9A%E8%AF%9D%E6%8C%81%E4%B9%85%E5%8C%96/index.html">
+<meta property="og:site_name" content="陌忆的博客">
+<meta property="og:description" content="解释 Goal 系统如何保存未完成任务、跨越对话生命周期，并让 Coding Agent 恢复长期工作。">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:image" content="https://moyi-math.github.io/images/background.webp">
+<meta property="article:published_time" content="2026-07-27T14:00:00.000Z">
+<meta property="article:modified_time" content="2026-08-20T14:47:37.218Z">
+<meta property="article:author" content="陌忆">
+<meta property="article:tag" content="Agent">
+<meta property="article:tag" content="LLM">
+<meta property="article:tag" content="Coding Agent">
+<meta property="article:tag" content="Goal">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:image" content="https://moyi-math.github.io/images/background.webp">
+
+
+<link rel="canonical" href="https://moyi-math.github.io/2026/07/27/Coding-Agent-4-Goal%E7%B3%BB%E7%BB%9F%E4%B8%8E%E8%B7%A8%E4%BC%9A%E8%AF%9D%E6%8C%81%E4%B9%85%E5%8C%96/">
+
+
+<script class="next-config" data-name="page" type="application/json">{"sidebar":"","isHome":false,"isPost":true,"lang":"zh-CN","comments":true,"permalink":"https://moyi-math.github.io/2026/07/27/Coding-Agent-4-Goal%E7%B3%BB%E7%BB%9F%E4%B8%8E%E8%B7%A8%E4%BC%9A%E8%AF%9D%E6%8C%81%E4%B9%85%E5%8C%96/","path":"2026/07/27/Coding-Agent-4-Goal系统与跨会话持久化/","title":"入门 Coding Agent（四）：当 Agent 醒来时——Goal 系统与跨会话持久化"}</script>
+
+<script class="next-config" data-name="calendar" type="application/json">""</script>
+<title>入门 Coding Agent（四）：当 Agent 醒来时——Goal 系统与跨会话持久化 | 陌忆的博客</title>
+  
+
+
+
+
+
+
+
+
+  
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/animejs/3.2.1/anime.min.js" integrity="sha256-XL2inqUJaslATFnHdJOi9GfQ60on8Wx1C2H8DYiN1xY=" crossorigin="anonymous" defer></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/lozad.js/1.16.0/lozad.min.js" integrity="sha256-mOFREFhqmHeQbXpK2lp4nA3qooVgACfh88fpJftLBbc=" crossorigin="anonymous" defer></script>
+<script src="/js/utils.js" defer></script><script src="/js/sidebar.js" defer></script><script src="/js/next-boot.js" defer></script>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/hexo-generator-searchdb/1.5.0/search.js" integrity="sha256-xFC6PJ82SL9b3WkGjFavNiA9gm5z6UBxWPiu4CYjptg=" crossorigin="anonymous" defer></script>
+<script src="/js/third-party/search/local-search.js" defer></script>
+
+
+
+
+
+
+
+  
+
+
+
+
+  
+
+  <script class="next-config" data-name="enableMath" type="application/json">false</script><link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/katex.min.css" integrity="sha256-UF1fgpAiu3tPJN/uCqEUHNe7pnr+QR0SQDNfgglgtcM=" crossorigin="anonymous">
+
+
+<link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
+
+
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"WebSite","name":"陌忆的博客","url":"https://moyi-math.github.io","description":"记录 RAG、Agent、MCP、算法与软件工程实践，按专栏整理可复用的技术笔记。","inLanguage":"zh-CN","author":{"@type":"Person","name":"陌忆"}}</script>
+
+
+
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"Article","headline":"入门 Coding Agent（四）：当 Agent 醒来时——Goal 系统与跨会话持久化","description":"解释 Goal 系统如何保存未完成任务、跨越对话生命周期，并让 Coding Agent 恢复长期工作。","datePublished":"2026-07-27T14:00:00.000Z","dateModified":"2026-08-20T14:47:37.218Z","inLanguage":"zh-CN","mainEntityOfPage":{"@type":"WebPage","@id":"https://moyi-math.github.io/2026/07/27/Coding-Agent-4-Goal%E7%B3%BB%E7%BB%9F%E4%B8%8E%E8%B7%A8%E4%BC%9A%E8%AF%9D%E6%8C%81%E4%B9%85%E5%8C%96/index.html"},"author":{"@type":"Person","name":"陌忆"}}</script>
+<meta name="author" content="陌忆">
+
+
+  <noscript>
+    <link rel="stylesheet" href="/css/noscript.css">
+  </noscript>
+<!-- hexo injector head_end start --><link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/katex.min.css" integrity="sha512-fHwaWebuwA7NSF5Qg/af4UeDx9XqUpYpOGgubo3yWu+b2IQR4UeQwbb42Ti7gVAjNtVoI/I9TEoYeu9omwcC6g==" crossorigin="anonymous" referrerpolicy="no-referrer" /><!-- hexo injector head_end end --><link rel="alternate" href="/atom.xml" title="陌忆的博客" type="application/atom+xml">
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage">
+  <div class="headband"></div>
+
+  <main class="main">
+    <div class="column">
+      <header class="header" itemscope itemtype="http://schema.org/WPHeader"><div class="site-brand-container">
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="切换导航栏" role="button">
+        <span class="toggle-line"></span>
+        <span class="toggle-line"></span>
+        <span class="toggle-line"></span>
+    </div>
+  </div>
+
+  <div class="site-meta">
+
+    <a href="/" class="brand" rel="start">
+      <i class="logo-line"></i>
+      <p class="site-title">陌忆的博客</p>
+      <i class="logo-line"></i>
+    </a>
+      <p class="site-subtitle" itemprop="description">数据库无法得出结论</p>
+  </div>
+
+  <div class="site-nav-right">
+    <div class="toggle popup-trigger" aria-label="搜索" role="button">
+        <i class="fa fa-search fa-fw fa-lg"></i>
+    </div>
+  </div>
+</div>
+
+
+
+<nav class="site-nav">
+  <ul class="main-menu menu"><li class="menu-item menu-item-home"><a href="/" rel="section"><i class="fa fa-home fa-fw"></i>首页</a></li><li class="menu-item menu-item-about"><a href="/about/" rel="section"><i class="fa fa-user fa-fw"></i>关于</a></li><li class="menu-item menu-item-tags"><a href="/tags/" rel="section"><i class="fa fa-tags fa-fw"></i>标签</a></li><li class="menu-item menu-item-categories"><a href="/categories/" rel="section"><i class="fa fa-th fa-fw"></i>分类</a></li><li class="menu-item menu-item-archives"><a href="/archives/" rel="section"><i class="fa fa-archive fa-fw"></i>归档</a></li>
+      <li class="menu-item menu-item-search">
+        <a role="button" class="popup-trigger"><i class="fa fa-search fa-fw"></i>搜索
+        </a>
+      </li>
+  </ul>
+</nav>
+
+
+
+  <div class="search-pop-overlay">
+    <div class="popup search-popup">
+      <div class="search-header">
+        <span class="search-icon">
+          <i class="fa fa-search"></i>
+        </span>
+        <div class="search-input-container">
+          <input autocomplete="off" autocapitalize="off" maxlength="80"
+                placeholder="搜索..." spellcheck="false"
+                type="search" class="search-input">
+        </div>
+        <span class="popup-btn-close" role="button">
+          <i class="fa fa-times-circle"></i>
+        </span>
+      </div>
+      <div class="search-result-container">
+        <div class="search-result-icon">
+          <i class="fa fa-spinner fa-pulse fa-5x"></i>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</header>
+        
+  
+  <aside class="sidebar">
+
+    <div class="sidebar-inner sidebar-nav-active sidebar-toc-active">
+      <ul class="sidebar-nav">
+        <li class="sidebar-nav-toc">
+          文章目录
+        </li>
+        <li class="sidebar-nav-overview">
+          站点概览
+        </li>
+      </ul>
+
+      <div class="sidebar-panel-container">
+        <!--noindex-->
+        <div class="post-toc-wrap sidebar-panel">
+            <div class="post-toc animated"><ol class="nav"><li class="nav-item nav-level-2"><a class="nav-link" href="#%E4%B8%80%E3%80%81%E5%89%8D%E6%83%85%E5%9B%9E%E9%A1%BE%EF%BC%9A%E4%B8%80%E4%B8%AA%E5%BE%AA%E7%8E%AF%E9%87%8C%E7%9A%84-Agent"><span class="nav-text">一、前情回顾：一个循环里的 Agent</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E4%BA%8C%E3%80%81%E8%A2%AB%E9%81%97%E5%BF%98%E7%9A%84%E9%97%AE%E9%A2%98%EF%BC%9A%E5%AF%B9%E8%AF%9D%E4%BC%9A%E7%BB%93%E6%9D%9F"><span class="nav-text">二、被遗忘的问题：对话会结束</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E4%B8%89%E3%80%81Goal-%E7%B3%BB%E7%BB%9F%EF%BC%9AAgent-%E4%B8%8E-Runtime-%E7%9A%84%E5%A5%91%E7%BA%A6"><span class="nav-text">三、Goal 系统：Agent 与 Runtime 的契约</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%9B%9B%E3%80%81%E8%87%AA%E5%8A%A8%E7%BB%AD%E6%9C%9F%EF%BC%9ARuntime-%E5%A6%82%E4%BD%95%E2%80%9D%E5%8F%AB%E9%86%92%E2%80%9DAgent"><span class="nav-text">四、自动续期：Runtime 如何”叫醒”Agent</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E4%BA%94%E3%80%81%E4%B8%A4%E4%B8%AA%E7%BB%88%E6%80%81%EF%BC%9AComplete-%E4%B8%8E-Blocked"><span class="nav-text">五、两个终态：Complete 与 Blocked</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#Complete%EF%BC%88%E5%AE%8C%E6%88%90%EF%BC%89"><span class="nav-text">Complete（完成）</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#Blocked%EF%BC%88%E5%8F%97%E9%98%BB%EF%BC%89"><span class="nav-text">Blocked（受阻）</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%85%AD%E3%80%81Token-Budget%EF%BC%9A%E6%8C%81%E4%B9%85%E5%B7%A5%E4%BD%9C%E7%9A%84%E7%87%83%E6%96%99"><span class="nav-text">六、Token Budget：持久工作的燃料</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E4%B8%83%E3%80%81%E4%B8%8E%E5%89%8D%E4%B8%89%E7%AF%87%E7%9A%84%E5%85%B3%E7%B3%BB"><span class="nav-text">七、与前三篇的关系</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%85%AB%E3%80%81%E5%B0%8F%E7%BB%93"><span class="nav-text">八、小结</span></a></li></ol></div>
+        </div>
+        <!--/noindex-->
+
+        <div class="site-overview-wrap sidebar-panel">
+          <div class="site-author animated" itemprop="author" itemscope itemtype="http://schema.org/Person">
+    <img class="site-author-image" itemprop="image" alt="陌忆"
+      src="/images/avatar.webp">
+  <p class="site-author-name" itemprop="name">陌忆</p>
+  <div class="site-description" itemprop="description">记录 RAG、Agent、MCP、算法与软件工程实践，按专栏整理可复用的技术笔记。</div>
+</div>
+<div class="site-state-wrap animated">
+  <nav class="site-state">
+      <div class="site-state-item site-state-posts">
+        <a href="/archives/">
+          <span class="site-state-item-count">50</span>
+          <span class="site-state-item-name">日志</span>
+        </a>
+      </div>
+      <div class="site-state-item site-state-categories">
+          <a href="/categories/">
+        <span class="site-state-item-count">10</span>
+        <span class="site-state-item-name">分类</span></a>
+      </div>
+      <div class="site-state-item site-state-tags">
+          <a href="/tags/">
+        <span class="site-state-item-count">172</span>
+        <span class="site-state-item-name">标签</span></a>
+      </div>
+  </nav>
+</div>
+  <div class="links-of-author animated">
+      <span class="links-of-author-item">
+        <a href="https://github.com/moyi-math" title="GitHub → https:&#x2F;&#x2F;github.com&#x2F;moyi-math" rel="noopener me" target="_blank"><i class="fab fa-github fa-fw"></i>GitHub</a>
+      </span>
+  </div>
+  <div class="cc-license animated" itemprop="license">
+    <a href="https://creativecommons.org/licenses/by-nc-sa/4.0/" class="cc-opacity" rel="noopener" target="_blank"><img src="https://cdnjs.cloudflare.com/ajax/libs/creativecommons-vocabulary/2020.11.3/assets/license_badges/small/by_nc_sa.svg" alt="Creative Commons"></a>
+  </div>
+
+        </div>
+      </div>
+    </div>
+
+    
+  </aside>
+
+
+    </div>
+
+    <div class="main-inner post posts-expand">
+
+
+  
+
+
+<div class="post-block">
+  
+  
+
+  <article itemscope itemtype="http://schema.org/Article" class="post-content" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="https://moyi-math.github.io/2026/07/27/Coding-Agent-4-Goal%E7%B3%BB%E7%BB%9F%E4%B8%8E%E8%B7%A8%E4%BC%9A%E8%AF%9D%E6%8C%81%E4%B9%85%E5%8C%96/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.webp">
+      <meta itemprop="name" content="陌忆">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="陌忆的博客">
+      <meta itemprop="description" content="记录 RAG、Agent、MCP、算法与软件工程实践，按专栏整理可复用的技术笔记。">
+    </span>
+
+    <span hidden itemprop="post" itemscope itemtype="http://schema.org/CreativeWork">
+      <meta itemprop="name" content="入门 Coding Agent（四）：当 Agent 醒来时——Goal 系统与跨会话持久化 | 陌忆的博客">
+      <meta itemprop="description" content="解释 Goal 系统如何保存未完成任务、跨越对话生命周期，并让 Coding Agent 恢复长期工作。">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          入门 Coding Agent（四）：当 Agent 醒来时——Goal 系统与跨会话持久化
+        </h1>
+
+        <div class="post-meta-container">
+          <div class="post-meta">
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-calendar"></i>
+      </span>
+      <span class="post-meta-item-text">发表于</span>
+
+      <time title="创建时间：2026-07-27 22:00:00" itemprop="dateCreated datePublished" datetime="2026-07-27T22:00:00+08:00">2026-07-27</time>
+    </span>
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-calendar-check"></i>
+      </span>
+      <span class="post-meta-item-text">更新于</span>
+      <time title="修改时间：2026-08-20 22:47:37" itemprop="dateModified" datetime="2026-08-20T22:47:37+08:00">2026-08-20</time>
+    </span>
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-folder"></i>
+      </span>
+      <span class="post-meta-item-text">分类于</span>
+        <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+          <a href="/categories/Coding-Agent-%E5%8E%9F%E7%90%86/" itemprop="url" rel="index"><span itemprop="name">Coding Agent 原理</span></a>
+        </span>
+    </span>
+
+  
+    <span class="post-meta-break"></span>
+    <span class="post-meta-item" title="本文字数">
+      <span class="post-meta-item-icon">
+        <i class="far fa-file-word"></i>
+      </span>
+      <span class="post-meta-item-text">本文字数：</span>
+      <span>1.6k</span>
+    </span>
+    <span class="post-meta-item" title="阅读时长">
+      <span class="post-meta-item-icon">
+        <i class="far fa-clock"></i>
+      </span>
+      <span class="post-meta-item-text">阅读时长 &asymp;</span>
+      <span>6 分钟</span>
+    </span>
+</div>
+
+            <div class="post-description">解释 Goal 系统如何保存未完成任务、跨越对话生命周期，并让 Coding Agent 恢复长期工作。</div>
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody"><blockquote>
+<p>本篇不再基于 mini-swe-agent，而是以 Codex（桌面版 Coding Agent）的 Goal 系统为蓝本讲解。所有机制均来自对实际运行时的逆向观察和工具接口的交互验证。</p>
+</blockquote>
+<h2 id="一、前情回顾：一个循环里的-Agent"><a href="#一、前情回顾：一个循环里的-Agent" class="headerlink" title="一、前情回顾：一个循环里的 Agent"></a>一、前情回顾：一个循环里的 Agent</h2><p>前三篇我们构建了一个完整的 Agent 心智模型：</p>
+<ol>
+<li><strong>核心循环</strong>：Agent &#x3D; 推理 → 执行 → 观察 → 循环</li>
+<li><strong>三体架构</strong>：Agent（决策者）→ Model（翻译官）→ Environment（执行者）</li>
+<li><strong>保险丝设计</strong>：步数上限、金额上限、时间上限等硬边界</li>
+</ol>
+<p>但这个模型有一个隐含假设：<strong>Agent 的生命周期等于一次对话的生命周期</strong>。你发起一个任务，它在循环里跑，跑完结束，对话关闭。</p>
+<p>如果任务在一步之内就能完成，这个模型没问题。但如果任务是”重构一个大型模块”或者”实现一个完整的博客系统”呢？</p>
+<h2 id="二、被遗忘的问题：对话会结束"><a href="#二、被遗忘的问题：对话会结束" class="headerlink" title="二、被遗忘的问题：对话会结束"></a>二、被遗忘的问题：对话会结束</h2><p>现实中，Coding Agent 的每次对话都有天然的限制：</p>
+<ul>
+<li><strong>Token 预算</strong>：每次对话有成本上限，用完了得停</li>
+<li><strong>上下文窗口</strong>：当历史越来越长，最终会撑满模型的最大上下文</li>
+<li><strong>自动压缩</strong>：系统会把历史压缩成摘要来节省空间，但压缩会丢失细节</li>
+</ul>
+<p>当这些限制被触发时，对话结束。下一轮你重新打开 Agent，它面对的是一个空白状态。</p>
+<p>这里出现了一个基本矛盾：</p>
+<p><strong>Agent 的工作可以跨多轮对话，但 Agent 的”记忆”只在单轮对话内有效。</strong></p>
+<p>需要有一种机制，让 Agent 能”记住”它在一个长任务中做到哪了，并在下一轮自动续上。</p>
+<h2 id="三、Goal-系统：Agent-与-Runtime-的契约"><a href="#三、Goal-系统：Agent-与-Runtime-的契约" class="headerlink" title="三、Goal 系统：Agent 与 Runtime 的契约"></a>三、Goal 系统：Agent 与 Runtime 的契约</h2><p>Goal 系统就是解决这个问题的方案。它不是 Agent 内部的循环机制，而是 <strong>Agent 和运行时（Runtime）之间的一份持久化契约</strong>。</p>
+<p>接口很简单，只有三个工具：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">create_goal(objective, token_budget)  → 创建一个目标</span><br><span class="line">get_goal()                            → 查询当前目标状态</span><br><span class="line">update_goal(status)                   → 更新目标状态（complete / blocked）</span><br></pre></td></tr></table></figure>
+
+<p>当一个 Agent 开始一个长任务时，它调用 <code>create_goal</code>。Runtime 把目标信息写入 SQLite 数据库：</p>
+<figure class="highlight sql"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">Table</span>: thread_goals</span><br><span class="line">  thread_id       <span class="comment">-- 会话 ID</span></span><br><span class="line">  goal_id         <span class="comment">-- 目标唯一标识</span></span><br><span class="line">  objective       <span class="comment">-- &quot;我们要完成什么&quot;</span></span><br><span class="line">  status          <span class="comment">-- 当前状态</span></span><br><span class="line">  token_budget    <span class="comment">-- 预算</span></span><br><span class="line">  tokens_used     <span class="comment">-- 已消耗</span></span><br><span class="line">  time_used_seconds</span><br><span class="line">  created_at_ms</span><br><span class="line">  updated_at_ms</span><br></pre></td></tr></table></figure>
+
+<p>这份数据独立于任何单次对话存在。Agent 可以走，对话可以关，但 Goal 留在数据库里。</p>
+<h2 id="四、自动续期：Runtime-如何”叫醒”Agent"><a href="#四、自动续期：Runtime-如何”叫醒”Agent" class="headerlink" title="四、自动续期：Runtime 如何”叫醒”Agent"></a>四、自动续期：Runtime 如何”叫醒”Agent</h2><p>这是 Goal 系统最核心的机制。当 Agent 在对话中消耗 token 并最终结束时，Runtime 的行为取决于 Goal 的状态：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br></pre></td><td class="code"><pre><span class="line">             本轮对话结束</span><br><span class="line">                 │</span><br><span class="line">                 ▼</span><br><span class="line">    ┌────────────────────────────┐</span><br><span class="line">    │  检查 goals_1.sqlite 数据库  │</span><br><span class="line">    │  当前 thread 有无 active goal? │</span><br><span class="line">    └────────────────────────────┘</span><br><span class="line">                 │</span><br><span class="line">       ┌─────────┴─────────┐</span><br><span class="line">       ▼                   ▼</span><br><span class="line">    有 active goal        没有 goal / 已 complete</span><br><span class="line">       │                   │</span><br><span class="line">       ▼                   ▼</span><br><span class="line">自动开启新一轮对话       对话正常结束</span><br><span class="line">注入 goal 信息                │</span><br><span class="line">到 Agent 上下文            不再续期</span><br><span class="line">       │</span><br><span class="line">       ▼</span><br><span class="line">Agent 醒来：</span><br><span class="line">&quot;哦，上次的架构重构</span><br><span class="line">还没做完，继续&quot;</span><br></pre></td></tr></table></figure>
+
+<p>所以 Goal 系统的本质是告诉 Runtime：**”这个 thread 还有事没干完，别杀它。”**</p>
+<h2 id="五、两个终态：Complete-与-Blocked"><a href="#五、两个终态：Complete-与-Blocked" class="headerlink" title="五、两个终态：Complete 与 Blocked"></a>五、两个终态：Complete 与 Blocked</h2><p><code>update_goal</code> 只接收两个状态值：</p>
+<h3 id="Complete（完成）"><a href="#Complete（完成）" class="headerlink" title="Complete（完成）"></a>Complete（完成）</h3><p>Agent 根据 <code>objective</code> 判断任务是否达成。比如目标是”重构模块 X 并确保测试全部通过”，Agent 改完代码、跑完测试、全部绿了，它就调用 <code>update_goal(complete)</code>。</p>
+<p><strong>这里没有外部验证机制</strong>——Agent 用自己的判断来决定是否完成。如果它误判了（测试写漏了、边界没覆盖），那 goal 已经结束，不会自动续期。你需要手动重新开一个 goal，或者直接告诉 Agent 继续改。</p>
+<p>这个设计是故意的：如果 complete 加了自动验证，Agent 和验证者可能是同一个模型，判断逻辑打架会导致死循环。</p>
+<h3 id="Blocked（受阻）"><a href="#Blocked（受阻）" class="headerlink" title="Blocked（受阻）"></a>Blocked（受阻）</h3><p>当 Agent 在任务中遇到无法自行解决的障碍（需要你提供 API key、某个依赖不兼容、需要决策方向），它会调用 <code>update_goal(blocked)</code>。</p>
+<p>Blocked 的效果是：<strong>Runtime 停止自动续期，等待你介入。</strong> 你解决了问题后，告诉 Agent”继续”，Agent 重新开始工作。</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br></pre></td><td class="code"><pre><span class="line">Agent 卡住</span><br><span class="line">    │</span><br><span class="line">    ▼</span><br><span class="line">update_goal(blocked)</span><br><span class="line">    │</span><br><span class="line">    ▼</span><br><span class="line">Runtime 暂停自动续期</span><br><span class="line">    │</span><br><span class="line">    ▼</span><br><span class="line">你：装好依赖 / 开通 API / 做决策</span><br><span class="line">    │</span><br><span class="line">    ▼</span><br><span class="line">你告诉 Agent：&quot;继续&quot;</span><br><span class="line">    │</span><br><span class="line">    ▼</span><br><span class="line">Agent 继续工作</span><br></pre></td></tr></table></figure>
+
+<p>注意这个不对称设计：</p>
+<table>
+<thead>
+<tr>
+<th>状态</th>
+<th>Runtime 行为</th>
+<th>控制权</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>complete</td>
+<td>结束，不续期</td>
+<td>交给 Agent 判断</td>
+</tr>
+<tr>
+<td>blocked</td>
+<td>暂停续期，等用户</td>
+<td>交给你</td>
+</tr>
+</tbody></table>
+<p>Blocked 会暂停循环，因为控制权需要转到你手里。Complete 不做二次验证，因为验证者和执行者是同一个模型，循环验证会产生死循环风险。</p>
+<h2 id="六、Token-Budget：持久工作的燃料"><a href="#六、Token-Budget：持久工作的燃料" class="headerlink" title="六、Token Budget：持久工作的燃料"></a>六、Token Budget：持久工作的燃料</h2><p><code>token_budget</code> 不仅是成本控制，更是”跨轮次工作”的保障。</p>
+<p>没有 Goal 系统时：Agent 只有”这一轮对话”的生命周期。</p>
+<p>有 Goal 系统时：Agent 可以创建一个 <code>token_budget=150000</code> 的目标，本轮花了 60000，Runtime 看到还没用完，自动续下一轮继续花。下一轮 Agent 醒来，<code>get_goal()</code> 返回 <code>tokens_used=60000, token_budget=150000</code>，知道还剩 90000 的预算。</p>
+<p>这就是”持续不断工作”的燃料保障。</p>
+<h2 id="七、与前三篇的关系"><a href="#七、与前三篇的关系" class="headerlink" title="七、与前三篇的关系"></a>七、与前三篇的关系</h2><p>把 Goal 系统放回前三篇的框架中理解：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br></pre></td><td class="code"><pre><span class="line">传统 Agent（单会话）:</span><br><span class="line">  推理 → 执行 → 观察 → 推理 → ... → 提交完成 → 结束</span><br><span class="line"></span><br><span class="line">带 Goal 的 Agent（跨会话）:</span><br><span class="line">  第一轮: 推理 → 执行 → 观察 → [token 耗尽] → 本轮结束</span><br><span class="line">               ↓</span><br><span class="line">  Runtime 检测到 active goal，自动开启第二轮</span><br><span class="line">               ↓</span><br><span class="line">  第二轮: [注入 goal 信息] → 推理 → 执行 → ... → complete / blocked</span><br><span class="line">               ↓</span><br><span class="line">  如果是 blocked: 暂停，等你介入</span><br><span class="line">  如果是 complete: 结束</span><br></pre></td></tr></table></figure>
+
+<p>Goal 系统补充了前三篇文章中的空白——它不是替代核心循环，而是让循环具备了<strong>跨 session 的连续性</strong>。</p>
+<h2 id="八、小结"><a href="#八、小结" class="headerlink" title="八、小结"></a>八、小结</h2><figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br></pre></td><td class="code"><pre><span class="line">核心循环 (第一篇):  推理 → 执行 → 观察（一次对话内）</span><br><span class="line">三体架构 (第二篇):   Agent / Model / Environment 分工</span><br><span class="line">保险丝设计 (第三篇):   step_limit / cost_limit / time_limit</span><br><span class="line">Goal 系统 (第四篇):   跨会话持久化 + 自动续期</span><br><span class="line">                          │</span><br><span class="line">                    ┌─────┴─────┐</span><br><span class="line">                    ▼           ▼</span><br><span class="line">               complete      blocked</span><br><span class="line">               (结束)        (暂停等你)</span><br></pre></td></tr></table></figure>
+
+<p>Goal 系统的核心哲学是：<strong>Agent 做判断，Runtime 做保障。</strong> Agent 决定目标是否完成、是否受阻；Runtime 根据目标状态决定是否续期、是否暂停。</p>
+<p>四篇下来，我们已经构建了一个完整的 Coding Agent 心智模型：从单次对话内的循环，到跨会话的持久化；从决策逻辑，到安全边界。这些加在一起，就是一个生产级 Coding Agent 的完整蓝图。</p>
+
+    </div>
+
+    
+    
+    
+
+    <footer class="post-footer">
+          
+
+<div class="post-copyright">
+<ul>
+  <li class="post-copyright-author">
+      <strong>本文作者： </strong>陌忆
+  </li>
+  <li class="post-copyright-link">
+      <strong>本文链接：</strong>
+      <a href="https://moyi-math.github.io/2026/07/27/Coding-Agent-4-Goal%E7%B3%BB%E7%BB%9F%E4%B8%8E%E8%B7%A8%E4%BC%9A%E8%AF%9D%E6%8C%81%E4%B9%85%E5%8C%96/" title="入门 Coding Agent（四）：当 Agent 醒来时——Goal 系统与跨会话持久化">https://moyi-math.github.io/2026/07/27/Coding-Agent-4-Goal系统与跨会话持久化/</a>
+  </li>
+  <li class="post-copyright-license">
+      <strong>版权声明： </strong>本博客所有文章除特别声明外，均采用 <a href="https://creativecommons.org/licenses/by-nc-sa/4.0/" rel="noopener" target="_blank"><i class="fab fa-fw fa-creative-commons"></i>BY-NC-SA</a> 许可协议。转载请注明出处！
+  </li>
+</ul>
+</div>
+
+          <div class="post-tags">
+              <a href="/tags/Agent/" rel="tag"># Agent</a>
+              <a href="/tags/LLM/" rel="tag"># LLM</a>
+              <a href="/tags/Coding-Agent/" rel="tag"># Coding Agent</a>
+              <a href="/tags/Goal/" rel="tag"># Goal</a>
+          </div>
+
+        
+
+          <div class="post-nav">
+            <div class="post-nav-item">
+                <a href="/2026/07/26/Hello%E7%AE%97%E6%B3%95-4.1-%E6%95%B0%E7%BB%84%EF%BC%9A%E8%BF%9E%E7%BB%AD%E5%86%85%E5%AD%98%E7%9A%84%E5%A8%81%E5%8A%9B/" rel="prev" title="Hello算法 学习笔记 · 4.1 数组：连续内存的威力">
+                  <i class="fa fa-angle-left"></i> Hello算法 学习笔记 · 4.1 数组：连续内存的威力
+                </a>
+            </div>
+            <div class="post-nav-item">
+                <a href="/2026/07/27/Hello%E7%AE%97%E6%B3%95-5.2-%E9%98%9F%E5%88%97%E4%B8%8E%E5%8F%8C%E7%AB%AF%E9%98%9F%E5%88%97%EF%BC%9A%E5%85%88%E8%BF%9B%E5%85%88%E5%87%BA%E4%B8%8E%E4%B8%A4%E7%AB%AF%E7%9A%84%E7%81%B5%E6%B4%BB/" rel="next" title="Hello算法 学习笔记 · 5.2 队列与双端队列：先进先出与两端的灵活">
+                  Hello算法 学习笔记 · 5.2 队列与双端队列：先进先出与两端的灵活 <i class="fa fa-angle-right"></i>
+                </a>
+            </div>
+          </div>
+    </footer>
+  </article>
+</div>
+
+
+
+
+
+
+</div>
+  </main>
+
+  <footer class="footer">
+    <div class="footer-inner">
+
+  <div class="copyright">
+    &copy; 
+    <span itemprop="copyrightYear">2026</span>
+    <span class="with-love">
+      <i class="fab fa-osi"></i>
+    </span>
+    <span class="author" itemprop="copyrightHolder">陌忆</span>
+  </div>
+<div class="wordcount">
+  <span class="post-meta-item">
+    <span class="post-meta-item-icon">
+      <i class="fa fa-chart-line"></i>
+    </span>
+    <span title="站点总字数">106k</span>
+  </span>
+  <span class="post-meta-item">
+    <span class="post-meta-item-icon">
+      <i class="fa fa-coffee"></i>
+    </span>
+    <span title="站点阅读时长">6:24</span>
+  </span>
+</div>
+  <div class="powered-by">由 <a href="https://hexo.io/" rel="noopener" target="_blank">Hexo</a> & <a href="https://theme-next.js.org/" rel="noopener" target="_blank">NexT.Gemini</a> 强力驱动
+  </div>
+
+    </div>
+  </footer>
+
+  
+  <div class="toggle sidebar-toggle" role="button">
+    <span class="toggle-line"></span>
+    <span class="toggle-line"></span>
+    <span class="toggle-line"></span>
+  </div>
+  <div class="sidebar-dimmer"></div>
+  <div class="back-to-top" role="button" aria-label="返回顶部">
+    <i class="fa fa-arrow-up fa-lg"></i>
+    <span>0%</span>
+  </div>
+
+<noscript>
+  <div class="noscript-warning">Theme NexT works best with JavaScript enabled</div>
+</noscript>
+<!-- Site running time -->
+<span id="timeDate" aria-live="off"></span>
+<script>
+(function() {
+  var start = new Date("2022-11-17T08:00:00+08:00");
+  function pad(n) { return n < 10 ? "0" + n : "" + n; }
+  function tick() {
+    var diff = Date.now() - start.getTime();
+    if (diff < 0) return;
+    var d = Math.floor(diff / 86400000);
+    var h = Math.floor((diff % 86400000) / 3600000);
+    var m = Math.floor((diff % 3600000) / 60000);
+    var timeDate = document.getElementById("timeDate");
+    if (!timeDate) return;
+    timeDate.textContent =
+      "\u672C\u7AD9\u5DF2\u5B89\u5168\u8FD0\u884C " + d + " \u5929 " + pad(h) + " \u5C0F\u65F6 " + pad(m) + " \u5206";
+  }
+  tick();
+  setInterval(tick, 60000);
+})();
+</script>
+
+</body>
+</html>

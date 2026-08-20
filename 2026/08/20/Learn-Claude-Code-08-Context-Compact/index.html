@@ -1,0 +1,574 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width">
+<meta name="theme-color" content="#222" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#222" media="(prefers-color-scheme: dark)"><meta name="generator" content="Hexo 7.3.0">
+<link rel="preconnect" href="https://cdnjs.cloudflare.com" crossorigin>
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon-next.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32-next.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next.png">
+  <link rel="mask-icon" href="/images/logo.svg" color="#222">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/7.0.0/css/all.min.css" integrity="sha256-VHqXKFhhMxcpubYf9xiWdCiojEbY9NexQ4jh8AxbvcM=" crossorigin="anonymous">
+
+<script class="next-config" data-name="main" type="application/json">{"hostname":"moyi-math.github.io","root":"/","images":"/images","scheme":"Gemini","darkmode":true,"version":"8.28.0","exturl":false,"sidebar":{"position":"left","width_expanded":320,"width_dual_column":240,"display":"post","padding":18,"offset":12},"hljswrap":true,"codeblock":{"theme":{"light":"default","dark":"stackoverflow-dark"},"prism":{"light":"prism","dark":"prism-dark"},"copy_button":{"enable":true,"style":null},"fold":{"enable":false,"height":500},"language":false},"bookmark":{"enable":false,"color":"#222","save":"auto"},"mediumzoom":false,"lazyload":true,"pangu":false,"comments":{"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},"stickytabs":false,"motion":{"enable":false,"async":false,"duration":200,"transition":{"menu_item":"fadeInDown","post_block":"fadeIn","post_header":"fadeInDown","post_body":"fadeInDown","coll_header":"fadeInLeft","sidebar":"fadeInUp"}},"prism":false,"i18n":{"placeholder":"搜索...","empty":"没有找到任何搜索结果：${query}","hits_time":"找到 ${hits} 个搜索结果（用时 ${time} 毫秒）","hits":"找到 ${hits} 个搜索结果"},"path":"/search.json","localsearch":{"enable":true,"top_n_per_article":1,"unescape":false,"preload":false}}</script><script src="/js/config.js" defer></script>
+
+    <meta name="description" content="从上下文窗口耗尽出发，拆解工具结果预算、历史裁剪、微压缩、语义摘要与应急恢复组成的分层压缩管线。">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Learn Claude Code 08：Context Compact——给长期运行的 Agent 腾出空间">
+<meta property="og:url" content="https://moyi-math.github.io/2026/08/20/Learn-Claude-Code-08-Context-Compact/index.html">
+<meta property="og:site_name" content="陌忆的博客">
+<meta property="og:description" content="从上下文窗口耗尽出发，拆解工具结果预算、历史裁剪、微压缩、语义摘要与应急恢复组成的分层压缩管线。">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:image" content="https://moyi-math.github.io/images/background.webp">
+<meta property="article:published_time" content="2026-08-20T03:10:00.000Z">
+<meta property="article:modified_time" content="2026-08-20T14:47:37.219Z">
+<meta property="article:author" content="陌忆">
+<meta property="article:tag" content="Agent">
+<meta property="article:tag" content="Claude Code">
+<meta property="article:tag" content="Context Compact">
+<meta property="article:tag" content="Context Window">
+<meta property="article:tag" content="Token Budget">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:image" content="https://moyi-math.github.io/images/background.webp">
+
+
+<link rel="canonical" href="https://moyi-math.github.io/2026/08/20/Learn-Claude-Code-08-Context-Compact/">
+
+
+<script class="next-config" data-name="page" type="application/json">{"sidebar":"","isHome":false,"isPost":true,"lang":"zh-CN","comments":true,"permalink":"https://moyi-math.github.io/2026/08/20/Learn-Claude-Code-08-Context-Compact/","path":"2026/08/20/Learn-Claude-Code-08-Context-Compact/","title":"Learn Claude Code 08：Context Compact——给长期运行的 Agent 腾出空间"}</script>
+
+<script class="next-config" data-name="calendar" type="application/json">""</script>
+<title>Learn Claude Code 08：Context Compact——给长期运行的 Agent 腾出空间 | 陌忆的博客</title>
+  
+
+
+
+
+
+
+
+
+  
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/animejs/3.2.1/anime.min.js" integrity="sha256-XL2inqUJaslATFnHdJOi9GfQ60on8Wx1C2H8DYiN1xY=" crossorigin="anonymous" defer></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/lozad.js/1.16.0/lozad.min.js" integrity="sha256-mOFREFhqmHeQbXpK2lp4nA3qooVgACfh88fpJftLBbc=" crossorigin="anonymous" defer></script>
+<script src="/js/utils.js" defer></script><script src="/js/sidebar.js" defer></script><script src="/js/next-boot.js" defer></script>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/hexo-generator-searchdb/1.5.0/search.js" integrity="sha256-xFC6PJ82SL9b3WkGjFavNiA9gm5z6UBxWPiu4CYjptg=" crossorigin="anonymous" defer></script>
+<script src="/js/third-party/search/local-search.js" defer></script>
+
+
+
+
+
+
+
+  
+
+
+
+
+  
+
+  <script class="next-config" data-name="enableMath" type="application/json">false</script><link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/katex.min.css" integrity="sha256-UF1fgpAiu3tPJN/uCqEUHNe7pnr+QR0SQDNfgglgtcM=" crossorigin="anonymous">
+
+
+<link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
+
+
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"WebSite","name":"陌忆的博客","url":"https://moyi-math.github.io","description":"记录 RAG、Agent、MCP、算法与软件工程实践，按专栏整理可复用的技术笔记。","inLanguage":"zh-CN","author":{"@type":"Person","name":"陌忆"}}</script>
+
+
+
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"Article","headline":"Learn Claude Code 08：Context Compact——给长期运行的 Agent 腾出空间","description":"从上下文窗口耗尽出发，拆解工具结果预算、历史裁剪、微压缩、语义摘要与应急恢复组成的分层压缩管线。","datePublished":"2026-08-20T03:10:00.000Z","dateModified":"2026-08-20T14:47:37.219Z","inLanguage":"zh-CN","mainEntityOfPage":{"@type":"WebPage","@id":"https://moyi-math.github.io/2026/08/20/Learn-Claude-Code-08-Context-Compact/index.html"},"author":{"@type":"Person","name":"陌忆"}}</script>
+<meta name="author" content="陌忆">
+
+
+  <noscript>
+    <link rel="stylesheet" href="/css/noscript.css">
+  </noscript>
+<!-- hexo injector head_end start --><link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/katex.min.css" integrity="sha512-fHwaWebuwA7NSF5Qg/af4UeDx9XqUpYpOGgubo3yWu+b2IQR4UeQwbb42Ti7gVAjNtVoI/I9TEoYeu9omwcC6g==" crossorigin="anonymous" referrerpolicy="no-referrer" /><!-- hexo injector head_end end --><link rel="alternate" href="/atom.xml" title="陌忆的博客" type="application/atom+xml">
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage">
+  <div class="headband"></div>
+
+  <main class="main">
+    <div class="column">
+      <header class="header" itemscope itemtype="http://schema.org/WPHeader"><div class="site-brand-container">
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="切换导航栏" role="button">
+        <span class="toggle-line"></span>
+        <span class="toggle-line"></span>
+        <span class="toggle-line"></span>
+    </div>
+  </div>
+
+  <div class="site-meta">
+
+    <a href="/" class="brand" rel="start">
+      <i class="logo-line"></i>
+      <p class="site-title">陌忆的博客</p>
+      <i class="logo-line"></i>
+    </a>
+      <p class="site-subtitle" itemprop="description">数据库无法得出结论</p>
+  </div>
+
+  <div class="site-nav-right">
+    <div class="toggle popup-trigger" aria-label="搜索" role="button">
+        <i class="fa fa-search fa-fw fa-lg"></i>
+    </div>
+  </div>
+</div>
+
+
+
+<nav class="site-nav">
+  <ul class="main-menu menu"><li class="menu-item menu-item-home"><a href="/" rel="section"><i class="fa fa-home fa-fw"></i>首页</a></li><li class="menu-item menu-item-about"><a href="/about/" rel="section"><i class="fa fa-user fa-fw"></i>关于</a></li><li class="menu-item menu-item-tags"><a href="/tags/" rel="section"><i class="fa fa-tags fa-fw"></i>标签</a></li><li class="menu-item menu-item-categories"><a href="/categories/" rel="section"><i class="fa fa-th fa-fw"></i>分类</a></li><li class="menu-item menu-item-archives"><a href="/archives/" rel="section"><i class="fa fa-archive fa-fw"></i>归档</a></li>
+      <li class="menu-item menu-item-search">
+        <a role="button" class="popup-trigger"><i class="fa fa-search fa-fw"></i>搜索
+        </a>
+      </li>
+  </ul>
+</nav>
+
+
+
+  <div class="search-pop-overlay">
+    <div class="popup search-popup">
+      <div class="search-header">
+        <span class="search-icon">
+          <i class="fa fa-search"></i>
+        </span>
+        <div class="search-input-container">
+          <input autocomplete="off" autocapitalize="off" maxlength="80"
+                placeholder="搜索..." spellcheck="false"
+                type="search" class="search-input">
+        </div>
+        <span class="popup-btn-close" role="button">
+          <i class="fa fa-times-circle"></i>
+        </span>
+      </div>
+      <div class="search-result-container">
+        <div class="search-result-icon">
+          <i class="fa fa-spinner fa-pulse fa-5x"></i>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</header>
+        
+  
+  <aside class="sidebar">
+
+    <div class="sidebar-inner sidebar-nav-active sidebar-toc-active">
+      <ul class="sidebar-nav">
+        <li class="sidebar-nav-toc">
+          文章目录
+        </li>
+        <li class="sidebar-nav-overview">
+          站点概览
+        </li>
+      </ul>
+
+      <div class="sidebar-panel-container">
+        <!--noindex-->
+        <div class="post-toc-wrap sidebar-panel">
+            <div class="post-toc animated"><ol class="nav"><li class="nav-item nav-level-2"><a class="nav-link" href="#%E4%B8%80%E3%80%81%E4%B8%8A%E4%B8%8B%E6%96%87%E7%AA%97%E5%8F%A3%E4%B8%BA%E4%BB%80%E4%B9%88%E6%80%BB%E4%BC%9A%E8%A2%AB%E5%A1%AB%E6%BB%A1"><span class="nav-text">一、上下文窗口为什么总会被填满</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E4%BA%8C%E3%80%81%E5%8E%8B%E7%BC%A9%E7%9C%9F%E6%AD%A3%E4%BC%98%E5%8C%96%E7%9A%84%E4%B8%8D%E6%98%AF%E6%B6%88%E6%81%AF%E6%9D%A1%E6%95%B0"><span class="nav-text">二、压缩真正优化的不是消息条数</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E4%B8%89%E3%80%81%E5%88%86%E5%B1%82%E5%8E%9F%E5%88%99%EF%BC%9A%E4%BE%BF%E5%AE%9C%E3%80%81%E7%A1%AE%E5%AE%9A%E7%9A%84%E6%93%8D%E4%BD%9C%E5%85%88%E6%89%A7%E8%A1%8C"><span class="nav-text">三、分层原则：便宜、确定的操作先执行</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%9B%9B%E3%80%81L1%EF%BC%9A%E4%B8%BA%E5%BD%93%E5%89%8D%E8%BD%AE%E5%B7%A5%E5%85%B7%E7%BB%93%E6%9E%9C%E8%AE%BE%E7%BD%AE%E9%A2%84%E7%AE%97"><span class="nav-text">四、L1：为当前轮工具结果设置预算</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E4%BA%94%E3%80%81L2%EF%BC%9A%E8%A3%81%E5%89%AA%E5%8E%86%E5%8F%B2%E6%97%B6%E4%B8%8D%E8%83%BD%E7%A0%B4%E5%9D%8F%E6%B6%88%E6%81%AF%E5%8D%8F%E8%AE%AE"><span class="nav-text">五、L2：裁剪历史时不能破坏消息协议</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%85%AD%E3%80%81L3%EF%BC%9A%E7%94%A8%E5%8D%A0%E4%BD%8D%E7%AC%A6%E6%9B%BF%E6%8D%A2%E8%BF%87%E6%97%B6%E5%B7%A5%E5%85%B7%E7%BB%93%E6%9E%9C"><span class="nav-text">六、L3：用占位符替换过时工具结果</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E4%B8%83%E3%80%81L4%EF%BC%9A%E7%94%A8-LLM-%E6%8A%8A%E5%8E%86%E5%8F%B2%E5%8E%8B%E6%88%90%E5%8F%AF%E7%BB%A7%E7%BB%AD%E5%B7%A5%E4%BD%9C%E7%9A%84%E7%8A%B6%E6%80%81"><span class="nav-text">七、L4：用 LLM 把历史压成可继续工作的状态</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%85%AB%E3%80%81%E5%8E%8B%E7%BC%A9%E5%90%8E%E4%B8%8D%E8%83%BD%E5%8F%AA%E5%89%A9%E4%B8%80%E6%AE%B5%E5%AD%A4%E7%AB%8B%E6%91%98%E8%A6%81"><span class="nav-text">八、压缩后不能只剩一段孤立摘要</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E4%B9%9D%E3%80%81%E4%B8%BB%E5%8A%A8%E5%8E%8B%E7%BC%A9%E3%80%81%E8%87%AA%E5%8A%A8%E5%8E%8B%E7%BC%A9%E4%B8%8E%E5%93%8D%E5%BA%94%E5%BC%8F%E5%8E%8B%E7%BC%A9"><span class="nav-text">九、主动压缩、自动压缩与响应式压缩</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%8D%81%E3%80%81%E4%B8%BA%E4%BB%80%E4%B9%88%E5%A4%84%E7%90%86%E9%A1%BA%E5%BA%8F%E4%B8%8D%E8%83%BD%E9%9A%8F%E4%BE%BF%E6%8D%A2"><span class="nav-text">十、为什么处理顺序不能随便换</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%8D%81%E4%B8%80%E3%80%81%E5%8E%8B%E7%BC%A9%E7%9A%84%E8%B4%A8%E9%87%8F%E6%80%8E%E6%A0%B7%E9%AA%8C%E8%AF%81"><span class="nav-text">十一、压缩的质量怎样验证</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%8D%81%E4%BA%8C%E3%80%81%E5%8E%8B%E7%BC%A9%E4%B8%8D%E6%98%AF%E8%AE%B0%E5%BF%86"><span class="nav-text">十二、压缩不是记忆</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%8D%81%E4%B8%89%E3%80%81%E8%BF%99%E4%B8%80%E7%AF%87%E7%9C%9F%E6%AD%A3%E9%9C%80%E8%A6%81%E8%AE%B0%E4%BD%8F%E4%BB%80%E4%B9%88"><span class="nav-text">十三、这一篇真正需要记住什么</span></a></li></ol></div>
+        </div>
+        <!--/noindex-->
+
+        <div class="site-overview-wrap sidebar-panel">
+          <div class="site-author animated" itemprop="author" itemscope itemtype="http://schema.org/Person">
+    <img class="site-author-image" itemprop="image" alt="陌忆"
+      src="/images/avatar.webp">
+  <p class="site-author-name" itemprop="name">陌忆</p>
+  <div class="site-description" itemprop="description">记录 RAG、Agent、MCP、算法与软件工程实践，按专栏整理可复用的技术笔记。</div>
+</div>
+<div class="site-state-wrap animated">
+  <nav class="site-state">
+      <div class="site-state-item site-state-posts">
+        <a href="/archives/">
+          <span class="site-state-item-count">50</span>
+          <span class="site-state-item-name">日志</span>
+        </a>
+      </div>
+      <div class="site-state-item site-state-categories">
+          <a href="/categories/">
+        <span class="site-state-item-count">10</span>
+        <span class="site-state-item-name">分类</span></a>
+      </div>
+      <div class="site-state-item site-state-tags">
+          <a href="/tags/">
+        <span class="site-state-item-count">172</span>
+        <span class="site-state-item-name">标签</span></a>
+      </div>
+  </nav>
+</div>
+  <div class="links-of-author animated">
+      <span class="links-of-author-item">
+        <a href="https://github.com/moyi-math" title="GitHub → https:&#x2F;&#x2F;github.com&#x2F;moyi-math" rel="noopener me" target="_blank"><i class="fab fa-github fa-fw"></i>GitHub</a>
+      </span>
+  </div>
+  <div class="cc-license animated" itemprop="license">
+    <a href="https://creativecommons.org/licenses/by-nc-sa/4.0/" class="cc-opacity" rel="noopener" target="_blank"><img src="https://cdnjs.cloudflare.com/ajax/libs/creativecommons-vocabulary/2020.11.3/assets/license_badges/small/by_nc_sa.svg" alt="Creative Commons"></a>
+  </div>
+
+        </div>
+      </div>
+    </div>
+
+    
+  </aside>
+
+
+    </div>
+
+    <div class="main-inner post posts-expand">
+
+
+  
+
+
+<div class="post-block">
+  
+  
+
+  <article itemscope itemtype="http://schema.org/Article" class="post-content" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="https://moyi-math.github.io/2026/08/20/Learn-Claude-Code-08-Context-Compact/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.webp">
+      <meta itemprop="name" content="陌忆">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="陌忆的博客">
+      <meta itemprop="description" content="记录 RAG、Agent、MCP、算法与软件工程实践，按专栏整理可复用的技术笔记。">
+    </span>
+
+    <span hidden itemprop="post" itemscope itemtype="http://schema.org/CreativeWork">
+      <meta itemprop="name" content="Learn Claude Code 08：Context Compact——给长期运行的 Agent 腾出空间 | 陌忆的博客">
+      <meta itemprop="description" content="从上下文窗口耗尽出发，拆解工具结果预算、历史裁剪、微压缩、语义摘要与应急恢复组成的分层压缩管线。">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          Learn Claude Code 08：Context Compact——给长期运行的 Agent 腾出空间
+        </h1>
+
+        <div class="post-meta-container">
+          <div class="post-meta">
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-calendar"></i>
+      </span>
+      <span class="post-meta-item-text">发表于</span>
+      
+
+      <time title="创建时间：2026-08-20 11:10:00 / 修改时间：22:47:37" itemprop="dateCreated datePublished" datetime="2026-08-20T11:10:00+08:00">2026-08-20</time>
+    </span>
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-folder"></i>
+      </span>
+      <span class="post-meta-item-text">分类于</span>
+        <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+          <a href="/categories/Learn-Claude-Code/" itemprop="url" rel="index"><span itemprop="name">Learn Claude Code</span></a>
+        </span>
+    </span>
+
+  
+    <span class="post-meta-break"></span>
+    <span class="post-meta-item" title="本文字数">
+      <span class="post-meta-item-icon">
+        <i class="far fa-file-word"></i>
+      </span>
+      <span class="post-meta-item-text">本文字数：</span>
+      <span>3.1k</span>
+    </span>
+    <span class="post-meta-item" title="阅读时长">
+      <span class="post-meta-item-icon">
+        <i class="far fa-clock"></i>
+      </span>
+      <span class="post-meta-item-text">阅读时长 &asymp;</span>
+      <span>11 分钟</span>
+    </span>
+</div>
+
+            <div class="post-description">从上下文窗口耗尽出发，拆解工具结果预算、历史裁剪、微压缩、语义摘要与应急恢复组成的分层压缩管线。</div>
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody"><span id="more"></span>
+
+<blockquote>
+<p><strong>系列定位：</strong> Agent 已经能加载 Skill、调用工具、维护计划和委派子任务，但所有请求、响应与工具结果仍不断追加到 <code>messages</code>。上下文窗口有限，长期运行最终一定会撞上边界。本文设计一条从便宜到昂贵的压缩管线，在尽量少丢信息的前提下延长会话寿命。</p>
+</blockquote>
+<h2 id="一、上下文窗口为什么总会被填满"><a href="#一、上下文窗口为什么总会被填满" class="headerlink" title="一、上下文窗口为什么总会被填满"></a>一、上下文窗口为什么总会被填满</h2><p>Agent 的每轮循环都会增加消息：</p>
+<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line">user 请求</span><br><span class="line">assistant 分析 + tool_use</span><br><span class="line">user tool_result</span><br><span class="line">assistant 继续分析 + tool_use</span><br><span class="line">user tool_result</span><br><span class="line">...</span><br></pre></td></tr></table></figure>
+
+<p>文件内容、测试日志和搜索结果往往比自然语言回答大得多。读取一个千行文件可能消耗数千 Token，一条递归构建日志也可能占据数百 KB。随着工具调用累积，即使模型能力和剩余任务都没有问题，API 也可能因为输入超过窗口而拒绝请求。</p>
+<p>上下文管理因此不是“有空再优化”的性能功能，而是长任务能否继续执行的生存机制。</p>
+<h2 id="二、压缩真正优化的不是消息条数"><a href="#二、压缩真正优化的不是消息条数" class="headerlink" title="二、压缩真正优化的不是消息条数"></a>二、压缩真正优化的不是消息条数</h2><p>只限制 <code>messages</code> 数量并不可靠：50 条短消息可能很小，一条大工具结果却可能填满整个窗口。压缩系统至少要同时观察：</p>
+<ul>
+<li>输入 Token 估算；</li>
+<li>单条工具结果大小；</li>
+<li>当前轮所有工具结果总量；</li>
+<li>历史工具结果的年龄和可重建性；</li>
+<li>System Prompt、工具 Schema 与预留输出空间。</li>
+</ul>
+<p>可用输入预算不是模型标称窗口本身：</p>
+<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line">可用历史预算</span><br><span class="line">= 模型上下文窗口</span><br><span class="line">- System Prompt 与工具定义</span><br><span class="line">- 本轮最大输出 Token</span><br><span class="line">- 安全缓冲区</span><br></pre></td></tr></table></figure>
+
+<p>如果压缩阈值等到窗口 100% 才触发，模型连生成摘要的空间都没有。生产系统必须提前预留输出和恢复缓冲。</p>
+<h2 id="三、分层原则：便宜、确定的操作先执行"><a href="#三、分层原则：便宜、确定的操作先执行" class="headerlink" title="三、分层原则：便宜、确定的操作先执行"></a>三、分层原则：便宜、确定的操作先执行</h2><p>一次完整的 LLM 摘要能大幅缩小历史，却有额外延迟、费用和信息失真风险。更合理的策略是先运行不需要模型的确定性预处理器：</p>
+<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br></pre></td><td class="code"><pre><span class="line">原始 messages</span><br><span class="line">      ↓</span><br><span class="line">L1 工具结果预算：超大结果落盘，保留预览</span><br><span class="line">      ↓</span><br><span class="line">L2 历史裁剪：移除较老的中间消息</span><br><span class="line">      ↓</span><br><span class="line">L3 微压缩：旧工具结果替换为占位符</span><br><span class="line">      ↓</span><br><span class="line">仍超过 Token 阈值？</span><br><span class="line">      ↓ 是</span><br><span class="line">L4 语义压缩：LLM 生成结构化摘要</span><br><span class="line">      ↓</span><br><span class="line">新的活跃上下文</span><br></pre></td></tr></table></figure>
+
+<p>这里的层级按实际执行顺序描述。核心原则是：<strong>先处理体积异常，再清理确定冗余，最后才花一次模型调用理解和总结历史。</strong></p>
+<h2 id="四、L1：为当前轮工具结果设置预算"><a href="#四、L1：为当前轮工具结果设置预算" class="headerlink" title="四、L1：为当前轮工具结果设置预算"></a>四、L1：为当前轮工具结果设置预算</h2><p>单次响应可能同时读取多个大文件。如果先把旧结果替换成占位符，完整内容可能尚未来得及持久化就丢失。因此第一步应处理当前轮的大输出。</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">def</span> <span class="title function_">apply_tool_result_budget</span>(<span class="params"></span></span><br><span class="line"><span class="params">    message: <span class="built_in">dict</span>,</span></span><br><span class="line"><span class="params">    max_chars: <span class="built_in">int</span> = <span class="number">200_000</span>,</span></span><br><span class="line"><span class="params"></span>) -&gt; <span class="built_in">dict</span>:</span><br><span class="line">    blocks = [</span><br><span class="line">        block <span class="keyword">for</span> block <span class="keyword">in</span> message.get(<span class="string">&quot;content&quot;</span>, [])</span><br><span class="line">        <span class="keyword">if</span> block.get(<span class="string">&quot;type&quot;</span>) == <span class="string">&quot;tool_result&quot;</span></span><br><span class="line">    ]</span><br><span class="line">    total = <span class="built_in">sum</span>(<span class="built_in">len</span>(<span class="built_in">str</span>(block.get(<span class="string">&quot;content&quot;</span>, <span class="string">&quot;&quot;</span>))) <span class="keyword">for</span> block <span class="keyword">in</span> blocks)</span><br><span class="line"></span><br><span class="line">    <span class="keyword">if</span> total &lt;= max_chars:</span><br><span class="line">        <span class="keyword">return</span> message</span><br><span class="line"></span><br><span class="line">    largest_first = <span class="built_in">sorted</span>(</span><br><span class="line">        blocks,</span><br><span class="line">        key=<span class="keyword">lambda</span> block: <span class="built_in">len</span>(<span class="built_in">str</span>(block.get(<span class="string">&quot;content&quot;</span>, <span class="string">&quot;&quot;</span>))),</span><br><span class="line">        reverse=<span class="literal">True</span>,</span><br><span class="line">    )</span><br><span class="line"></span><br><span class="line">    <span class="keyword">for</span> block <span class="keyword">in</span> largest_first:</span><br><span class="line">        <span class="keyword">if</span> total &lt;= max_chars:</span><br><span class="line">            <span class="keyword">break</span></span><br><span class="line"></span><br><span class="line">        original = <span class="built_in">str</span>(block.get(<span class="string">&quot;content&quot;</span>, <span class="string">&quot;&quot;</span>))</span><br><span class="line">        reference = persist_output(block[<span class="string">&quot;tool_use_id&quot;</span>], original)</span><br><span class="line">        preview = original[:<span class="number">2_000</span>]</span><br><span class="line">        block[<span class="string">&quot;content&quot;</span>] = (</span><br><span class="line">            <span class="string">f&quot;&lt;persisted-output path=<span class="subst">&#123;reference!r&#125;</span>&gt;\n&quot;</span></span><br><span class="line">            <span class="string">f&quot;<span class="subst">&#123;preview&#125;</span>\n[preview truncated]&quot;</span></span><br><span class="line">        )</span><br><span class="line">        total -= <span class="built_in">max</span>(<span class="number">0</span>, <span class="built_in">len</span>(original) - <span class="built_in">len</span>(<span class="built_in">str</span>(block[<span class="string">&quot;content&quot;</span>])))</span><br><span class="line"></span><br><span class="line">    <span class="keyword">return</span> message</span><br></pre></td></tr></table></figure>
+
+<p>需要保留三类信息：</p>
+<ol>
+<li>完整结果保存在哪里；</li>
+<li>足以判断内容类型的短预览；</li>
+<li>清晰标记当前内容已被截断。</li>
+</ol>
+<p>落盘目录不能位于可公开发布或被 Git 默认提交的位置；文件名应由运行框架生成，避免使用不可信的工具输入。输出中可能包含源码、凭证和用户数据，因此还需要访问控制、生命周期清理和加密策略。</p>
+<h2 id="五、L2：裁剪历史时不能破坏消息协议"><a href="#五、L2：裁剪历史时不能破坏消息协议" class="headerlink" title="五、L2：裁剪历史时不能破坏消息协议"></a>五、L2：裁剪历史时不能破坏消息协议</h2><p>当消息数量持续增加，可以保留早期任务入口和最近工作区间，裁掉中间的旧探索：</p>
+<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">[最初目标与约束]</span><br><span class="line">[压缩边界：中间 63 条消息已移除]</span><br><span class="line">[最近几轮消息与当前状态]</span><br></pre></td></tr></table></figure>
+
+<p>但切口不能随意落在两个数组下标之间。工具调用是一组协议单元：</p>
+<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">assistant: tool_use(id=&quot;call_123&quot;)</span><br><span class="line">user:      tool_result(tool_use_id=&quot;call_123&quot;)</span><br></pre></td></tr></table></figure>
+
+<p>如果只保留后一条，会出现孤立的 <code>tool_result</code>；如果只保留前一条，则模型看到一个永远没有结果的调用。很多 API 会直接拒绝这种无效消息结构。</p>
+<p>因此，裁剪算法应以“消息组”而不是单条消息为单位，至少保证：</p>
+<ul>
+<li><code>tool_use</code> 与对应 <code>tool_result</code> 同时保留或同时移除；</li>
+<li>多工具调用的一组结果不能只留下部分；</li>
+<li>角色顺序仍满足 API 协议；</li>
+<li>切口处插入明确的压缩边界消息。</li>
+</ul>
+<h2 id="六、L3：用占位符替换过时工具结果"><a href="#六、L3：用占位符替换过时工具结果" class="headerlink" title="六、L3：用占位符替换过时工具结果"></a>六、L3：用占位符替换过时工具结果</h2><p>即使消息条数不多，旧 <code>tool_result</code> 仍可能占据大量空间。可保留最近若干结果全文，把更老的大结果替换为可恢复占位符：</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">def</span> <span class="title function_">compact_old_tool_results</span>(<span class="params"></span></span><br><span class="line"><span class="params">    messages: <span class="built_in">list</span>[<span class="built_in">dict</span>],</span></span><br><span class="line"><span class="params">    keep_recent: <span class="built_in">int</span> = <span class="number">3</span>,</span></span><br><span class="line"><span class="params"></span>) -&gt; <span class="built_in">list</span>[<span class="built_in">dict</span>]:</span><br><span class="line">    refs = collect_tool_result_blocks(messages)</span><br><span class="line"></span><br><span class="line">    <span class="keyword">for</span> block <span class="keyword">in</span> refs[:-keep_recent]:</span><br><span class="line">        content = <span class="built_in">str</span>(block.get(<span class="string">&quot;content&quot;</span>, <span class="string">&quot;&quot;</span>))</span><br><span class="line">        <span class="keyword">if</span> <span class="built_in">len</span>(content) &lt;= <span class="number">120</span>:</span><br><span class="line">            <span class="keyword">continue</span></span><br><span class="line"></span><br><span class="line">        block[<span class="string">&quot;content&quot;</span>] = (</span><br><span class="line">            <span class="string">&quot;[Earlier tool result compacted. &quot;</span></span><br><span class="line">            <span class="string">&quot;Re-run the tool if the full result is needed.]&quot;</span></span><br><span class="line">        )</span><br><span class="line"></span><br><span class="line">    <span class="keyword">return</span> messages</span><br></pre></td></tr></table></figure>
+
+<p>这种方法便宜，但会牺牲 Prompt Cache 命中，也可能让模型重复读取文件。生产系统可以维护 <code>readFileState</code>：记录文件路径、内容版本或哈希；压缩后若文件未变化，返回简短的“内容未变化”标记，并按预算恢复最近读取的关键文件。</p>
+<p>并非所有工具结果都适合清空。用户审批、不可逆操作的确认、生成的唯一标识和无法重放的外部响应，可能比普通文件读取更需要保留。压缩策略应按工具类型和结果语义分级，而不只是看位置。</p>
+<h2 id="七、L4：用-LLM-把历史压成可继续工作的状态"><a href="#七、L4：用-LLM-把历史压成可继续工作的状态" class="headerlink" title="七、L4：用 LLM 把历史压成可继续工作的状态"></a>七、L4：用 LLM 把历史压成可继续工作的状态</h2><p>前三层只理解结构和大小，不理解任务语义。当 Token 仍超过阈值时，需要让模型生成一次交接摘要。</p>
+<p>摘要不是普通“聊天总结”，而是新上下文的启动状态，至少应保留：</p>
+<ul>
+<li>用户当前目标与成功标准；</li>
+<li>不可违反的约束和用户偏好；</li>
+<li>已完成工作及验证证据；</li>
+<li>修改过的文件和关键代码位置；</li>
+<li>重要发现、失败尝试与原因；</li>
+<li>当前 TODO 状态与下一步；</li>
+<li>已加载的 Skills、关键规则和版本；</li>
+<li>权限拒绝、未解决风险与开放问题。</li>
+</ul>
+<p>压缩前先保存完整 Transcript：</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">def</span> <span class="title function_">compact_history</span>(<span class="params">messages: <span class="built_in">list</span>[<span class="built_in">dict</span>]</span>) -&gt; <span class="built_in">list</span>[<span class="built_in">dict</span>]:</span><br><span class="line">    transcript = write_transcript(messages)</span><br><span class="line">    summary = summarize_without_tools(messages)</span><br><span class="line"></span><br><span class="line">    <span class="keyword">return</span> [&#123;</span><br><span class="line">        <span class="string">&quot;role&quot;</span>: <span class="string">&quot;user&quot;</span>,</span><br><span class="line">        <span class="string">&quot;content&quot;</span>: (</span><br><span class="line">            <span class="string">&quot;&lt;compacted-context&gt;\n&quot;</span></span><br><span class="line">            <span class="string">f&quot;Transcript: <span class="subst">&#123;transcript&#125;</span>\n\n&quot;</span></span><br><span class="line">            <span class="string">f&quot;<span class="subst">&#123;summary&#125;</span>\n&quot;</span></span><br><span class="line">            <span class="string">&quot;&lt;/compacted-context&gt;&quot;</span></span><br><span class="line">        ),</span><br><span class="line">    &#125;]</span><br></pre></td></tr></table></figure>
+
+<p>摘要调用必须禁止使用工具。否则模型可能在“整理历史”的特殊调用中继续修改文件，产生主循环无法正确关联的副作用。可以使用不提供 Tools 的独立请求，并对返回格式进行校验。</p>
+<p>Transcript 保证审计与人工恢复，不代表模型仍然“记得”其中内容。除非提供检索工具，退出活跃上下文的细节对模型来说就是不可访问的。</p>
+<h2 id="八、压缩后不能只剩一段孤立摘要"><a href="#八、压缩后不能只剩一段孤立摘要" class="headerlink" title="八、压缩后不能只剩一段孤立摘要"></a>八、压缩后不能只剩一段孤立摘要</h2><p>最小实现可以用一条摘要替换全部历史，但生产 Agent 往往需要重新挂载运行状态：</p>
+<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line">压缩摘要</span><br><span class="line">  + 当前 TODO / Task 状态</span><br><span class="line">  + 最近修改文件与必要片段</span><br><span class="line">  + 已加载 Skill 的关键约束</span><br><span class="line">  + Agent / 工具运行状态</span><br><span class="line">  + 未完成权限请求或后台任务</span><br></pre></td></tr></table></figure>
+
+<p>这叫“后压缩恢复”。如果摘要说“继续修改 <code>auth.py</code>”，但关键函数内容已被压掉，模型只能重新读文件；适度恢复最近文件可以减少一次往返，但也必须受总 Token、文件数和单文件额度限制。</p>
+<p>恢复顺序还要尊重新鲜度：文件在摘要生成后可能已经被其他 Agent 修改，不能盲目附加旧缓存。应校验哈希或修改时间，发现变化就重新读取。</p>
+<h2 id="九、主动压缩、自动压缩与响应式压缩"><a href="#九、主动压缩、自动压缩与响应式压缩" class="headerlink" title="九、主动压缩、自动压缩与响应式压缩"></a>九、主动压缩、自动压缩与响应式压缩</h2><p>压缩可以由三类信号触发：</p>
+<table>
+<thead>
+<tr>
+<th>模式</th>
+<th>触发条件</th>
+<th>特点</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>主动</td>
+<td>用户或模型调用 <code>compact</code></td>
+<td>可在自然阶段边界整理上下文</td>
+</tr>
+<tr>
+<td>自动</td>
+<td>估算 Token 超过预警阈值</td>
+<td>常规防护，留有摘要生成空间</td>
+</tr>
+<tr>
+<td>响应式</td>
+<td>API 返回 <code>prompt_too_long</code></td>
+<td>应急恢复，通常更激进</td>
+</tr>
+</tbody></table>
+<p>响应式压缩处理的是“预估失败”或“上下文突然增长”。它可以生成摘要后保留最近的一小组完整消息，再重试原请求。但必须设置严格上限：</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">try</span>:</span><br><span class="line">    response = call_model(messages)</span><br><span class="line"><span class="keyword">except</span> PromptTooLongError:</span><br><span class="line">    <span class="keyword">if</span> reactive_retries &gt;= MAX_REACTIVE_RETRIES:</span><br><span class="line">        <span class="keyword">raise</span></span><br><span class="line"></span><br><span class="line">    messages[:] = reactive_compact(messages)</span><br><span class="line">    reactive_retries += <span class="number">1</span></span><br><span class="line">    <span class="keyword">continue</span></span><br></pre></td></tr></table></figure>
+
+<p>如果摘要连续失败还无限重试，只会重复消耗费用。自动压缩也需要失败计数和熔断器，达到上限后向上层报告明确错误。</p>
+<h2 id="十、为什么处理顺序不能随便换"><a href="#十、为什么处理顺序不能随便换" class="headerlink" title="十、为什么处理顺序不能随便换"></a>十、为什么处理顺序不能随便换</h2><p>一条稳妥的预处理顺序是：</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line">messages[:] = apply_current_result_budget(messages)</span><br><span class="line">messages[:] = snip_old_message_groups(messages)</span><br><span class="line">messages[:] = compact_old_tool_results(messages)</span><br><span class="line"></span><br><span class="line"><span class="keyword">if</span> token_count(messages) &gt; AUTO_COMPACT_THRESHOLD:</span><br><span class="line">    messages[:] = compact_history(messages)</span><br></pre></td></tr></table></figure>
+
+<p>先处理工具结果预算，是为了在完整大输出仍然存在时将其持久化；若先执行微压缩，原内容已经被占位符覆盖，就没有完整结果可保存。</p>
+<p>先确定性压缩、后语义摘要，也让摘要模型看到更少噪声，降低费用。压缩层之间不是互相替代，而是按成本和信息损失逐级升级。</p>
+<h2 id="十一、压缩的质量怎样验证"><a href="#十一、压缩的质量怎样验证" class="headerlink" title="十一、压缩的质量怎样验证"></a>十一、压缩的质量怎样验证</h2><p>“Token 下降了”只说明压缩变小，不说明 Agent 还能继续正确工作。可以从四个维度验证：</p>
+<ol>
+<li><strong>结构有效性：</strong> 消息角色与工具调用配对是否仍符合 API 协议；</li>
+<li><strong>任务连续性：</strong> 压缩后能否准确说出目标、当前步骤和剩余工作；</li>
+<li><strong>事实保持：</strong> 文件修改、测试结果和用户约束有没有被摘要扭曲；</li>
+<li><strong>恢复能力：</strong> 被移除的细节能否通过 Transcript 或重新调用工具找回。</li>
+</ol>
+<p>适合建立回归用例：给定固定的长历史，执行压缩后断言关键约束仍存在、敏感内容未意外扩散、所有 <code>tool_result</code> 都有对应调用，并让 Agent继续完成一个后续步骤。</p>
+<h2 id="十二、压缩不是记忆"><a href="#十二、压缩不是记忆" class="headerlink" title="十二、压缩不是记忆"></a>十二、压缩不是记忆</h2><p>Context Compact 的目标是让<strong>当前会话继续运行</strong>。它会主动舍弃细节，只保留对眼前任务最有价值的信息。</p>
+<p>Memory 解决的是另一个问题：哪些偏好、事实和经验值得跨压缩甚至跨会话保留。两者可以这样区分：</p>
+<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">Compact：把这一段工作整理成可继续的短状态</span><br><span class="line">Memory：把长期有价值的信息写入可再次检索的存储</span><br></pre></td></tr></table></figure>
+
+<p>如果把所有历史都写进长期记忆，噪声和隐私风险会迅速累积；如果只依赖压缩摘要，用户偏好又可能随着多次压缩逐渐失真。下一篇的 Memory 将处理选择、提取与巩固。</p>
+<h2 id="十三、这一篇真正需要记住什么"><a href="#十三、这一篇真正需要记住什么" class="headerlink" title="十三、这一篇真正需要记住什么"></a>十三、这一篇真正需要记住什么</h2><ol>
+<li><strong>上下文一定会满，压缩必须是运行框架能力。</strong> 不能等 API 拒绝后才临时补救。</li>
+<li><strong>按实际 Token 和输出体积管理预算。</strong> 消息条数只是粗略信号。</li>
+<li><strong>先便宜后昂贵。</strong> 大结果持久化、历史裁剪和微压缩先运行，最后才调用 LLM 摘要。</li>
+<li><strong>工具调用配对是硬约束。</strong> 裁剪不能制造孤立的 <code>tool_use</code> 或 <code>tool_result</code>。</li>
+<li><strong>摘要必须面向继续工作。</strong> 保留目标、约束、证据、文件、计划、风险和下一步。</li>
+<li><strong>压缩后要恢复必要运行状态。</strong> 最近文件、计划与 Skill 约束应按预算重新挂载。</li>
+<li><strong>所有压缩路径都要有限重试。</strong> 自动和响应式压缩需要熔断，避免费用死循环。</li>
+<li><strong>Transcript 是敏感资产。</strong> 它需要访问控制和清理策略，也不等同于模型可访问记忆。</li>
+</ol>
+
+    </div>
+
+    
+    
+    
+
+    <footer class="post-footer">
+          
+
+<div class="post-copyright">
+<ul>
+  <li class="post-copyright-author">
+      <strong>本文作者： </strong>陌忆
+  </li>
+  <li class="post-copyright-link">
+      <strong>本文链接：</strong>
+      <a href="https://moyi-math.github.io/2026/08/20/Learn-Claude-Code-08-Context-Compact/" title="Learn Claude Code 08：Context Compact——给长期运行的 Agent 腾出空间">https://moyi-math.github.io/2026/08/20/Learn-Claude-Code-08-Context-Compact/</a>
+  </li>
+  <li class="post-copyright-license">
+      <strong>版权声明： </strong>本博客所有文章除特别声明外，均采用 <a href="https://creativecommons.org/licenses/by-nc-sa/4.0/" rel="noopener" target="_blank"><i class="fab fa-fw fa-creative-commons"></i>BY-NC-SA</a> 许可协议。转载请注明出处！
+  </li>
+</ul>
+</div>
+
+          <div class="post-tags">
+              <a href="/tags/Agent/" rel="tag"># Agent</a>
+              <a href="/tags/Claude-Code/" rel="tag"># Claude Code</a>
+              <a href="/tags/Context-Compact/" rel="tag"># Context Compact</a>
+              <a href="/tags/Context-Window/" rel="tag"># Context Window</a>
+              <a href="/tags/Token-Budget/" rel="tag"># Token Budget</a>
+          </div>
+
+        
+
+          <div class="post-nav">
+            <div class="post-nav-item">
+                <a href="/2026/08/20/Learn-Claude-Code-07-Skills/" rel="prev" title="Learn Claude Code 07：Skills——让专业知识按需进入上下文">
+                  <i class="fa fa-angle-left"></i> Learn Claude Code 07：Skills——让专业知识按需进入上下文
+                </a>
+            </div>
+            <div class="post-nav-item">
+                <a href="/2026/08/20/Learn-Claude-Code-09-Memory/" rel="next" title="Learn Claude Code 09：Memory——让重要信息跨越压缩与会话">
+                  Learn Claude Code 09：Memory——让重要信息跨越压缩与会话 <i class="fa fa-angle-right"></i>
+                </a>
+            </div>
+          </div>
+    </footer>
+  </article>
+</div>
+
+
+
+
+
+
+</div>
+  </main>
+
+  <footer class="footer">
+    <div class="footer-inner">
+
+  <div class="copyright">
+    &copy; 
+    <span itemprop="copyrightYear">2026</span>
+    <span class="with-love">
+      <i class="fab fa-osi"></i>
+    </span>
+    <span class="author" itemprop="copyrightHolder">陌忆</span>
+  </div>
+<div class="wordcount">
+  <span class="post-meta-item">
+    <span class="post-meta-item-icon">
+      <i class="fa fa-chart-line"></i>
+    </span>
+    <span title="站点总字数">106k</span>
+  </span>
+  <span class="post-meta-item">
+    <span class="post-meta-item-icon">
+      <i class="fa fa-coffee"></i>
+    </span>
+    <span title="站点阅读时长">6:24</span>
+  </span>
+</div>
+  <div class="powered-by">由 <a href="https://hexo.io/" rel="noopener" target="_blank">Hexo</a> & <a href="https://theme-next.js.org/" rel="noopener" target="_blank">NexT.Gemini</a> 强力驱动
+  </div>
+
+    </div>
+  </footer>
+
+  
+  <div class="toggle sidebar-toggle" role="button">
+    <span class="toggle-line"></span>
+    <span class="toggle-line"></span>
+    <span class="toggle-line"></span>
+  </div>
+  <div class="sidebar-dimmer"></div>
+  <div class="back-to-top" role="button" aria-label="返回顶部">
+    <i class="fa fa-arrow-up fa-lg"></i>
+    <span>0%</span>
+  </div>
+
+<noscript>
+  <div class="noscript-warning">Theme NexT works best with JavaScript enabled</div>
+</noscript>
+<!-- Site running time -->
+<span id="timeDate" aria-live="off"></span>
+<script>
+(function() {
+  var start = new Date("2022-11-17T08:00:00+08:00");
+  function pad(n) { return n < 10 ? "0" + n : "" + n; }
+  function tick() {
+    var diff = Date.now() - start.getTime();
+    if (diff < 0) return;
+    var d = Math.floor(diff / 86400000);
+    var h = Math.floor((diff % 86400000) / 3600000);
+    var m = Math.floor((diff % 3600000) / 60000);
+    var timeDate = document.getElementById("timeDate");
+    if (!timeDate) return;
+    timeDate.textContent =
+      "\u672C\u7AD9\u5DF2\u5B89\u5168\u8FD0\u884C " + d + " \u5929 " + pad(h) + " \u5C0F\u65F6 " + pad(m) + " \u5206";
+  }
+  tick();
+  setInterval(tick, 60000);
+})();
+</script>
+
+</body>
+</html>

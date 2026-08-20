@@ -1,0 +1,541 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width">
+<meta name="theme-color" content="#222" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#222" media="(prefers-color-scheme: dark)"><meta name="generator" content="Hexo 7.3.0">
+<link rel="preconnect" href="https://cdnjs.cloudflare.com" crossorigin>
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon-next.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32-next.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next.png">
+  <link rel="mask-icon" href="/images/logo.svg" color="#222">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/7.0.0/css/all.min.css" integrity="sha256-VHqXKFhhMxcpubYf9xiWdCiojEbY9NexQ4jh8AxbvcM=" crossorigin="anonymous">
+
+<script class="next-config" data-name="main" type="application/json">{"hostname":"moyi-math.github.io","root":"/","images":"/images","scheme":"Gemini","darkmode":true,"version":"8.28.0","exturl":false,"sidebar":{"position":"left","width_expanded":320,"width_dual_column":240,"display":"post","padding":18,"offset":12},"hljswrap":true,"codeblock":{"theme":{"light":"default","dark":"stackoverflow-dark"},"prism":{"light":"prism","dark":"prism-dark"},"copy_button":{"enable":true,"style":null},"fold":{"enable":false,"height":500},"language":false},"bookmark":{"enable":false,"color":"#222","save":"auto"},"mediumzoom":false,"lazyload":true,"pangu":false,"comments":{"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},"stickytabs":false,"motion":{"enable":false,"async":false,"duration":200,"transition":{"menu_item":"fadeInDown","post_block":"fadeIn","post_header":"fadeInDown","post_body":"fadeInDown","coll_header":"fadeInLeft","sidebar":"fadeInUp"}},"prism":false,"i18n":{"placeholder":"搜索...","empty":"没有找到任何搜索结果：${query}","hits_time":"找到 ${hits} 个搜索结果（用时 ${time} 毫秒）","hits":"找到 ${hits} 个搜索结果"},"path":"/search.json","localsearch":{"enable":true,"top_n_per_article":1,"unescape":false,"preload":false}}</script><script src="/js/config.js" defer></script>
+
+    <meta name="description" content="从上下文窗口耗尽的问题出发，说明 Coding Agent 如何压缩历史、保留任务状态并继续执行。">
+<meta property="og:type" content="article">
+<meta property="og:title" content="入门 Coding Agent（五）：当对话撑满时——自动压缩机制与上下文管理">
+<meta property="og:url" content="https://moyi-math.github.io/2026/07/29/Coding-Agent-5-%E8%87%AA%E5%8A%A8%E5%8E%8B%E7%BC%A9%E4%B8%8E%E4%B8%8A%E4%B8%8B%E6%96%87%E7%AE%A1%E7%90%86/index.html">
+<meta property="og:site_name" content="陌忆的博客">
+<meta property="og:description" content="从上下文窗口耗尽的问题出发，说明 Coding Agent 如何压缩历史、保留任务状态并继续执行。">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:image" content="https://moyi-math.github.io/images/background.webp">
+<meta property="article:published_time" content="2026-07-29T14:00:00.000Z">
+<meta property="article:modified_time" content="2026-08-20T14:47:37.218Z">
+<meta property="article:author" content="陌忆">
+<meta property="article:tag" content="Agent">
+<meta property="article:tag" content="LLM">
+<meta property="article:tag" content="Coding Agent">
+<meta property="article:tag" content="Context">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:image" content="https://moyi-math.github.io/images/background.webp">
+
+
+<link rel="canonical" href="https://moyi-math.github.io/2026/07/29/Coding-Agent-5-%E8%87%AA%E5%8A%A8%E5%8E%8B%E7%BC%A9%E4%B8%8E%E4%B8%8A%E4%B8%8B%E6%96%87%E7%AE%A1%E7%90%86/">
+
+
+<script class="next-config" data-name="page" type="application/json">{"sidebar":"","isHome":false,"isPost":true,"lang":"zh-CN","comments":true,"permalink":"https://moyi-math.github.io/2026/07/29/Coding-Agent-5-%E8%87%AA%E5%8A%A8%E5%8E%8B%E7%BC%A9%E4%B8%8E%E4%B8%8A%E4%B8%8B%E6%96%87%E7%AE%A1%E7%90%86/","path":"2026/07/29/Coding-Agent-5-自动压缩与上下文管理/","title":"入门 Coding Agent（五）：当对话撑满时——自动压缩机制与上下文管理"}</script>
+
+<script class="next-config" data-name="calendar" type="application/json">""</script>
+<title>入门 Coding Agent（五）：当对话撑满时——自动压缩机制与上下文管理 | 陌忆的博客</title>
+  
+
+
+
+
+
+
+
+
+  
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/animejs/3.2.1/anime.min.js" integrity="sha256-XL2inqUJaslATFnHdJOi9GfQ60on8Wx1C2H8DYiN1xY=" crossorigin="anonymous" defer></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/lozad.js/1.16.0/lozad.min.js" integrity="sha256-mOFREFhqmHeQbXpK2lp4nA3qooVgACfh88fpJftLBbc=" crossorigin="anonymous" defer></script>
+<script src="/js/utils.js" defer></script><script src="/js/sidebar.js" defer></script><script src="/js/next-boot.js" defer></script>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/hexo-generator-searchdb/1.5.0/search.js" integrity="sha256-xFC6PJ82SL9b3WkGjFavNiA9gm5z6UBxWPiu4CYjptg=" crossorigin="anonymous" defer></script>
+<script src="/js/third-party/search/local-search.js" defer></script>
+
+
+
+
+
+
+
+  
+
+
+
+
+  
+
+  <script class="next-config" data-name="enableMath" type="application/json">false</script><link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/katex.min.css" integrity="sha256-UF1fgpAiu3tPJN/uCqEUHNe7pnr+QR0SQDNfgglgtcM=" crossorigin="anonymous">
+
+
+<link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
+
+
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"WebSite","name":"陌忆的博客","url":"https://moyi-math.github.io","description":"记录 RAG、Agent、MCP、算法与软件工程实践，按专栏整理可复用的技术笔记。","inLanguage":"zh-CN","author":{"@type":"Person","name":"陌忆"}}</script>
+
+
+
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"Article","headline":"入门 Coding Agent（五）：当对话撑满时——自动压缩机制与上下文管理","description":"从上下文窗口耗尽的问题出发，说明 Coding Agent 如何压缩历史、保留任务状态并继续执行。","datePublished":"2026-07-29T14:00:00.000Z","dateModified":"2026-08-20T14:47:37.218Z","inLanguage":"zh-CN","mainEntityOfPage":{"@type":"WebPage","@id":"https://moyi-math.github.io/2026/07/29/Coding-Agent-5-%E8%87%AA%E5%8A%A8%E5%8E%8B%E7%BC%A9%E4%B8%8E%E4%B8%8A%E4%B8%8B%E6%96%87%E7%AE%A1%E7%90%86/index.html"},"author":{"@type":"Person","name":"陌忆"}}</script>
+<meta name="author" content="陌忆">
+
+
+  <noscript>
+    <link rel="stylesheet" href="/css/noscript.css">
+  </noscript>
+<!-- hexo injector head_end start --><link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/katex.min.css" integrity="sha512-fHwaWebuwA7NSF5Qg/af4UeDx9XqUpYpOGgubo3yWu+b2IQR4UeQwbb42Ti7gVAjNtVoI/I9TEoYeu9omwcC6g==" crossorigin="anonymous" referrerpolicy="no-referrer" /><!-- hexo injector head_end end --><link rel="alternate" href="/atom.xml" title="陌忆的博客" type="application/atom+xml">
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage">
+  <div class="headband"></div>
+
+  <main class="main">
+    <div class="column">
+      <header class="header" itemscope itemtype="http://schema.org/WPHeader"><div class="site-brand-container">
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="切换导航栏" role="button">
+        <span class="toggle-line"></span>
+        <span class="toggle-line"></span>
+        <span class="toggle-line"></span>
+    </div>
+  </div>
+
+  <div class="site-meta">
+
+    <a href="/" class="brand" rel="start">
+      <i class="logo-line"></i>
+      <p class="site-title">陌忆的博客</p>
+      <i class="logo-line"></i>
+    </a>
+      <p class="site-subtitle" itemprop="description">数据库无法得出结论</p>
+  </div>
+
+  <div class="site-nav-right">
+    <div class="toggle popup-trigger" aria-label="搜索" role="button">
+        <i class="fa fa-search fa-fw fa-lg"></i>
+    </div>
+  </div>
+</div>
+
+
+
+<nav class="site-nav">
+  <ul class="main-menu menu"><li class="menu-item menu-item-home"><a href="/" rel="section"><i class="fa fa-home fa-fw"></i>首页</a></li><li class="menu-item menu-item-about"><a href="/about/" rel="section"><i class="fa fa-user fa-fw"></i>关于</a></li><li class="menu-item menu-item-tags"><a href="/tags/" rel="section"><i class="fa fa-tags fa-fw"></i>标签</a></li><li class="menu-item menu-item-categories"><a href="/categories/" rel="section"><i class="fa fa-th fa-fw"></i>分类</a></li><li class="menu-item menu-item-archives"><a href="/archives/" rel="section"><i class="fa fa-archive fa-fw"></i>归档</a></li>
+      <li class="menu-item menu-item-search">
+        <a role="button" class="popup-trigger"><i class="fa fa-search fa-fw"></i>搜索
+        </a>
+      </li>
+  </ul>
+</nav>
+
+
+
+  <div class="search-pop-overlay">
+    <div class="popup search-popup">
+      <div class="search-header">
+        <span class="search-icon">
+          <i class="fa fa-search"></i>
+        </span>
+        <div class="search-input-container">
+          <input autocomplete="off" autocapitalize="off" maxlength="80"
+                placeholder="搜索..." spellcheck="false"
+                type="search" class="search-input">
+        </div>
+        <span class="popup-btn-close" role="button">
+          <i class="fa fa-times-circle"></i>
+        </span>
+      </div>
+      <div class="search-result-container">
+        <div class="search-result-icon">
+          <i class="fa fa-spinner fa-pulse fa-5x"></i>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</header>
+        
+  
+  <aside class="sidebar">
+
+    <div class="sidebar-inner sidebar-nav-active sidebar-toc-active">
+      <ul class="sidebar-nav">
+        <li class="sidebar-nav-toc">
+          文章目录
+        </li>
+        <li class="sidebar-nav-overview">
+          站点概览
+        </li>
+      </ul>
+
+      <div class="sidebar-panel-container">
+        <!--noindex-->
+        <div class="post-toc-wrap sidebar-panel">
+            <div class="post-toc animated"><ol class="nav"><li class="nav-item nav-level-2"><a class="nav-link" href="#%E4%B8%80%E3%80%81%E4%B8%80%E4%B8%AA%E8%A2%AB%E5%BF%BD%E7%95%A5%E7%9A%84%E9%97%AE%E9%A2%98%EF%BC%9A%E4%B8%8A%E4%B8%8B%E6%96%87%E4%B8%8D%E6%98%AF%E6%97%A0%E9%99%90%E7%9A%84"><span class="nav-text">一、一个被忽略的问题：上下文不是无限的</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E4%BA%8C%E3%80%81%E4%B8%A4%E7%A7%8D%E6%96%B9%E6%A1%88%EF%BC%9A%E4%B8%A2%E6%8E%89-vs-%E5%8E%8B%E7%BC%A9"><span class="nav-text">二、两种方案：丢掉 vs 压缩</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E4%B8%89%E3%80%81%E8%B0%81%E6%9D%A5%E5%81%9A%E5%8E%8B%E7%BC%A9%EF%BC%9F"><span class="nav-text">三、谁来做压缩？</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%9B%9B%E3%80%81%E5%8E%8B%E7%BC%A9%E8%A7%A6%E5%8F%91%E6%9D%A1%E4%BB%B6"><span class="nav-text">四、压缩触发条件</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E4%BA%94%E3%80%81%E5%8E%8B%E7%BC%A9%E7%9A%84%E5%85%B7%E4%BD%93%E6%B5%81%E7%A8%8B"><span class="nav-text">五、压缩的具体流程</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%85%AD%E3%80%81%E5%8E%8B%E7%BC%A9%E5%AF%B9-Agent-%E7%9A%84%E5%BD%B1%E5%93%8D"><span class="nav-text">六、压缩对 Agent 的影响</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E4%B8%83%E3%80%81%E8%B7%9F%E4%BF%9D%E9%99%A9%E4%B8%9D%EF%BC%88%E7%AC%AC%E4%B8%89%E7%AF%87%EF%BC%89%E7%9A%84%E5%8C%BA%E5%88%AB"><span class="nav-text">七、跟保险丝（第三篇）的区别</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%85%AB%E3%80%81%E8%B7%9F-Goal-%E7%B3%BB%E7%BB%9F%E7%9A%84%E5%85%B3%E7%B3%BB"><span class="nav-text">八、跟 Goal 系统的关系</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E4%B9%9D%E3%80%81%E9%AA%8C%E8%AF%81%EF%BC%9A%E4%B8%80%E4%B8%AA%E6%AD%A3%E5%9C%A8%E8%A2%AB%E5%8E%8B%E7%BC%A9%E7%9A%84%E5%AF%B9%E8%AF%9D"><span class="nav-text">九、验证：一个正在被压缩的对话</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%8D%81%E3%80%81%E5%B0%8F%E7%BB%93"><span class="nav-text">十、小结</span></a></li></ol></div>
+        </div>
+        <!--/noindex-->
+
+        <div class="site-overview-wrap sidebar-panel">
+          <div class="site-author animated" itemprop="author" itemscope itemtype="http://schema.org/Person">
+    <img class="site-author-image" itemprop="image" alt="陌忆"
+      src="/images/avatar.webp">
+  <p class="site-author-name" itemprop="name">陌忆</p>
+  <div class="site-description" itemprop="description">记录 RAG、Agent、MCP、算法与软件工程实践，按专栏整理可复用的技术笔记。</div>
+</div>
+<div class="site-state-wrap animated">
+  <nav class="site-state">
+      <div class="site-state-item site-state-posts">
+        <a href="/archives/">
+          <span class="site-state-item-count">50</span>
+          <span class="site-state-item-name">日志</span>
+        </a>
+      </div>
+      <div class="site-state-item site-state-categories">
+          <a href="/categories/">
+        <span class="site-state-item-count">10</span>
+        <span class="site-state-item-name">分类</span></a>
+      </div>
+      <div class="site-state-item site-state-tags">
+          <a href="/tags/">
+        <span class="site-state-item-count">172</span>
+        <span class="site-state-item-name">标签</span></a>
+      </div>
+  </nav>
+</div>
+  <div class="links-of-author animated">
+      <span class="links-of-author-item">
+        <a href="https://github.com/moyi-math" title="GitHub → https:&#x2F;&#x2F;github.com&#x2F;moyi-math" rel="noopener me" target="_blank"><i class="fab fa-github fa-fw"></i>GitHub</a>
+      </span>
+  </div>
+  <div class="cc-license animated" itemprop="license">
+    <a href="https://creativecommons.org/licenses/by-nc-sa/4.0/" class="cc-opacity" rel="noopener" target="_blank"><img src="https://cdnjs.cloudflare.com/ajax/libs/creativecommons-vocabulary/2020.11.3/assets/license_badges/small/by_nc_sa.svg" alt="Creative Commons"></a>
+  </div>
+
+        </div>
+      </div>
+    </div>
+
+    
+  </aside>
+
+
+    </div>
+
+    <div class="main-inner post posts-expand">
+
+
+  
+
+
+<div class="post-block">
+  
+  
+
+  <article itemscope itemtype="http://schema.org/Article" class="post-content" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="https://moyi-math.github.io/2026/07/29/Coding-Agent-5-%E8%87%AA%E5%8A%A8%E5%8E%8B%E7%BC%A9%E4%B8%8E%E4%B8%8A%E4%B8%8B%E6%96%87%E7%AE%A1%E7%90%86/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.webp">
+      <meta itemprop="name" content="陌忆">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="陌忆的博客">
+      <meta itemprop="description" content="记录 RAG、Agent、MCP、算法与软件工程实践，按专栏整理可复用的技术笔记。">
+    </span>
+
+    <span hidden itemprop="post" itemscope itemtype="http://schema.org/CreativeWork">
+      <meta itemprop="name" content="入门 Coding Agent（五）：当对话撑满时——自动压缩机制与上下文管理 | 陌忆的博客">
+      <meta itemprop="description" content="从上下文窗口耗尽的问题出发，说明 Coding Agent 如何压缩历史、保留任务状态并继续执行。">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          入门 Coding Agent（五）：当对话撑满时——自动压缩机制与上下文管理
+        </h1>
+
+        <div class="post-meta-container">
+          <div class="post-meta">
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-calendar"></i>
+      </span>
+      <span class="post-meta-item-text">发表于</span>
+
+      <time title="创建时间：2026-07-29 22:00:00" itemprop="dateCreated datePublished" datetime="2026-07-29T22:00:00+08:00">2026-07-29</time>
+    </span>
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-calendar-check"></i>
+      </span>
+      <span class="post-meta-item-text">更新于</span>
+      <time title="修改时间：2026-08-20 22:47:37" itemprop="dateModified" datetime="2026-08-20T22:47:37+08:00">2026-08-20</time>
+    </span>
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-folder"></i>
+      </span>
+      <span class="post-meta-item-text">分类于</span>
+        <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+          <a href="/categories/Coding-Agent-%E5%8E%9F%E7%90%86/" itemprop="url" rel="index"><span itemprop="name">Coding Agent 原理</span></a>
+        </span>
+    </span>
+
+  
+    <span class="post-meta-break"></span>
+    <span class="post-meta-item" title="本文字数">
+      <span class="post-meta-item-icon">
+        <i class="far fa-file-word"></i>
+      </span>
+      <span class="post-meta-item-text">本文字数：</span>
+      <span>1.9k</span>
+    </span>
+    <span class="post-meta-item" title="阅读时长">
+      <span class="post-meta-item-icon">
+        <i class="far fa-clock"></i>
+      </span>
+      <span class="post-meta-item-text">阅读时长 &asymp;</span>
+      <span>7 分钟</span>
+    </span>
+</div>
+
+            <div class="post-description">从上下文窗口耗尽的问题出发，说明 Coding Agent 如何压缩历史、保留任务状态并继续执行。</div>
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody"><blockquote>
+<p>本篇基于对 Codex Desktop Runtime 的实际行为观察编写。所有机制来自对系统日志、数据库结构、以及 Agent 系统提示的交叉验证。</p>
+</blockquote>
+<h2 id="一、一个被忽略的问题：上下文不是无限的"><a href="#一、一个被忽略的问题：上下文不是无限的" class="headerlink" title="一、一个被忽略的问题：上下文不是无限的"></a>一、一个被忽略的问题：上下文不是无限的</h2><p>前三篇我们构建了一个能在循环中自主工作的 Agent（核心循环），给它配了安全边界（保险丝设计），又通过 Goal 系统让它能跨 session 持续工作（跨会话持久化）。</p>
+<p>但这里有一个更基础的问题一直没有被正面回答：<strong>每一次对话里，上下文是有限的。</strong></p>
+<p>不管是 Claude 的 200K、GPT-4o 的 128K，还是如今更主流的新模型——Claude 4 Sonnet 已达到 1M token、GPT-5 系列也迈入了 1M token 级别——上下文窗口都有上限。当 Agent 在一个长对话里不断调用工具、看结果、再调用工具，消息列表持续膨胀，最终一定会撑满窗口。</p>
+<p>撑满之后会发生什么？</p>
+<ul>
+<li>丢弃最早的消息？那 Agent 会失忆，变成”盲人”</li>
+<li>直接报错？那对话终结，任务中断</li>
+<li>无限扩容？不现实，模型有硬限制</li>
+</ul>
+<p>这个问题必须在 Runtime 层面解决。</p>
+<h2 id="二、两种方案：丢掉-vs-压缩"><a href="#二、两种方案：丢掉-vs-压缩" class="headerlink" title="二、两种方案：丢掉 vs 压缩"></a>二、两种方案：丢掉 vs 压缩</h2><p>粗暴的方案是<strong>丢弃最早的消息</strong>——把最旧的那批对话删掉，腾出空间。ChatGPT 的网页版就用了这个策略：当上下文接近上限时，静默删除最早的几条消息。</p>
+<p>这个方案的代价很直接：<strong>信息丢失。</strong> 如果最早的消息里包含了任务的初始需求、用户的关键约束、或者 Agent 已经完成的分析结论，丢掉了 Agent 就”忘了”这些事。</p>
+<p>更好的方案是<strong>压缩（Compaction）</strong>——不直接删除，而是把旧消息发给 LLM 做一次总结，用摘要替代原文。这样既腾出了空间，又保留了关键信息。</p>
+<p>Codex Desktop 用的就是压缩方案。</p>
+<h2 id="三、谁来做压缩？"><a href="#三、谁来做压缩？" class="headerlink" title="三、谁来做压缩？"></a>三、谁来做压缩？</h2><p>压缩不是 Agent 自己做的。Agent 在忙着做自己的事——推理、执行命令、看结果。它没有精力也没有必要去监控上下文还剩多少空间。</p>
+<p>压缩是 <strong>Runtime（运行时）</strong> 的职责。</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br></pre></td><td class="code"><pre><span class="line">Agent（大模型里的我）</span><br><span class="line">    │  专注：推理→执行→观察的循环</span><br><span class="line">    │</span><br><span class="line">    └── 上方被 Runtime 托管 ──┐</span><br><span class="line">                              │</span><br><span class="line">Runtime (codex.exe)           │</span><br><span class="line">    ├── 管理 session_loop     │</span><br><span class="line">    ├── 执行工具调用           │</span><br><span class="line">    ├── 监控 token 用量       │</span><br><span class="line">    ├── 触发自动压缩 ← 这里  │</span><br><span class="line">    ├── 管理 Goal 续期       │</span><br><span class="line">    └── 写入 SQLite 数据库    │</span><br><span class="line">                              │</span><br><span class="line">    ┌─────────────────────────┘</span><br><span class="line">    ▼</span><br><span class="line">我甚至不知道压缩发生了</span><br></pre></td></tr></table></figure>
+
+<p>在 Codex 的系统提示中，有一段话直接说明了这个关系：</p>
+<blockquote>
+<p>“When you run out of context, the tool automatically compacts the conversation. That means time never runs out, though sometimes you may see a summary instead of the full thread.”</p>
+</blockquote>
+<p>关键词是 <strong>automatically</strong>——自动的、不需要我参与的。</p>
+<h2 id="四、压缩触发条件"><a href="#四、压缩触发条件" class="headerlink" title="四、压缩触发条件"></a>四、压缩触发条件</h2><p>从运行时行为可以还原出触发逻辑：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br></pre></td><td class="code"><pre><span class="line">每次 Agent 返回响应后</span><br><span class="line">    │</span><br><span class="line">    ▼</span><br><span class="line">Runtime 检查当前上下文总长度</span><br><span class="line">    │</span><br><span class="line">    ├── 总长度 &lt; 模型上下文窗口限制？</span><br><span class="line">    │    └── 继续，什么都不做</span><br><span class="line">    │</span><br><span class="line">    └── 总长度 &gt;= 压缩阈值？</span><br><span class="line">         │</span><br><span class="line">         ▼</span><br><span class="line">         触发自动压缩</span><br></pre></td></tr></table></figure>
+
+<p>压缩阈值通常不是窗口上限本身，而是一个更保守的值（比如窗口的 60-70%）。这是因为压缩本身也需要消耗上下文空间来放新生成的摘要，不能等到窗口完全满了才开始压。</p>
+<h2 id="五、压缩的具体流程"><a href="#五、压缩的具体流程" class="headerlink" title="五、压缩的具体流程"></a>五、压缩的具体流程</h2><p>压缩不是无脑把最早的消息全部丢给 LLM。它遵循一套分层策略：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br></pre></td><td class="code"><pre><span class="line">层级一（永远保留）</span><br><span class="line">┌──────────────────────────────────────┐</span><br><span class="line">│ 系统提示（System Prompt）             │</span><br><span class="line">│ Agent 的角色设定、行为规则、能力描述    │</span><br><span class="line">│ 每次新 session 会重新注入，不受压缩影响 │</span><br><span class="line">└──────────────────────────────────────┘</span><br><span class="line"></span><br><span class="line">层级二（压缩成摘要）</span><br><span class="line">┌──────────────────────────────────────┐</span><br><span class="line">│ 最早 N 轮对话                         │</span><br><span class="line">│ 用户最初的几条消息 + Agent 早期的分析    │</span><br><span class="line">│                                      │</span><br><span class="line">│      ↓ 发给 LLM 做一次总结 ↓          │</span><br><span class="line">│                                      │</span><br><span class="line">│ &quot;用户要求重构模块X，Agent 分析了        │</span><br><span class="line">│  依赖关系，修改了 core.py，跑测试       │</span><br><span class="line">│  3 个通过 2 个失败&quot;                    │</span><br><span class="line">└──────────────────────────────────────┘</span><br><span class="line"></span><br><span class="line">层级三（保留原文）</span><br><span class="line">┌──────────────────────────────────────┐</span><br><span class="line">│ 最近 M 轮对话（原文保留）               │</span><br><span class="line">│ 当前正在讨论的内容，最相关，不压缩       │</span><br><span class="line">│ &quot;测试还差一个边界情况没覆盖&quot; &lt;- 刚说的   │</span><br><span class="line">└──────────────────────────────────────┘</span><br></pre></td></tr></table></figure>
+
+<p>M 和 N 的值取决于上下文窗口大小和当前使用量。通常 M 是”最近几轮”——保证刚说过的话不被压缩，因为那最相关。</p>
+<p>压缩用的 LLM 调用和对话用的 LLM 可以是同一个模型，也可以是专门用来做摘要的轻量模型，取决于实现。</p>
+<h2 id="六、压缩对-Agent-的影响"><a href="#六、压缩对-Agent-的影响" class="headerlink" title="六、压缩对 Agent 的影响"></a>六、压缩对 Agent 的影响</h2><p>作为 Agent，我<strong>完全不知道</strong>压缩正在发生。但压缩的结果会影响到我接下来的行为：</p>
+<p><strong>正常情况：</strong></p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line">用户: &quot;帮我重构模块X&quot;</span><br><span class="line">我: &quot;让我看看代码&quot; → ls src/</span><br><span class="line">环境: &quot;core.py, utils.py&quot;</span><br><span class="line">我: &quot;改这里&quot; → sed ...</span><br><span class="line">环境: &quot;done&quot;</span><br><span class="line">我: &quot;跑测试&quot; → pytest</span><br><span class="line">环境: &quot;3 passed&quot;</span><br><span class="line">...（上下文正常）</span><br></pre></td></tr></table></figure>
+
+<p><strong>压缩发生后，我醒来可能看到的是：</strong></p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line">系统提示（完整）</span><br><span class="line">[压缩摘要]: &quot;用户要求重构模块X，Agent分析了依赖并修改了core.py，</span><br><span class="line">            测试3过2，目前正在调试最后一个用例&quot;</span><br><span class="line">（最近几轮对话原文）</span><br><span class="line">用户: &quot;看看那个边界情况还缺什么&quot;</span><br><span class="line">...</span><br></pre></td></tr></table></figure>
+
+<p>这时候我需要在”丢失了部分细节”的情况下继续工作。系统提示告诉我：</p>
+<blockquote>
+<p>“When that happens, you assume compaction occurred while you were working. Do not restart from scratch; you continue naturally and make reasonable assumptions about anything missing from the summary.”</p>
+</blockquote>
+<p>关键有两个：</p>
+<ol>
+<li><strong>不要从头开始</strong>——假设之前的工作是有效的，继续推进</li>
+<li><strong>基于摘要做合理推断</strong>——如果摘要说”分析了依赖”，那我就相信分析过了，不需要重做</li>
+</ol>
+<h2 id="七、跟保险丝（第三篇）的区别"><a href="#七、跟保险丝（第三篇）的区别" class="headerlink" title="七、跟保险丝（第三篇）的区别"></a>七、跟保险丝（第三篇）的区别</h2><p>保险丝设计是<strong>硬边界</strong>——达到上限就停，不管 Agent 是否觉得还能继续。</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">保险丝触发 → 直接终止循环 → 用户介入</span><br></pre></td></tr></table></figure>
+
+<p>压缩是<strong>软手段</strong>——上下文快满时压缩，让对话能继续。</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">压缩触发 → 释放空间 → 对话继续</span><br></pre></td></tr></table></figure>
+
+<p>一个管”什么时候必须停”，一个管”怎么才能不停”。</p>
+<h2 id="八、跟-Goal-系统的关系"><a href="#八、跟-Goal-系统的关系" class="headerlink" title="八、跟 Goal 系统的关系"></a>八、跟 Goal 系统的关系</h2><p>Goal 系统和压缩机制是互补的，但不相同：</p>
+<table>
+<thead>
+<tr>
+<th></th>
+<th>压缩（Compaction）</th>
+<th>Goal 系统</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>谁触发</td>
+<td>Runtime 自动</td>
+<td>Agent 主动调用 create_goal</td>
+</tr>
+<tr>
+<td>数据流向</td>
+<td>消息列表 → LLM → 摘要替换原文</td>
+<td>→ SQLite 数据库持久化</td>
+</tr>
+<tr>
+<td>目的</td>
+<td>释放上下文空间</td>
+<td>跨 session 续任务</td>
+</tr>
+<tr>
+<td>我知情吗</td>
+<td>不知情，只看摘要</td>
+<td>知情，主动管理状态</td>
+</tr>
+<tr>
+<td>管什么</td>
+<td>“内存”</td>
+<td>“持久化”</td>
+</tr>
+</tbody></table>
+<p>一个管当前对话能继续聊下去，一个管下一轮对话还能接上任务。</p>
+<h2 id="九、验证：一个正在被压缩的对话"><a href="#九、验证：一个正在被压缩的对话" class="headerlink" title="九、验证：一个正在被压缩的对话"></a>九、验证：一个正在被压缩的对话</h2><p>写这篇文章时，当前 session 已经消耗了超过 300 万 token（state_5.sqlite 中 tokens_used 字段记录）。但对话仍在继续——既没有撑爆窗口，也没有丢失之前的上下文。这就是压缩机制在背后默默工作的证据。</p>
+<p>而 session 日志里找不到任何名为”compaction”的事件——说明压缩是<strong>完全静默</strong>的操作，不留日志、不发通知、Runtime 自己消化。</p>
+<h2 id="十、小结"><a href="#十、小结" class="headerlink" title="十、小结"></a>十、小结</h2><figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br></pre></td><td class="code"><pre><span class="line">上下文管理分层</span><br><span class="line">    │</span><br><span class="line">    ├── 系统提示（永久保留）</span><br><span class="line">    │</span><br><span class="line">    ├── 旧历史（LLM 压缩成摘要）</span><br><span class="line">    │    Runtime 自动触发</span><br><span class="line">    │    Agent 不知情</span><br><span class="line">    │</span><br><span class="line">    └── 最近对话（原文保留）</span><br><span class="line">         当前讨论内容，最相关</span><br><span class="line"></span><br><span class="line">与前三篇的关系：</span><br><span class="line">    核心循环（一）→ 循环本身</span><br><span class="line">    三体架构（二）→ 分工</span><br><span class="line">    保险丝（三）  → 什么时候停（硬边界）</span><br><span class="line">    Goal（四）    → 怎么跨 session 续（持久化）</span><br><span class="line">    压缩（五）    → 怎么让对话继续（内存管理）</span><br></pre></td></tr></table></figure>
+
+    </div>
+
+    
+    
+    
+
+    <footer class="post-footer">
+          
+
+<div class="post-copyright">
+<ul>
+  <li class="post-copyright-author">
+      <strong>本文作者： </strong>陌忆
+  </li>
+  <li class="post-copyright-link">
+      <strong>本文链接：</strong>
+      <a href="https://moyi-math.github.io/2026/07/29/Coding-Agent-5-%E8%87%AA%E5%8A%A8%E5%8E%8B%E7%BC%A9%E4%B8%8E%E4%B8%8A%E4%B8%8B%E6%96%87%E7%AE%A1%E7%90%86/" title="入门 Coding Agent（五）：当对话撑满时——自动压缩机制与上下文管理">https://moyi-math.github.io/2026/07/29/Coding-Agent-5-自动压缩与上下文管理/</a>
+  </li>
+  <li class="post-copyright-license">
+      <strong>版权声明： </strong>本博客所有文章除特别声明外，均采用 <a href="https://creativecommons.org/licenses/by-nc-sa/4.0/" rel="noopener" target="_blank"><i class="fab fa-fw fa-creative-commons"></i>BY-NC-SA</a> 许可协议。转载请注明出处！
+  </li>
+</ul>
+</div>
+
+          <div class="post-tags">
+              <a href="/tags/Agent/" rel="tag"># Agent</a>
+              <a href="/tags/LLM/" rel="tag"># LLM</a>
+              <a href="/tags/Coding-Agent/" rel="tag"># Coding Agent</a>
+              <a href="/tags/Context/" rel="tag"># Context</a>
+          </div>
+
+        
+
+          <div class="post-nav">
+            <div class="post-nav-item">
+                <a href="/2026/07/28/Hello%E7%AE%97%E6%B3%95-6.1-%E5%93%88%E5%B8%8C%E8%A1%A8%EF%BC%9A%E4%BB%8EO(n)%E5%88%B0O(1)%E7%9A%84%E9%A3%9E%E8%B7%83/" rel="prev" title="Hello算法 学习笔记 · 6.1 哈希表：从 O(n) 到 O(1) 的飞跃">
+                  <i class="fa fa-angle-left"></i> Hello算法 学习笔记 · 6.1 哈希表：从 O(n) 到 O(1) 的飞跃
+                </a>
+            </div>
+            <div class="post-nav-item">
+                <a href="/2026/07/29/Hello%E7%AE%97%E6%B3%95-7.2-%E4%BA%8C%E5%8F%89%E6%90%9C%E7%B4%A2%E6%A0%91%EF%BC%9A%E4%BA%8C%E5%88%86%E6%9F%A5%E6%89%BE%E7%9A%84%E6%A0%91%E5%BD%A2%E5%AE%9E%E7%8E%B0/" rel="next" title="Hello算法 学习笔记 · 7.2 二叉搜索树：二分查找的树形实现">
+                  Hello算法 学习笔记 · 7.2 二叉搜索树：二分查找的树形实现 <i class="fa fa-angle-right"></i>
+                </a>
+            </div>
+          </div>
+    </footer>
+  </article>
+</div>
+
+
+
+
+
+
+</div>
+  </main>
+
+  <footer class="footer">
+    <div class="footer-inner">
+
+  <div class="copyright">
+    &copy; 
+    <span itemprop="copyrightYear">2026</span>
+    <span class="with-love">
+      <i class="fab fa-osi"></i>
+    </span>
+    <span class="author" itemprop="copyrightHolder">陌忆</span>
+  </div>
+<div class="wordcount">
+  <span class="post-meta-item">
+    <span class="post-meta-item-icon">
+      <i class="fa fa-chart-line"></i>
+    </span>
+    <span title="站点总字数">106k</span>
+  </span>
+  <span class="post-meta-item">
+    <span class="post-meta-item-icon">
+      <i class="fa fa-coffee"></i>
+    </span>
+    <span title="站点阅读时长">6:24</span>
+  </span>
+</div>
+  <div class="powered-by">由 <a href="https://hexo.io/" rel="noopener" target="_blank">Hexo</a> & <a href="https://theme-next.js.org/" rel="noopener" target="_blank">NexT.Gemini</a> 强力驱动
+  </div>
+
+    </div>
+  </footer>
+
+  
+  <div class="toggle sidebar-toggle" role="button">
+    <span class="toggle-line"></span>
+    <span class="toggle-line"></span>
+    <span class="toggle-line"></span>
+  </div>
+  <div class="sidebar-dimmer"></div>
+  <div class="back-to-top" role="button" aria-label="返回顶部">
+    <i class="fa fa-arrow-up fa-lg"></i>
+    <span>0%</span>
+  </div>
+
+<noscript>
+  <div class="noscript-warning">Theme NexT works best with JavaScript enabled</div>
+</noscript>
+<!-- Site running time -->
+<span id="timeDate" aria-live="off"></span>
+<script>
+(function() {
+  var start = new Date("2022-11-17T08:00:00+08:00");
+  function pad(n) { return n < 10 ? "0" + n : "" + n; }
+  function tick() {
+    var diff = Date.now() - start.getTime();
+    if (diff < 0) return;
+    var d = Math.floor(diff / 86400000);
+    var h = Math.floor((diff % 86400000) / 3600000);
+    var m = Math.floor((diff % 3600000) / 60000);
+    var timeDate = document.getElementById("timeDate");
+    if (!timeDate) return;
+    timeDate.textContent =
+      "\u672C\u7AD9\u5DF2\u5B89\u5168\u8FD0\u884C " + d + " \u5929 " + pad(h) + " \u5C0F\u65F6 " + pad(m) + " \u5206";
+  }
+  tick();
+  setInterval(tick, 60000);
+})();
+</script>
+
+</body>
+</html>

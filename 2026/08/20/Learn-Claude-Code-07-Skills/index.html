@@ -1,0 +1,592 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width">
+<meta name="theme-color" content="#222" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#222" media="(prefers-color-scheme: dark)"><meta name="generator" content="Hexo 7.3.0">
+<link rel="preconnect" href="https://cdnjs.cloudflare.com" crossorigin>
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon-next.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32-next.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next.png">
+  <link rel="mask-icon" href="/images/logo.svg" color="#222">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/7.0.0/css/all.min.css" integrity="sha256-VHqXKFhhMxcpubYf9xiWdCiojEbY9NexQ4jh8AxbvcM=" crossorigin="anonymous">
+
+<script class="next-config" data-name="main" type="application/json">{"hostname":"moyi-math.github.io","root":"/","images":"/images","scheme":"Gemini","darkmode":true,"version":"8.28.0","exturl":false,"sidebar":{"position":"left","width_expanded":320,"width_dual_column":240,"display":"post","padding":18,"offset":12},"hljswrap":true,"codeblock":{"theme":{"light":"default","dark":"stackoverflow-dark"},"prism":{"light":"prism","dark":"prism-dark"},"copy_button":{"enable":true,"style":null},"fold":{"enable":false,"height":500},"language":false},"bookmark":{"enable":false,"color":"#222","save":"auto"},"mediumzoom":false,"lazyload":true,"pangu":false,"comments":{"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},"stickytabs":false,"motion":{"enable":false,"async":false,"duration":200,"transition":{"menu_item":"fadeInDown","post_block":"fadeIn","post_header":"fadeInDown","post_body":"fadeInDown","coll_header":"fadeInLeft","sidebar":"fadeInUp"}},"prism":false,"i18n":{"placeholder":"搜索...","empty":"没有找到任何搜索结果：${query}","hits_time":"找到 ${hits} 个搜索结果（用时 ${time} 毫秒）","hits":"找到 ${hits} 个搜索结果"},"path":"/search.json","localsearch":{"enable":true,"top_n_per_article":1,"unescape":false,"preload":false}}</script><script src="/js/config.js" defer></script>
+
+    <meta name="description" content="从 System Prompt 膨胀出发，拆解 Skill 的两级加载、注册表、触发描述与资源引用，并厘清 Skill、Tool 和 Subagent 的职责边界。">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Learn Claude Code 07：Skills——让专业知识按需进入上下文">
+<meta property="og:url" content="https://moyi-math.github.io/2026/08/20/Learn-Claude-Code-07-Skills/index.html">
+<meta property="og:site_name" content="陌忆的博客">
+<meta property="og:description" content="从 System Prompt 膨胀出发，拆解 Skill 的两级加载、注册表、触发描述与资源引用，并厘清 Skill、Tool 和 Subagent 的职责边界。">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:image" content="https://moyi-math.github.io/images/background.webp">
+<meta property="article:published_time" content="2026-08-20T03:00:00.000Z">
+<meta property="article:modified_time" content="2026-08-20T14:47:37.219Z">
+<meta property="article:author" content="陌忆">
+<meta property="article:tag" content="Agent">
+<meta property="article:tag" content="Claude Code">
+<meta property="article:tag" content="Context Engineering">
+<meta property="article:tag" content="Skills">
+<meta property="article:tag" content="Progressive Disclosure">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:image" content="https://moyi-math.github.io/images/background.webp">
+
+
+<link rel="canonical" href="https://moyi-math.github.io/2026/08/20/Learn-Claude-Code-07-Skills/">
+
+
+<script class="next-config" data-name="page" type="application/json">{"sidebar":"","isHome":false,"isPost":true,"lang":"zh-CN","comments":true,"permalink":"https://moyi-math.github.io/2026/08/20/Learn-Claude-Code-07-Skills/","path":"2026/08/20/Learn-Claude-Code-07-Skills/","title":"Learn Claude Code 07：Skills——让专业知识按需进入上下文"}</script>
+
+<script class="next-config" data-name="calendar" type="application/json">""</script>
+<title>Learn Claude Code 07：Skills——让专业知识按需进入上下文 | 陌忆的博客</title>
+  
+
+
+
+
+
+
+
+
+  
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/animejs/3.2.1/anime.min.js" integrity="sha256-XL2inqUJaslATFnHdJOi9GfQ60on8Wx1C2H8DYiN1xY=" crossorigin="anonymous" defer></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/lozad.js/1.16.0/lozad.min.js" integrity="sha256-mOFREFhqmHeQbXpK2lp4nA3qooVgACfh88fpJftLBbc=" crossorigin="anonymous" defer></script>
+<script src="/js/utils.js" defer></script><script src="/js/sidebar.js" defer></script><script src="/js/next-boot.js" defer></script>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/hexo-generator-searchdb/1.5.0/search.js" integrity="sha256-xFC6PJ82SL9b3WkGjFavNiA9gm5z6UBxWPiu4CYjptg=" crossorigin="anonymous" defer></script>
+<script src="/js/third-party/search/local-search.js" defer></script>
+
+
+
+
+
+
+
+  
+
+
+
+
+  
+
+  <script class="next-config" data-name="enableMath" type="application/json">false</script><link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/katex.min.css" integrity="sha256-UF1fgpAiu3tPJN/uCqEUHNe7pnr+QR0SQDNfgglgtcM=" crossorigin="anonymous">
+
+
+<link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
+
+
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"WebSite","name":"陌忆的博客","url":"https://moyi-math.github.io","description":"记录 RAG、Agent、MCP、算法与软件工程实践，按专栏整理可复用的技术笔记。","inLanguage":"zh-CN","author":{"@type":"Person","name":"陌忆"}}</script>
+
+
+
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"Article","headline":"Learn Claude Code 07：Skills——让专业知识按需进入上下文","description":"从 System Prompt 膨胀出发，拆解 Skill 的两级加载、注册表、触发描述与资源引用，并厘清 Skill、Tool 和 Subagent 的职责边界。","datePublished":"2026-08-20T03:00:00.000Z","dateModified":"2026-08-20T14:47:37.219Z","inLanguage":"zh-CN","mainEntityOfPage":{"@type":"WebPage","@id":"https://moyi-math.github.io/2026/08/20/Learn-Claude-Code-07-Skills/index.html"},"author":{"@type":"Person","name":"陌忆"}}</script>
+<meta name="author" content="陌忆">
+
+
+  <noscript>
+    <link rel="stylesheet" href="/css/noscript.css">
+  </noscript>
+<!-- hexo injector head_end start --><link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/katex.min.css" integrity="sha512-fHwaWebuwA7NSF5Qg/af4UeDx9XqUpYpOGgubo3yWu+b2IQR4UeQwbb42Ti7gVAjNtVoI/I9TEoYeu9omwcC6g==" crossorigin="anonymous" referrerpolicy="no-referrer" /><!-- hexo injector head_end end --><link rel="alternate" href="/atom.xml" title="陌忆的博客" type="application/atom+xml">
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage">
+  <div class="headband"></div>
+
+  <main class="main">
+    <div class="column">
+      <header class="header" itemscope itemtype="http://schema.org/WPHeader"><div class="site-brand-container">
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="切换导航栏" role="button">
+        <span class="toggle-line"></span>
+        <span class="toggle-line"></span>
+        <span class="toggle-line"></span>
+    </div>
+  </div>
+
+  <div class="site-meta">
+
+    <a href="/" class="brand" rel="start">
+      <i class="logo-line"></i>
+      <p class="site-title">陌忆的博客</p>
+      <i class="logo-line"></i>
+    </a>
+      <p class="site-subtitle" itemprop="description">数据库无法得出结论</p>
+  </div>
+
+  <div class="site-nav-right">
+    <div class="toggle popup-trigger" aria-label="搜索" role="button">
+        <i class="fa fa-search fa-fw fa-lg"></i>
+    </div>
+  </div>
+</div>
+
+
+
+<nav class="site-nav">
+  <ul class="main-menu menu"><li class="menu-item menu-item-home"><a href="/" rel="section"><i class="fa fa-home fa-fw"></i>首页</a></li><li class="menu-item menu-item-about"><a href="/about/" rel="section"><i class="fa fa-user fa-fw"></i>关于</a></li><li class="menu-item menu-item-tags"><a href="/tags/" rel="section"><i class="fa fa-tags fa-fw"></i>标签</a></li><li class="menu-item menu-item-categories"><a href="/categories/" rel="section"><i class="fa fa-th fa-fw"></i>分类</a></li><li class="menu-item menu-item-archives"><a href="/archives/" rel="section"><i class="fa fa-archive fa-fw"></i>归档</a></li>
+      <li class="menu-item menu-item-search">
+        <a role="button" class="popup-trigger"><i class="fa fa-search fa-fw"></i>搜索
+        </a>
+      </li>
+  </ul>
+</nav>
+
+
+
+  <div class="search-pop-overlay">
+    <div class="popup search-popup">
+      <div class="search-header">
+        <span class="search-icon">
+          <i class="fa fa-search"></i>
+        </span>
+        <div class="search-input-container">
+          <input autocomplete="off" autocapitalize="off" maxlength="80"
+                placeholder="搜索..." spellcheck="false"
+                type="search" class="search-input">
+        </div>
+        <span class="popup-btn-close" role="button">
+          <i class="fa fa-times-circle"></i>
+        </span>
+      </div>
+      <div class="search-result-container">
+        <div class="search-result-icon">
+          <i class="fa fa-spinner fa-pulse fa-5x"></i>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</header>
+        
+  
+  <aside class="sidebar">
+
+    <div class="sidebar-inner sidebar-nav-active sidebar-toc-active">
+      <ul class="sidebar-nav">
+        <li class="sidebar-nav-toc">
+          文章目录
+        </li>
+        <li class="sidebar-nav-overview">
+          站点概览
+        </li>
+      </ul>
+
+      <div class="sidebar-panel-container">
+        <!--noindex-->
+        <div class="post-toc-wrap sidebar-panel">
+            <div class="post-toc animated"><ol class="nav"><li class="nav-item nav-level-2"><a class="nav-link" href="#%E4%B8%80%E3%80%81System-Prompt-%E4%B8%8D%E6%98%AF%E7%9F%A5%E8%AF%86%E4%BB%93%E5%BA%93"><span class="nav-text">一、System Prompt 不是知识仓库</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E4%BA%8C%E3%80%81Skills-%E7%9A%84%E6%A0%B8%E5%BF%83%E6%98%AF%E6%B8%90%E8%BF%9B%E5%BC%8F%E6%8A%AB%E9%9C%B2"><span class="nav-text">二、Skills 的核心是渐进式披露</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E4%B8%89%E3%80%81%E4%B8%80%E4%B8%AA-Skill-%E7%9B%AE%E5%BD%95%E9%95%BF%E4%BB%80%E4%B9%88%E6%A0%B7"><span class="nav-text">三、一个 Skill 目录长什么样</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%9B%9B%E3%80%81%E5%90%AF%E5%8A%A8%E6%97%B6%E5%8F%AA%E6%9E%84%E5%BB%BA-Skill-%E6%B3%A8%E5%86%8C%E8%A1%A8"><span class="nav-text">四、启动时只构建 Skill 注册表</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E4%BA%94%E3%80%81%E5%8A%A0%E8%BD%BD%E6%97%B6%E6%8C%89%E5%90%8D%E7%A7%B0%E6%9F%A5%E8%A1%A8%EF%BC%8C%E4%B8%8D%E6%8E%A5%E5%8F%97%E4%BB%BB%E6%84%8F%E8%B7%AF%E5%BE%84"><span class="nav-text">五、加载时按名称查表，不接受任意路径</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%85%AD%E3%80%81SKILL-md-%E4%B8%8D%E9%9C%80%E8%A6%81%E8%A3%85%E4%B8%8B%E6%89%80%E6%9C%89%E8%B5%84%E6%BA%90"><span class="nav-text">六、SKILL.md 不需要装下所有资源</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E4%B8%83%E3%80%81Skill%E3%80%81Tool-%E5%92%8C-Subagent-%E5%88%86%E5%88%AB%E8%A7%A3%E5%86%B3%E4%BB%80%E4%B9%88"><span class="nav-text">七、Skill、Tool 和 Subagent 分别解决什么</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%85%AB%E3%80%81%E5%A4%9A%E6%9D%A5%E6%BA%90-Skill-%E5%A6%82%E4%BD%95%E5%A4%84%E7%90%86%E5%86%B2%E7%AA%81"><span class="nav-text">八、多来源 Skill 如何处理冲突</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E4%B9%9D%E3%80%81%E6%8C%89%E8%B7%AF%E5%BE%84%E6%88%96%E4%BB%BB%E5%8A%A1%E6%9D%A1%E4%BB%B6%E7%BC%A9%E5%B0%8F%E7%9B%AE%E5%BD%95"><span class="nav-text">九、按路径或任务条件缩小目录</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%8D%81%E3%80%81%E5%8A%A0%E8%BD%BD%E5%90%8E%E7%9A%84%E7%9F%A5%E8%AF%86%E4%B9%9F%E4%BC%9A%E8%BF%87%E6%9C%9F"><span class="nav-text">十、加载后的知识也会过期</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%8D%81%E4%B8%80%E3%80%81%E8%BF%99%E4%B8%80%E7%AF%87%E7%9C%9F%E6%AD%A3%E9%9C%80%E8%A6%81%E8%AE%B0%E4%BD%8F%E4%BB%80%E4%B9%88"><span class="nav-text">十一、这一篇真正需要记住什么</span></a></li></ol></div>
+        </div>
+        <!--/noindex-->
+
+        <div class="site-overview-wrap sidebar-panel">
+          <div class="site-author animated" itemprop="author" itemscope itemtype="http://schema.org/Person">
+    <img class="site-author-image" itemprop="image" alt="陌忆"
+      src="/images/avatar.webp">
+  <p class="site-author-name" itemprop="name">陌忆</p>
+  <div class="site-description" itemprop="description">记录 RAG、Agent、MCP、算法与软件工程实践，按专栏整理可复用的技术笔记。</div>
+</div>
+<div class="site-state-wrap animated">
+  <nav class="site-state">
+      <div class="site-state-item site-state-posts">
+        <a href="/archives/">
+          <span class="site-state-item-count">50</span>
+          <span class="site-state-item-name">日志</span>
+        </a>
+      </div>
+      <div class="site-state-item site-state-categories">
+          <a href="/categories/">
+        <span class="site-state-item-count">10</span>
+        <span class="site-state-item-name">分类</span></a>
+      </div>
+      <div class="site-state-item site-state-tags">
+          <a href="/tags/">
+        <span class="site-state-item-count">172</span>
+        <span class="site-state-item-name">标签</span></a>
+      </div>
+  </nav>
+</div>
+  <div class="links-of-author animated">
+      <span class="links-of-author-item">
+        <a href="https://github.com/moyi-math" title="GitHub → https:&#x2F;&#x2F;github.com&#x2F;moyi-math" rel="noopener me" target="_blank"><i class="fab fa-github fa-fw"></i>GitHub</a>
+      </span>
+  </div>
+  <div class="cc-license animated" itemprop="license">
+    <a href="https://creativecommons.org/licenses/by-nc-sa/4.0/" class="cc-opacity" rel="noopener" target="_blank"><img src="https://cdnjs.cloudflare.com/ajax/libs/creativecommons-vocabulary/2020.11.3/assets/license_badges/small/by_nc_sa.svg" alt="Creative Commons"></a>
+  </div>
+
+        </div>
+      </div>
+    </div>
+
+    
+  </aside>
+
+
+    </div>
+
+    <div class="main-inner post posts-expand">
+
+
+  
+
+
+<div class="post-block">
+  
+  
+
+  <article itemscope itemtype="http://schema.org/Article" class="post-content" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="https://moyi-math.github.io/2026/08/20/Learn-Claude-Code-07-Skills/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.webp">
+      <meta itemprop="name" content="陌忆">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="陌忆的博客">
+      <meta itemprop="description" content="记录 RAG、Agent、MCP、算法与软件工程实践，按专栏整理可复用的技术笔记。">
+    </span>
+
+    <span hidden itemprop="post" itemscope itemtype="http://schema.org/CreativeWork">
+      <meta itemprop="name" content="Learn Claude Code 07：Skills——让专业知识按需进入上下文 | 陌忆的博客">
+      <meta itemprop="description" content="从 System Prompt 膨胀出发，拆解 Skill 的两级加载、注册表、触发描述与资源引用，并厘清 Skill、Tool 和 Subagent 的职责边界。">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          Learn Claude Code 07：Skills——让专业知识按需进入上下文
+        </h1>
+
+        <div class="post-meta-container">
+          <div class="post-meta">
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-calendar"></i>
+      </span>
+      <span class="post-meta-item-text">发表于</span>
+      
+
+      <time title="创建时间：2026-08-20 11:00:00 / 修改时间：22:47:37" itemprop="dateCreated datePublished" datetime="2026-08-20T11:00:00+08:00">2026-08-20</time>
+    </span>
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-folder"></i>
+      </span>
+      <span class="post-meta-item-text">分类于</span>
+        <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+          <a href="/categories/Learn-Claude-Code/" itemprop="url" rel="index"><span itemprop="name">Learn Claude Code</span></a>
+        </span>
+    </span>
+
+  
+    <span class="post-meta-break"></span>
+    <span class="post-meta-item" title="本文字数">
+      <span class="post-meta-item-icon">
+        <i class="far fa-file-word"></i>
+      </span>
+      <span class="post-meta-item-text">本文字数：</span>
+      <span>2.4k</span>
+    </span>
+    <span class="post-meta-item" title="阅读时长">
+      <span class="post-meta-item-icon">
+        <i class="far fa-clock"></i>
+      </span>
+      <span class="post-meta-item-text">阅读时长 &asymp;</span>
+      <span>9 分钟</span>
+    </span>
+</div>
+
+            <div class="post-description">从 System Prompt 膨胀出发，拆解 Skill 的两级加载、注册表、触发描述与资源引用，并厘清 Skill、Tool 和 Subagent 的职责边界。</div>
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody"><span id="more"></span>
+
+<blockquote>
+<p><strong>系列定位：</strong> Subagent 解决了不同子任务之间的上下文隔离，但每个 Agent 仍然需要专业知识：前端规范、数据库约束、发布流程、代码审查清单……如果把这些文档全部塞进 System Prompt，隔离出来的新上下文依然会从一开始就很拥挤。本文引入 Skills，让知识在真正需要时才进入消息历史。</p>
+</blockquote>
+<h2 id="一、System-Prompt-不是知识仓库"><a href="#一、System-Prompt-不是知识仓库" class="headerlink" title="一、System Prompt 不是知识仓库"></a>一、System Prompt 不是知识仓库</h2><p>假设一个项目同时维护以下说明：</p>
+<ul>
+<li>React 组件规范，2000 行；</li>
+<li>SQL 风格与表结构说明，1500 行；</li>
+<li>API 设计指南，3000 行；</li>
+<li>发布与回滚手册，1000 行。</li>
+</ul>
+<p>最直接的做法是启动时全部拼进 System Prompt。但 Agent 只是修改按钮颜色时，SQL 和发布手册依然会随每次 API 请求重复发送。</p>
+<p>这会产生四类成本：</p>
+<ol>
+<li><strong>Token 成本：</strong> 无关知识在每一轮重复占用窗口；</li>
+<li><strong>注意力成本：</strong> 规则越多，当前任务真正需要的指令越不突出；</li>
+<li><strong>维护成本：</strong> 任一文档更新都会改变庞大的基础 Prompt；</li>
+<li><strong>冲突风险：</strong> 不同领域的规范可能给出不兼容的建议。</li>
+</ol>
+<p>System Prompt 更适合承载身份、全局约束和稳定行为原则，而不是装下所有“也许有一天会用到”的知识。</p>
+<h2 id="二、Skills-的核心是渐进式披露"><a href="#二、Skills-的核心是渐进式披露" class="headerlink" title="二、Skills 的核心是渐进式披露"></a>二、Skills 的核心是渐进式披露</h2><p>按需加载需要同时解决两个看似矛盾的问题：</p>
+<ul>
+<li>如果 Agent 完全不知道某项知识存在，它就不会主动加载；</li>
+<li>如果把完整知识都提前告诉 Agent，又回到了 Prompt 膨胀。</li>
+</ul>
+<p>Skill 使用两级结构化解这个矛盾：</p>
+<table>
+<thead>
+<tr>
+<th>层级</th>
+<th>常驻内容</th>
+<th>作用</th>
+<th>成本</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>目录层</td>
+<td>名称、简短描述、触发条件</td>
+<td>让模型知道有哪些能力可选</td>
+<td>小，每轮携带</td>
+</tr>
+<tr>
+<td>内容层</td>
+<td>完整步骤、约束、示例和资源引用</td>
+<td>真正指导当前任务</td>
+<td>大，仅按需加载</td>
+</tr>
+</tbody></table>
+<p>数据流可以画成：</p>
+<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br></pre></td><td class="code"><pre><span class="line">启动时扫描 skills/</span><br><span class="line">        ↓</span><br><span class="line">System Prompt 只看到目录</span><br><span class="line">  - code-review：审查代码缺陷</span><br><span class="line">  - sql-style：遵循数据库规范</span><br><span class="line">  - release：执行发布检查</span><br><span class="line">        ↓</span><br><span class="line">当前任务需要 SQL 规范？</span><br><span class="line">     /              \</span><br><span class="line">   不需要            需要</span><br><span class="line">     │                │</span><br><span class="line">不加载正文      load_skill(&quot;sql-style&quot;)</span><br><span class="line">                      ↓</span><br><span class="line">              完整知识进入当前上下文</span><br></pre></td></tr></table></figure>
+
+<p>这就是渐进式披露：先给模型足以做选择的元数据，再在选择发生后提供细节。</p>
+<h2 id="三、一个-Skill-目录长什么样"><a href="#三、一个-Skill-目录长什么样" class="headerlink" title="三、一个 Skill 目录长什么样"></a>三、一个 Skill 目录长什么样</h2><p>最小目录约定可以是：</p>
+<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br></pre></td><td class="code"><pre><span class="line">skills/</span><br><span class="line">├── code-review/</span><br><span class="line">│   ├── SKILL.md</span><br><span class="line">│   └── references/</span><br><span class="line">│       └── checklist.md</span><br><span class="line">├── sql-style/</span><br><span class="line">│   ├── SKILL.md</span><br><span class="line">│   └── examples/</span><br><span class="line">└── release/</span><br><span class="line">    ├── SKILL.md</span><br><span class="line">    └── scripts/</span><br><span class="line">        └── verify.ps1</span><br></pre></td></tr></table></figure>
+
+<p>每个 <code>SKILL.md</code> 由 YAML 元数据和正文组成：</p>
+<figure class="highlight markdown"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br></pre></td><td class="code"><pre><span class="line">---</span><br><span class="line">name: code-review</span><br><span class="line">description: Review code changes for correctness, security, and regressions.</span><br><span class="line"><span class="section">when<span class="emphasis">_to_</span>use: Use when the user asks to review a diff, commit, or pull request.</span></span><br><span class="line"><span class="section">---</span></span><br><span class="line"></span><br><span class="line"><span class="section"># Code Review</span></span><br><span class="line"></span><br><span class="line"><span class="bullet">1.</span> Understand the intended behavior.</span><br><span class="line"><span class="bullet">2.</span> Inspect the diff and affected callers.</span><br><span class="line"><span class="bullet">3.</span> Prioritize correctness and security findings.</span><br><span class="line"><span class="bullet">4.</span> Report evidence with file and line references.</span><br></pre></td></tr></table></figure>
+
+<p><code>description</code> 不是宣传文案，而是路由信息。它需要清楚说明“解决什么问题”和“何时使用”。描述过于宽泛，例如“帮助处理代码”，会让模型在大量无关任务中误触发；描述过窄则会漏掉本该使用的场景。</p>
+<h2 id="四、启动时只构建-Skill-注册表"><a href="#四、启动时只构建-Skill-注册表" class="headerlink" title="四、启动时只构建 Skill 注册表"></a>四、启动时只构建 Skill 注册表</h2><p>运行框架启动时扫描目录，解析元数据，并把规范化名称映射到可信的实际目录：</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">from</span> pathlib <span class="keyword">import</span> Path</span><br><span class="line"></span><br><span class="line">SKILLS_DIR = Path(<span class="string">&quot;skills&quot;</span>).resolve()</span><br><span class="line">SKILL_REGISTRY: <span class="built_in">dict</span>[<span class="built_in">str</span>, <span class="built_in">dict</span>] = &#123;&#125;</span><br><span class="line"></span><br><span class="line"></span><br><span class="line"><span class="keyword">def</span> <span class="title function_">scan_skills</span>() -&gt; <span class="literal">None</span>:</span><br><span class="line">    <span class="keyword">for</span> directory <span class="keyword">in</span> <span class="built_in">sorted</span>(SKILLS_DIR.iterdir()):</span><br><span class="line">        <span class="keyword">if</span> <span class="keyword">not</span> directory.is_dir():</span><br><span class="line">            <span class="keyword">continue</span></span><br><span class="line"></span><br><span class="line">        manifest = directory / <span class="string">&quot;SKILL.md&quot;</span></span><br><span class="line">        <span class="keyword">if</span> <span class="keyword">not</span> manifest.is_file():</span><br><span class="line">            <span class="keyword">continue</span></span><br><span class="line"></span><br><span class="line">        raw = manifest.read_text(encoding=<span class="string">&quot;utf-8&quot;</span>)</span><br><span class="line">        metadata, _ = parse_frontmatter(raw)</span><br><span class="line">        name = metadata.get(<span class="string">&quot;name&quot;</span>, directory.name)</span><br><span class="line"></span><br><span class="line">        <span class="keyword">if</span> name <span class="keyword">in</span> SKILL_REGISTRY:</span><br><span class="line">            <span class="keyword">raise</span> ValueError(<span class="string">f&quot;Duplicate skill name: <span class="subst">&#123;name&#125;</span>&quot;</span>)</span><br><span class="line"></span><br><span class="line">        SKILL_REGISTRY[name] = &#123;</span><br><span class="line">            <span class="string">&quot;name&quot;</span>: name,</span><br><span class="line">            <span class="string">&quot;description&quot;</span>: metadata.get(<span class="string">&quot;description&quot;</span>, <span class="string">&quot;&quot;</span>),</span><br><span class="line">            <span class="string">&quot;directory&quot;</span>: directory.resolve(),</span><br><span class="line">            <span class="string">&quot;manifest&quot;</span>: manifest.resolve(),</span><br><span class="line">        &#125;</span><br></pre></td></tr></table></figure>
+
+<p>目录注入只使用精简元数据：</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">def</span> <span class="title function_">skill_catalog</span>() -&gt; <span class="built_in">str</span>:</span><br><span class="line">    lines = [<span class="string">&quot;Available skills:&quot;</span>]</span><br><span class="line">    <span class="keyword">for</span> skill <span class="keyword">in</span> SKILL_REGISTRY.values():</span><br><span class="line">        lines.append(</span><br><span class="line">            <span class="string">f&quot;- <span class="subst">&#123;skill[<span class="string">&#x27;name&#x27;</span>]&#125;</span>: <span class="subst">&#123;skill[<span class="string">&#x27;description&#x27;</span>]&#125;</span>&quot;</span></span><br><span class="line">        )</span><br><span class="line">    <span class="keyword">return</span> <span class="string">&quot;\n&quot;</span>.join(lines)</span><br></pre></td></tr></table></figure>
+
+<p>目录本身也要有预算。如果装了几百个 Skill，即使每项只有几十个词，常驻成本仍会变大。可以限制总字符数、按项目路径筛选，或先展示相关度最高的一组。</p>
+<h2 id="五、加载时按名称查表，不接受任意路径"><a href="#五、加载时按名称查表，不接受任意路径" class="headerlink" title="五、加载时按名称查表，不接受任意路径"></a>五、加载时按名称查表，不接受任意路径</h2><p><code>load_skill</code> 工具只接收注册表中的逻辑名称：</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">def</span> <span class="title function_">load_skill</span>(<span class="params">name: <span class="built_in">str</span></span>) -&gt; <span class="built_in">str</span>:</span><br><span class="line">    skill = SKILL_REGISTRY.get(name)</span><br><span class="line">    <span class="keyword">if</span> skill <span class="keyword">is</span> <span class="literal">None</span>:</span><br><span class="line">        available = <span class="string">&quot;, &quot;</span>.join(<span class="built_in">sorted</span>(SKILL_REGISTRY))</span><br><span class="line">        <span class="keyword">return</span> <span class="string">f&quot;Skill not found. Available: <span class="subst">&#123;available&#125;</span>&quot;</span></span><br><span class="line"></span><br><span class="line">    <span class="keyword">return</span> skill[<span class="string">&quot;manifest&quot;</span>].read_text(encoding=<span class="string">&quot;utf-8&quot;</span>)</span><br></pre></td></tr></table></figure>
+
+<p>不能把输入直接拼成路径：</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># 不安全：name 可能是 ../../secrets</span></span><br><span class="line">Path(<span class="string">&quot;skills&quot;</span>, name, <span class="string">&quot;SKILL.md&quot;</span>).read_text()</span><br></pre></td></tr></table></figure>
+
+<p>启动时完成扫描和路径规范化，运行时只允许按注册名称查表，既减少重复 I&#x2F;O，也消除了这类路径遍历入口。</p>
+<p>教学实现可以把全文作为 <code>tool_result</code> 返回。更完整的运行框架也可以通过专门的新消息注入 Skill 内容，只在界面上显示“正在加载某技能”。两种实现的协议细节不同，设计目标相同：<strong>完整正文进入当前会话历史，而不是永久膨胀 System Prompt。</strong></p>
+<h2 id="六、SKILL-md-不需要装下所有资源"><a href="#六、SKILL-md-不需要装下所有资源" class="headerlink" title="六、SKILL.md 不需要装下所有资源"></a>六、SKILL.md 不需要装下所有资源</h2><p>Skill 正文适合描述工作流和资源导航，不必复制完整规范、脚本和模板。它可以告诉 Agent 接下来按需读取哪些文件：</p>
+<figure class="highlight markdown"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line"><span class="section">## Workflow</span></span><br><span class="line"></span><br><span class="line"><span class="bullet">1.</span> Read <span class="code">`references/checklist.md`</span> before reviewing.</span><br><span class="line"><span class="bullet">2.</span> Use <span class="code">`scripts/collect-diff.ps1`</span> to gather the change set.</span><br><span class="line"><span class="bullet">3.</span> Load files under <span class="code">`examples/`</span> only when a matching case appears.</span><br></pre></td></tr></table></figure>
+
+<p>这形成第三层披露：</p>
+<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line">Skill 目录摘要</span><br><span class="line">      ↓ 按需</span><br><span class="line">SKILL.md 工作流</span><br><span class="line">      ↓ 按需</span><br><span class="line">references / scripts / assets</span><br></pre></td></tr></table></figure>
+
+<p>但引用资源仍属于工具访问，需要遵守现有权限规则。Skill 指示“运行脚本”只是建议，不是授权；脚本应先经过可信来源检查，实际命令仍要通过 <code>PreToolUse</code> Hook 和 Permission Gate。</p>
+<h2 id="七、Skill、Tool-和-Subagent-分别解决什么"><a href="#七、Skill、Tool-和-Subagent-分别解决什么" class="headerlink" title="七、Skill、Tool 和 Subagent 分别解决什么"></a>七、Skill、Tool 和 Subagent 分别解决什么</h2><p>这三个概念经常同时出现，但职责不同：</p>
+<table>
+<thead>
+<tr>
+<th>机制</th>
+<th>核心问题</th>
+<th>提供的东西</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Tool</td>
+<td>Agent 怎样作用于外部世界</td>
+<td>可执行动作</td>
+</tr>
+<tr>
+<td>Skill</td>
+<td>Agent 应该怎样完成某类工作</td>
+<td>知识与流程</td>
+</tr>
+<tr>
+<td>Subagent</td>
+<td>一项独立工作在哪里推理</td>
+<td>隔离的执行上下文</td>
+</tr>
+</tbody></table>
+<p>以代码审查为例：</p>
+<ul>
+<li><code>read_file</code>、<code>git diff</code> 是 Tool；</li>
+<li>缺陷分类和审查清单是 Skill；</li>
+<li>把安全审查交给独立上下文执行的是 Subagent。</li>
+</ul>
+<p>一个 Skill 还可以声明在独立上下文中运行，相当于组合“专业流程 + Subagent”。但这种组合仍应明确工具集合、模型、预算和权限模式，不能因为加载了 Skill 就默认获得额外能力。</p>
+<h2 id="八、多来源-Skill-如何处理冲突"><a href="#八、多来源-Skill-如何处理冲突" class="headerlink" title="八、多来源 Skill 如何处理冲突"></a>八、多来源 Skill 如何处理冲突</h2><p>真实系统中的 Skill 可能来自多个位置：</p>
+<ul>
+<li>产品内置；</li>
+<li>企业管理策略；</li>
+<li>用户级目录；</li>
+<li>项目级目录；</li>
+<li>插件或远程服务；</li>
+<li>命令行临时添加的目录。</li>
+</ul>
+<p>这会带来同名冲突和信任问题。运行框架至少需要：</p>
+<ol>
+<li>明确来源优先级，不能依赖文件系统遍历顺序；</li>
+<li>在注册表中记录来源、真实路径和版本；</li>
+<li>同名覆盖时给出可观察提示，而不是静默替换；</li>
+<li>企业策略或安全禁用不能被项目 Skill 绕过；</li>
+<li>远程内容需要固定版本、校验完整性并限制权限。</li>
+</ol>
+<p>Skill 是会影响模型行为的可执行知识，风险类似代码依赖。第三方 <code>SKILL.md</code> 可能诱导 Agent 读取凭证、运行危险命令或忽略用户要求，因此不能把“只是 Markdown”当作安全保证。</p>
+<h2 id="九、按路径或任务条件缩小目录"><a href="#九、按路径或任务条件缩小目录" class="headerlink" title="九、按路径或任务条件缩小目录"></a>九、按路径或任务条件缩小目录</h2><p>当 Skill 数量继续增长，可以根据上下文做条件激活。例如某个 Skill 的元数据声明：</p>
+<figure class="highlight yaml"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line"><span class="attr">paths:</span></span><br><span class="line">  <span class="bullet">-</span> <span class="string">&quot;frontend/**/*.tsx&quot;</span></span><br><span class="line">  <span class="bullet">-</span> <span class="string">&quot;frontend/**/*.css&quot;</span></span><br></pre></td></tr></table></figure>
+
+<p>只有当前任务涉及匹配文件时，目录才展示该 Skill。这样既减少 Token，又降低错误路由概率。</p>
+<p>但条件激活应该是“提高相关度”，不是隐藏用户明确要求的能力。用户点名某个 Skill 时，系统仍应能解析并加载，或清楚说明它为何不可用。</p>
+<h2 id="十、加载后的知识也会过期"><a href="#十、加载后的知识也会过期" class="headerlink" title="十、加载后的知识也会过期"></a>十、加载后的知识也会过期</h2><p>Skill 一旦进入消息历史，会和其他消息一样持续占用上下文，直到会话结束、被裁剪或被摘要。此后磁盘上的 <code>SKILL.md</code> 即使更新，历史中的旧版本也不会自动变化。</p>
+<p>因此可以记录加载事件的版本指纹：</p>
+<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line">skill: code-review</span><br><span class="line">source: project</span><br><span class="line">version: sha256:8b7...</span><br><span class="line">loaded_at: turn 12</span><br></pre></td></tr></table></figure>
+
+<p>当运行框架检测到文件变化时，可以提醒重新加载；上下文压缩时，则应保留“加载过哪些 Skill、关键约束是什么、当前版本是什么”。这正好引出下一章：按需加载解决“无关知识不要提前进入上下文”，Context Compact 解决“已经进入的历史如何腾出空间”。</p>
+<h2 id="十一、这一篇真正需要记住什么"><a href="#十一、这一篇真正需要记住什么" class="headerlink" title="十一、这一篇真正需要记住什么"></a>十一、这一篇真正需要记住什么</h2><ol>
+<li><strong>System Prompt 不是知识仓库。</strong> 全局稳定约束常驻，专业知识按需加载。</li>
+<li><strong>Skill 采用两级甚至三级披露。</strong> 目录帮助选择，正文指导流程，资源按需读取。</li>
+<li><strong>描述决定路由质量。</strong> 它要清楚说明用途和触发条件，而不是宽泛宣传。</li>
+<li><strong>运行时按注册名称加载。</strong> 不把模型输入直接当成文件路径。</li>
+<li><strong>Skill 提供知识，不提供授权。</strong> 引用的脚本和工具调用仍要经过权限管线。</li>
+<li><strong>多来源需要优先级与信任治理。</strong> 记录来源、版本和覆盖关系，防止静默劫持。</li>
+<li><strong>加载后的知识仍占上下文。</strong> 需要版本感知，并与后续压缩机制协作。</li>
+</ol>
+<p>下一篇将进入 Context Compact：先治理超大工具结果，再清理旧消息，最后用语义摘要替换历史，让有限上下文承载更长的工作过程。</p>
+
+    </div>
+
+    
+    
+    
+
+    <footer class="post-footer">
+          
+
+<div class="post-copyright">
+<ul>
+  <li class="post-copyright-author">
+      <strong>本文作者： </strong>陌忆
+  </li>
+  <li class="post-copyright-link">
+      <strong>本文链接：</strong>
+      <a href="https://moyi-math.github.io/2026/08/20/Learn-Claude-Code-07-Skills/" title="Learn Claude Code 07：Skills——让专业知识按需进入上下文">https://moyi-math.github.io/2026/08/20/Learn-Claude-Code-07-Skills/</a>
+  </li>
+  <li class="post-copyright-license">
+      <strong>版权声明： </strong>本博客所有文章除特别声明外，均采用 <a href="https://creativecommons.org/licenses/by-nc-sa/4.0/" rel="noopener" target="_blank"><i class="fab fa-fw fa-creative-commons"></i>BY-NC-SA</a> 许可协议。转载请注明出处！
+  </li>
+</ul>
+</div>
+
+          <div class="post-tags">
+              <a href="/tags/Agent/" rel="tag"># Agent</a>
+              <a href="/tags/Claude-Code/" rel="tag"># Claude Code</a>
+              <a href="/tags/Context-Engineering/" rel="tag"># Context Engineering</a>
+              <a href="/tags/Skills/" rel="tag"># Skills</a>
+              <a href="/tags/Progressive-Disclosure/" rel="tag"># Progressive Disclosure</a>
+          </div>
+
+        
+
+          <div class="post-nav">
+            <div class="post-nav-item">
+                <a href="/2026/08/20/Learn-Claude-Code-06-Subagent/" rel="prev" title="Learn Claude Code 06：Subagent——用独立上下文拆解复杂任务">
+                  <i class="fa fa-angle-left"></i> Learn Claude Code 06：Subagent——用独立上下文拆解复杂任务
+                </a>
+            </div>
+            <div class="post-nav-item">
+                <a href="/2026/08/20/Learn-Claude-Code-08-Context-Compact/" rel="next" title="Learn Claude Code 08：Context Compact——给长期运行的 Agent 腾出空间">
+                  Learn Claude Code 08：Context Compact——给长期运行的 Agent 腾出空间 <i class="fa fa-angle-right"></i>
+                </a>
+            </div>
+          </div>
+    </footer>
+  </article>
+</div>
+
+
+
+
+
+
+</div>
+  </main>
+
+  <footer class="footer">
+    <div class="footer-inner">
+
+  <div class="copyright">
+    &copy; 
+    <span itemprop="copyrightYear">2026</span>
+    <span class="with-love">
+      <i class="fab fa-osi"></i>
+    </span>
+    <span class="author" itemprop="copyrightHolder">陌忆</span>
+  </div>
+<div class="wordcount">
+  <span class="post-meta-item">
+    <span class="post-meta-item-icon">
+      <i class="fa fa-chart-line"></i>
+    </span>
+    <span title="站点总字数">106k</span>
+  </span>
+  <span class="post-meta-item">
+    <span class="post-meta-item-icon">
+      <i class="fa fa-coffee"></i>
+    </span>
+    <span title="站点阅读时长">6:24</span>
+  </span>
+</div>
+  <div class="powered-by">由 <a href="https://hexo.io/" rel="noopener" target="_blank">Hexo</a> & <a href="https://theme-next.js.org/" rel="noopener" target="_blank">NexT.Gemini</a> 强力驱动
+  </div>
+
+    </div>
+  </footer>
+
+  
+  <div class="toggle sidebar-toggle" role="button">
+    <span class="toggle-line"></span>
+    <span class="toggle-line"></span>
+    <span class="toggle-line"></span>
+  </div>
+  <div class="sidebar-dimmer"></div>
+  <div class="back-to-top" role="button" aria-label="返回顶部">
+    <i class="fa fa-arrow-up fa-lg"></i>
+    <span>0%</span>
+  </div>
+
+<noscript>
+  <div class="noscript-warning">Theme NexT works best with JavaScript enabled</div>
+</noscript>
+<!-- Site running time -->
+<span id="timeDate" aria-live="off"></span>
+<script>
+(function() {
+  var start = new Date("2022-11-17T08:00:00+08:00");
+  function pad(n) { return n < 10 ? "0" + n : "" + n; }
+  function tick() {
+    var diff = Date.now() - start.getTime();
+    if (diff < 0) return;
+    var d = Math.floor(diff / 86400000);
+    var h = Math.floor((diff % 86400000) / 3600000);
+    var m = Math.floor((diff % 3600000) / 60000);
+    var timeDate = document.getElementById("timeDate");
+    if (!timeDate) return;
+    timeDate.textContent =
+      "\u672C\u7AD9\u5DF2\u5B89\u5168\u8FD0\u884C " + d + " \u5929 " + pad(h) + " \u5C0F\u65F6 " + pad(m) + " \u5206";
+  }
+  tick();
+  setInterval(tick, 60000);
+})();
+</script>
+
+</body>
+</html>

@@ -1,0 +1,688 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width">
+<meta name="theme-color" content="#222" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#222" media="(prefers-color-scheme: dark)"><meta name="generator" content="Hexo 7.3.0">
+<link rel="preconnect" href="https://cdnjs.cloudflare.com" crossorigin>
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon-next.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32-next.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next.png">
+  <link rel="mask-icon" href="/images/logo.svg" color="#222">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/7.0.0/css/all.min.css" integrity="sha256-VHqXKFhhMxcpubYf9xiWdCiojEbY9NexQ4jh8AxbvcM=" crossorigin="anonymous">
+
+<script class="next-config" data-name="main" type="application/json">{"hostname":"moyi-math.github.io","root":"/","images":"/images","scheme":"Gemini","darkmode":true,"version":"8.28.0","exturl":false,"sidebar":{"position":"left","width_expanded":320,"width_dual_column":240,"display":"post","padding":18,"offset":12},"hljswrap":true,"codeblock":{"theme":{"light":"default","dark":"stackoverflow-dark"},"prism":{"light":"prism","dark":"prism-dark"},"copy_button":{"enable":true,"style":null},"fold":{"enable":false,"height":500},"language":false},"bookmark":{"enable":false,"color":"#222","save":"auto"},"mediumzoom":false,"lazyload":true,"pangu":false,"comments":{"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},"stickytabs":false,"motion":{"enable":false,"async":false,"duration":200,"transition":{"menu_item":"fadeInDown","post_block":"fadeIn","post_header":"fadeInDown","post_body":"fadeInDown","coll_header":"fadeInLeft","sidebar":"fadeInUp"}},"prism":false,"i18n":{"placeholder":"搜索...","empty":"没有找到任何搜索结果：${query}","hits_time":"找到 ${hits} 个搜索结果（用时 ${time} 毫秒）","hits":"找到 ${hits} 个搜索结果"},"path":"/search.json","localsearch":{"enable":true,"top_n_per_article":1,"unescape":false,"preload":false}}</script><script src="/js/config.js" defer></script>
+
+    <meta name="description" content="如何科学衡量算法的效率？大O表示法告诉你算法随输入规模增长的&quot;增长趋势&quot;，而不是精确的运行秒数。从 O(1) 到 O(n!)，七个常见复杂度一一拆解。">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Hello算法 学习笔记 · 2.2 时间复杂度与空间复杂度">
+<meta property="og:url" content="https://moyi-math.github.io/2026/07/25/Hello%E7%AE%97%E6%B3%95-2.2-%E6%97%B6%E9%97%B4%E5%A4%8D%E6%9D%82%E5%BA%A6%E4%B8%8E%E7%A9%BA%E9%97%B4%E5%A4%8D%E6%9D%82%E5%BA%A6/index.html">
+<meta property="og:site_name" content="陌忆的博客">
+<meta property="og:description" content="如何科学衡量算法的效率？大O表示法告诉你算法随输入规模增长的&quot;增长趋势&quot;，而不是精确的运行秒数。从 O(1) 到 O(n!)，七个常见复杂度一一拆解。">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:image" content="https://moyi-math.github.io/images/background.webp">
+<meta property="article:published_time" content="2026-07-25T16:00:00.000Z">
+<meta property="article:modified_time" content="2026-07-25T16:00:00.000Z">
+<meta property="article:author" content="陌忆">
+<meta property="article:tag" content="算法">
+<meta property="article:tag" content="数据结构">
+<meta property="article:tag" content="Python">
+<meta property="article:tag" content="时间复杂度">
+<meta property="article:tag" content="空间复杂度">
+<meta property="article:tag" content="大O表示法">
+<meta property="article:tag" content="O(1)">
+<meta property="article:tag" content="O(n)">
+<meta property="article:tag" content="O(n²)">
+<meta property="article:tag" content="O(2ⁿ)">
+<meta property="article:tag" content="O(log n)">
+<meta property="article:tag" content="O(nlog n)">
+<meta property="article:tag" content="O(n!)">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:image" content="https://moyi-math.github.io/images/background.webp">
+
+
+<link rel="canonical" href="https://moyi-math.github.io/2026/07/25/Hello%E7%AE%97%E6%B3%95-2.2-%E6%97%B6%E9%97%B4%E5%A4%8D%E6%9D%82%E5%BA%A6%E4%B8%8E%E7%A9%BA%E9%97%B4%E5%A4%8D%E6%9D%82%E5%BA%A6/">
+
+
+<script class="next-config" data-name="page" type="application/json">{"sidebar":"","isHome":false,"isPost":true,"lang":"zh-CN","comments":true,"permalink":"https://moyi-math.github.io/2026/07/25/Hello%E7%AE%97%E6%B3%95-2.2-%E6%97%B6%E9%97%B4%E5%A4%8D%E6%9D%82%E5%BA%A6%E4%B8%8E%E7%A9%BA%E9%97%B4%E5%A4%8D%E6%9D%82%E5%BA%A6/","path":"2026/07/25/Hello算法-2.2-时间复杂度与空间复杂度/","title":"Hello算法 学习笔记 · 2.2 时间复杂度与空间复杂度"}</script>
+
+<script class="next-config" data-name="calendar" type="application/json">""</script>
+<title>Hello算法 学习笔记 · 2.2 时间复杂度与空间复杂度 | 陌忆的博客</title>
+  
+
+
+
+
+
+
+
+
+  
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/animejs/3.2.1/anime.min.js" integrity="sha256-XL2inqUJaslATFnHdJOi9GfQ60on8Wx1C2H8DYiN1xY=" crossorigin="anonymous" defer></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/lozad.js/1.16.0/lozad.min.js" integrity="sha256-mOFREFhqmHeQbXpK2lp4nA3qooVgACfh88fpJftLBbc=" crossorigin="anonymous" defer></script>
+<script src="/js/utils.js" defer></script><script src="/js/sidebar.js" defer></script><script src="/js/next-boot.js" defer></script>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/hexo-generator-searchdb/1.5.0/search.js" integrity="sha256-xFC6PJ82SL9b3WkGjFavNiA9gm5z6UBxWPiu4CYjptg=" crossorigin="anonymous" defer></script>
+<script src="/js/third-party/search/local-search.js" defer></script>
+
+
+
+
+
+
+
+  
+
+
+
+
+  
+
+  <script class="next-config" data-name="enableMath" type="application/json">false</script><link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/katex.min.css" integrity="sha256-UF1fgpAiu3tPJN/uCqEUHNe7pnr+QR0SQDNfgglgtcM=" crossorigin="anonymous">
+
+
+<link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
+
+
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"WebSite","name":"陌忆的博客","url":"https://moyi-math.github.io","description":"记录 RAG、Agent、MCP、算法与软件工程实践，按专栏整理可复用的技术笔记。","inLanguage":"zh-CN","author":{"@type":"Person","name":"陌忆"}}</script>
+
+
+
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"Article","headline":"Hello算法 学习笔记 · 2.2 时间复杂度与空间复杂度","description":"如何科学衡量算法的效率？大O表示法告诉你算法随输入规模增长的\"增长趋势\"，而不是精确的运行秒数。从 O(1) 到 O(n!)，七个常见复杂度一一拆解。","datePublished":"2026-07-25T16:00:00.000Z","dateModified":"2026-07-25T16:00:00.000Z","inLanguage":"zh-CN","mainEntityOfPage":{"@type":"WebPage","@id":"https://moyi-math.github.io/2026/07/25/Hello%E7%AE%97%E6%B3%95-2.2-%E6%97%B6%E9%97%B4%E5%A4%8D%E6%9D%82%E5%BA%A6%E4%B8%8E%E7%A9%BA%E9%97%B4%E5%A4%8D%E6%9D%82%E5%BA%A6/index.html"},"author":{"@type":"Person","name":"陌忆"}}</script>
+<meta name="author" content="陌忆">
+
+
+  <noscript>
+    <link rel="stylesheet" href="/css/noscript.css">
+  </noscript>
+<!-- hexo injector head_end start --><link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/katex.min.css" integrity="sha512-fHwaWebuwA7NSF5Qg/af4UeDx9XqUpYpOGgubo3yWu+b2IQR4UeQwbb42Ti7gVAjNtVoI/I9TEoYeu9omwcC6g==" crossorigin="anonymous" referrerpolicy="no-referrer" /><!-- hexo injector head_end end --><link rel="alternate" href="/atom.xml" title="陌忆的博客" type="application/atom+xml">
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage">
+  <div class="headband"></div>
+
+  <main class="main">
+    <div class="column">
+      <header class="header" itemscope itemtype="http://schema.org/WPHeader"><div class="site-brand-container">
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="切换导航栏" role="button">
+        <span class="toggle-line"></span>
+        <span class="toggle-line"></span>
+        <span class="toggle-line"></span>
+    </div>
+  </div>
+
+  <div class="site-meta">
+
+    <a href="/" class="brand" rel="start">
+      <i class="logo-line"></i>
+      <p class="site-title">陌忆的博客</p>
+      <i class="logo-line"></i>
+    </a>
+      <p class="site-subtitle" itemprop="description">数据库无法得出结论</p>
+  </div>
+
+  <div class="site-nav-right">
+    <div class="toggle popup-trigger" aria-label="搜索" role="button">
+        <i class="fa fa-search fa-fw fa-lg"></i>
+    </div>
+  </div>
+</div>
+
+
+
+<nav class="site-nav">
+  <ul class="main-menu menu"><li class="menu-item menu-item-home"><a href="/" rel="section"><i class="fa fa-home fa-fw"></i>首页</a></li><li class="menu-item menu-item-about"><a href="/about/" rel="section"><i class="fa fa-user fa-fw"></i>关于</a></li><li class="menu-item menu-item-tags"><a href="/tags/" rel="section"><i class="fa fa-tags fa-fw"></i>标签</a></li><li class="menu-item menu-item-categories"><a href="/categories/" rel="section"><i class="fa fa-th fa-fw"></i>分类</a></li><li class="menu-item menu-item-archives"><a href="/archives/" rel="section"><i class="fa fa-archive fa-fw"></i>归档</a></li>
+      <li class="menu-item menu-item-search">
+        <a role="button" class="popup-trigger"><i class="fa fa-search fa-fw"></i>搜索
+        </a>
+      </li>
+  </ul>
+</nav>
+
+
+
+  <div class="search-pop-overlay">
+    <div class="popup search-popup">
+      <div class="search-header">
+        <span class="search-icon">
+          <i class="fa fa-search"></i>
+        </span>
+        <div class="search-input-container">
+          <input autocomplete="off" autocapitalize="off" maxlength="80"
+                placeholder="搜索..." spellcheck="false"
+                type="search" class="search-input">
+        </div>
+        <span class="popup-btn-close" role="button">
+          <i class="fa fa-times-circle"></i>
+        </span>
+      </div>
+      <div class="search-result-container">
+        <div class="search-result-icon">
+          <i class="fa fa-spinner fa-pulse fa-5x"></i>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</header>
+        
+  
+  <aside class="sidebar">
+
+    <div class="sidebar-inner sidebar-nav-active sidebar-toc-active">
+      <ul class="sidebar-nav">
+        <li class="sidebar-nav-toc">
+          文章目录
+        </li>
+        <li class="sidebar-nav-overview">
+          站点概览
+        </li>
+      </ul>
+
+      <div class="sidebar-panel-container">
+        <!--noindex-->
+        <div class="post-toc-wrap sidebar-panel">
+            <div class="post-toc animated"><ol class="nav"><li class="nav-item nav-level-2"><a class="nav-link" href="#%E6%91%98%E8%A6%81-Abstract"><span class="nav-text">摘要(Abstract)</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E4%B8%80%E3%80%81%E5%A4%A7O%E8%A1%A8%E7%A4%BA%E6%B3%95"><span class="nav-text">一、大O表示法</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#1-1-%E4%B8%BA%E4%BB%80%E4%B9%88%E9%9C%80%E8%A6%81%E5%A4%A7O%EF%BC%9F"><span class="nav-text">1.1 为什么需要大O？</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#1-2-%E6%A0%B8%E5%BF%83%E8%A7%84%E5%88%99"><span class="nav-text">1.2 核心规则</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E4%BA%8C%E3%80%81%E4%B8%83%E5%A4%A7%E6%97%B6%E9%97%B4%E5%A4%8D%E6%9D%82%E5%BA%A6"><span class="nav-text">二、七大时间复杂度</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#2-1-O-1-%E5%B8%B8%E6%95%B0%E9%98%B6%E2%80%94%E2%80%94%E4%B8%8E-n-%E6%97%A0%E5%85%B3"><span class="nav-text">2.1 O(1) 常数阶——与 n 无关</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#2-2-O-log-n-%E5%AF%B9%E6%95%B0%E9%98%B6%E2%80%94%E2%80%94%E6%95%88%E7%8E%87%E4%B9%8B%E7%8E%8B"><span class="nav-text">2.2 O(log n) 对数阶——效率之王</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#2-3-O-n-%E7%BA%BF%E6%80%A7%E9%98%B6%E2%80%94%E2%80%94%E4%B8%8E-n-%E6%88%90%E6%AD%A3%E6%AF%94"><span class="nav-text">2.3 O(n) 线性阶——与 n 成正比</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#2-4-O-n-log-n-%E7%BA%BF%E6%80%A7%E5%AF%B9%E6%95%B0%E9%98%B6%E2%80%94%E2%80%94%E5%88%86%E6%B2%BB%E7%9A%84%E4%BB%A3%E4%BB%B7"><span class="nav-text">2.4 O(n log n) 线性对数阶——分治的代价</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#2-5-O-n%C2%B2-%E5%B9%B3%E6%96%B9%E9%98%B6%E2%80%94%E2%80%94%E4%B8%A4%E5%B1%82%E5%B5%8C%E5%A5%97"><span class="nav-text">2.5 O(n²) 平方阶——两层嵌套</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#2-6-O-2%E2%81%BF-%E6%8C%87%E6%95%B0%E9%98%B6%E2%80%94%E2%80%94%E5%A2%9E%E9%95%BF%E6%81%90%E6%80%96"><span class="nav-text">2.6 O(2ⁿ) 指数阶——增长恐怖</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#2-7-O-n-%E9%98%B6%E4%B9%98%E9%98%B6%E2%80%94%E2%80%94%E6%9C%80%E6%85%A2%E7%9A%84%E5%B8%B8%E8%A7%81%E5%A4%8D%E6%9D%82%E5%BA%A6"><span class="nav-text">2.7 O(n!) 阶乘阶——最慢的常见复杂度</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#2-8-%E5%A4%8D%E6%9D%82%E5%BA%A6%E5%AF%B9%E6%AF%94%E8%A1%A8-n-8"><span class="nav-text">2.8 复杂度对比表(n&#x3D;8)</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#2-9-%E5%A2%9E%E9%95%BF%E9%80%9F%E5%BA%A6%E5%8F%AF%E8%A7%86%E5%8C%96"><span class="nav-text">2.9 增长速度可视化</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E4%B8%89%E3%80%81%E7%A9%BA%E9%97%B4%E5%A4%8D%E6%9D%82%E5%BA%A6"><span class="nav-text">三、空间复杂度</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#3-1-%E7%A9%BA%E9%97%B4%E5%A4%8D%E6%9D%82%E5%BA%A6%E7%9A%84%E4%B8%83%E5%A4%A7%E9%98%B6"><span class="nav-text">3.1 空间复杂度的七大阶</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%9B%9B%E3%80%81%E6%97%B6%E7%A9%BA%E6%9D%83%E8%A1%A1"><span class="nav-text">四、时空权衡</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E4%BA%94%E3%80%81%E6%80%BB%E7%BB%93"><span class="nav-text">五、总结</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#5-1-%E5%BF%AB%E9%80%9F%E5%88%A4%E6%96%AD%E5%A4%8D%E6%9D%82%E5%BA%A6%E7%9A%84%E5%8F%A3%E8%AF%80"><span class="nav-text">5.1 快速判断复杂度的口诀</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#5-2-%E7%AE%97%E6%B3%95%E8%AE%BE%E8%AE%A1%E7%9A%84%E7%9B%AE%E6%A0%87"><span class="nav-text">5.2 算法设计的目标</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#5-3-%E5%AD%A6%E4%B9%A0%E8%B7%AF%E7%BA%BF"><span class="nav-text">5.3 学习路线</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%85%AD%E3%80%81%E9%9D%A2%E8%AF%95%E9%AB%98%E9%A2%91%E9%A2%98"><span class="nav-text">六、面试高频题</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#Q1-%E5%A4%A7O%E3%80%81%E5%A4%A7%CE%98%E3%80%81%E5%A4%A7%CE%A9-%E7%9A%84%E5%8C%BA%E5%88%AB%EF%BC%9F"><span class="nav-text">Q1: 大O、大Θ、大Ω 的区别？</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#Q2-O-2%E2%81%BF-%E5%92%8C-O-n%C2%B2-%E5%93%AA%E4%B8%AA%E5%A2%9E%E9%95%BF%E6%9B%B4%E5%BF%AB%EF%BC%9F%E7%9B%B4%E8%A7%82%E6%84%9F%E5%8F%97%E6%98%AF%E4%BB%80%E4%B9%88%EF%BC%9F"><span class="nav-text">Q2: O(2ⁿ) 和 O(n²) 哪个增长更快？直观感受是什么？</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#Q3-%E4%BB%80%E4%B9%88%E6%98%AF%E2%80%9D%E7%94%A8%E7%A9%BA%E9%97%B4%E6%8D%A2%E6%97%B6%E9%97%B4%E2%80%9D%EF%BC%9F%E4%B8%BE%E4%B8%80%E4%B8%AA%E4%BE%8B%E5%AD%90%E3%80%82"><span class="nav-text">Q3: 什么是”用空间换时间”？举一个例子。</span></a></li></ol></li></ol></div>
+        </div>
+        <!--/noindex-->
+
+        <div class="site-overview-wrap sidebar-panel">
+          <div class="site-author animated" itemprop="author" itemscope itemtype="http://schema.org/Person">
+    <img class="site-author-image" itemprop="image" alt="陌忆"
+      src="/images/avatar.webp">
+  <p class="site-author-name" itemprop="name">陌忆</p>
+  <div class="site-description" itemprop="description">记录 RAG、Agent、MCP、算法与软件工程实践，按专栏整理可复用的技术笔记。</div>
+</div>
+<div class="site-state-wrap animated">
+  <nav class="site-state">
+      <div class="site-state-item site-state-posts">
+        <a href="/archives/">
+          <span class="site-state-item-count">50</span>
+          <span class="site-state-item-name">日志</span>
+        </a>
+      </div>
+      <div class="site-state-item site-state-categories">
+          <a href="/categories/">
+        <span class="site-state-item-count">10</span>
+        <span class="site-state-item-name">分类</span></a>
+      </div>
+      <div class="site-state-item site-state-tags">
+          <a href="/tags/">
+        <span class="site-state-item-count">172</span>
+        <span class="site-state-item-name">标签</span></a>
+      </div>
+  </nav>
+</div>
+  <div class="links-of-author animated">
+      <span class="links-of-author-item">
+        <a href="https://github.com/moyi-math" title="GitHub → https:&#x2F;&#x2F;github.com&#x2F;moyi-math" rel="noopener me" target="_blank"><i class="fab fa-github fa-fw"></i>GitHub</a>
+      </span>
+  </div>
+  <div class="cc-license animated" itemprop="license">
+    <a href="https://creativecommons.org/licenses/by-nc-sa/4.0/" class="cc-opacity" rel="noopener" target="_blank"><img src="https://cdnjs.cloudflare.com/ajax/libs/creativecommons-vocabulary/2020.11.3/assets/license_badges/small/by_nc_sa.svg" alt="Creative Commons"></a>
+  </div>
+
+        </div>
+      </div>
+    </div>
+
+    
+  </aside>
+
+
+    </div>
+
+    <div class="main-inner post posts-expand">
+
+
+  
+
+
+<div class="post-block">
+  
+  
+
+  <article itemscope itemtype="http://schema.org/Article" class="post-content" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="https://moyi-math.github.io/2026/07/25/Hello%E7%AE%97%E6%B3%95-2.2-%E6%97%B6%E9%97%B4%E5%A4%8D%E6%9D%82%E5%BA%A6%E4%B8%8E%E7%A9%BA%E9%97%B4%E5%A4%8D%E6%9D%82%E5%BA%A6/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.webp">
+      <meta itemprop="name" content="陌忆">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="陌忆的博客">
+      <meta itemprop="description" content="记录 RAG、Agent、MCP、算法与软件工程实践，按专栏整理可复用的技术笔记。">
+    </span>
+
+    <span hidden itemprop="post" itemscope itemtype="http://schema.org/CreativeWork">
+      <meta itemprop="name" content="Hello算法 学习笔记 · 2.2 时间复杂度与空间复杂度 | 陌忆的博客">
+      <meta itemprop="description" content="如何科学衡量算法的效率？大O表示法告诉你算法随输入规模增长的&quot;增长趋势&quot;，而不是精确的运行秒数。从 O(1) 到 O(n!)，七个常见复杂度一一拆解。">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          Hello算法 学习笔记 · 2.2 时间复杂度与空间复杂度
+        </h1>
+
+        <div class="post-meta-container">
+          <div class="post-meta">
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-calendar"></i>
+      </span>
+      <span class="post-meta-item-text">发表于</span>
+
+      <time title="创建时间：2026-07-26 00:00:00" itemprop="dateCreated datePublished" datetime="2026-07-26T00:00:00+08:00">2026-07-26</time>
+    </span>
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-folder"></i>
+      </span>
+      <span class="post-meta-item-text">分类于</span>
+        <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+          <a href="/categories/Hello%E7%AE%97%E6%B3%95%E5%AD%A6%E4%B9%A0%E7%AC%94%E8%AE%B0/" itemprop="url" rel="index"><span itemprop="name">Hello算法学习笔记</span></a>
+        </span>
+    </span>
+
+  
+    <span class="post-meta-break"></span>
+    <span class="post-meta-item" title="本文字数">
+      <span class="post-meta-item-icon">
+        <i class="far fa-file-word"></i>
+      </span>
+      <span class="post-meta-item-text">本文字数：</span>
+      <span>2.6k</span>
+    </span>
+    <span class="post-meta-item" title="阅读时长">
+      <span class="post-meta-item-icon">
+        <i class="far fa-clock"></i>
+      </span>
+      <span class="post-meta-item-text">阅读时长 &asymp;</span>
+      <span>9 分钟</span>
+    </span>
+</div>
+
+            <div class="post-description">如何科学衡量算法的效率？大O表示法告诉你算法随输入规模增长的"增长趋势"，而不是精确的运行秒数。从 O(1) 到 O(n!)，七个常见复杂度一一拆解。</div>
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody"><blockquote>
+<p><strong>章节定位:</strong> 上节学了迭代与递归——理解了”操作次数”和”输入规模”的关系。本节正式引入<strong>大O表示法</strong>，系统学习如何衡量算法的时间和空间效率。这是后续所有数据结构与算法分析的共同语言。</p>
+</blockquote>
+<span id="more"></span>
+
+<h2 id="摘要-Abstract"><a href="#摘要-Abstract" class="headerlink" title="摘要(Abstract)"></a>摘要(Abstract)</h2><p><strong>TL;DR:</strong> 大O表示法描述的是<strong>算法效率随输入规模 <code>n</code> 增长的变化趋势</strong>，不是精确的运行时间。它的核心规则是：<strong>忽略常数，只保留最高阶</strong>。掌握从 O(1) → O(log n) → O(n) → O(n log n) → O(n²) → O(2ⁿ) → O(n!) 这七个常见复杂度阶，你就拥有了分析任何算法效率的基本工具。</p>
+<p>本文覆盖:</p>
+<ul>
+<li><strong>大O表示法</strong>: 定义、规则、为什么忽略常数和低阶项</li>
+<li><strong>七大时间复杂度</strong>: 每个都有 Python 代码、运行数据、直觉解释</li>
+<li><strong>空间复杂度</strong>: 七大复杂度在内存占用上的对应表现</li>
+<li><strong>满二叉树的 O(2ⁿ)</strong>: 从代码到递归树的完整追踪</li>
+<li><strong>时空权衡</strong>: 为什么有时”用空间换时间”是值得的</li>
+<li><strong>面试高频题</strong>: 3 道覆盖复杂度分析核心知识的面试题</li>
+</ul>
+<p>适合读者: 想系统理解大O表示法、建立算法效率直觉的初学者；准备算法面试的开发者。</p>
+<hr>
+<h2 id="一、大O表示法"><a href="#一、大O表示法" class="headerlink" title="一、大O表示法"></a>一、大O表示法</h2><h3 id="1-1-为什么需要大O？"><a href="#1-1-为什么需要大O？" class="headerlink" title="1.1 为什么需要大O？"></a>1.1 为什么需要大O？</h3><p>运行同样的算法，你的电脑可能比别人的快 2 倍——但这不说明你的算法更好。我们需要的是一种<strong>和硬件无关、只描述算法本身效率</strong>的度量方式。</p>
+<p><strong>大O表示法</strong>定义: <code>T(n) = O(f(n))</code> 表示当 <code>n</code> 足够大时，运行时间 <code>T(n)</code> 的增长速度不超过 <code>f(n)</code> 的常数倍。</p>
+<h3 id="1-2-核心规则"><a href="#1-2-核心规则" class="headerlink" title="1.2 核心规则"></a>1.2 核心规则</h3><figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">T(n) = 3n² + 5n + 1000  →  O(n²)</span><br></pre></td></tr></table></figure>
+
+<p>为什么可以这样简化？</p>
+<div class="note primary"><p><strong>1. 忽略常数系数</strong><br><code>3n²</code> 和 <code>1000n²</code> 在大 O 里都是 <code>O(n²)</code>。常数只反映硬件差异，不反映算法本质。</p>
+<p><strong>2. 只保留最高阶项</strong><br><code>n² + n + 1</code> → 只看 <code>n²</code>。当 <code>n=10000</code> 时，<code>n²=100000000</code>，而 <code>n=10000</code>，<code>1=1</code>——低阶项的影响可以忽略。</p>
+<p><strong>3. 大 O 描述的是”增长趋势”，不是精确值</strong></p>
+<ul>
+<li><code>O(n)</code> 意味着：n 翻倍，操作数也翻倍</li>
+<li><code>O(n²)</code> 意味着：n 翻倍，操作数翻 4 倍</li>
+<li><code>O(2ⁿ)</code> 意味着：n 加 1，操作数翻倍</li>
+</ul>
+</div>
+
+<hr>
+<h2 id="二、七大时间复杂度"><a href="#二、七大时间复杂度" class="headerlink" title="二、七大时间复杂度"></a>二、七大时间复杂度</h2><p>以下所有代码和运行数据都来自 <code>hello-algo</code> 项目，<code>n=8</code>。</p>
+<h3 id="2-1-O-1-常数阶——与-n-无关"><a href="#2-1-O-1-常数阶——与-n-无关" class="headerlink" title="2.1 O(1) 常数阶——与 n 无关"></a>2.1 O(1) 常数阶——与 n 无关</h3><figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">def</span> <span class="title function_">constant</span>(<span class="params">n: <span class="built_in">int</span></span>) -&gt; <span class="built_in">int</span>:</span><br><span class="line">    count = <span class="number">0</span></span><br><span class="line">    size = <span class="number">100000</span></span><br><span class="line">    <span class="keyword">for</span> _ <span class="keyword">in</span> <span class="built_in">range</span>(size):   <span class="comment"># 固定次数</span></span><br><span class="line">        count += <span class="number">1</span></span><br><span class="line">    <span class="keyword">return</span> count</span><br></pre></td></tr></table></figure>
+
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">n=8  → 操作数: 100000</span><br><span class="line">n=任意值 → 操作数: 100000</span><br></pre></td></tr></table></figure>
+
+<div class="note primary"><p><strong>特征:</strong> 无论 <code>n</code> 多大，操作次数是固定的。数组随机访问、哈希表查找都是 O(1)。这是<strong>最理想的复杂度</strong>。</p>
+</div>
+
+<h3 id="2-2-O-log-n-对数阶——效率之王"><a href="#2-2-O-log-n-对数阶——效率之王" class="headerlink" title="2.2 O(log n) 对数阶——效率之王"></a>2.2 O(log n) 对数阶——效率之王</h3><figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">def</span> <span class="title function_">logarithmic</span>(<span class="params">n: <span class="built_in">int</span></span>) -&gt; <span class="built_in">int</span>:</span><br><span class="line">    count = <span class="number">0</span></span><br><span class="line">    <span class="keyword">while</span> n &gt; <span class="number">1</span>:</span><br><span class="line">        n = n / <span class="number">2</span>    <span class="comment"># n 每次都砍半</span></span><br><span class="line">        count += <span class="number">1</span></span><br><span class="line">    <span class="keyword">return</span> count</span><br></pre></td></tr></table></figure>
+
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line">n=8   → 8→4→2→1: 操作数 = 3</span><br><span class="line">n=16  → 操作数 = 4</span><br><span class="line">n=1024 → 操作数 = 10</span><br><span class="line">n=1百万 → 操作数 ≈ 20</span><br></pre></td></tr></table></figure>
+
+<div class="note warning"><p><strong>“砍半”是 O(log n) 的标志:</strong> 每次循环都把问题规模减半，循环次数就是 <code>log₂n</code>。二分查找就是 O(log n)——在 100 万条数据中找一个数，最多只需 20 次比较。</p>
+</div>
+
+<h3 id="2-3-O-n-线性阶——与-n-成正比"><a href="#2-3-O-n-线性阶——与-n-成正比" class="headerlink" title="2.3 O(n) 线性阶——与 n 成正比"></a>2.3 O(n) 线性阶——与 n 成正比</h3><figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">def</span> <span class="title function_">linear</span>(<span class="params">n: <span class="built_in">int</span></span>) -&gt; <span class="built_in">int</span>:</span><br><span class="line">    count = <span class="number">0</span></span><br><span class="line">    <span class="keyword">for</span> _ <span class="keyword">in</span> <span class="built_in">range</span>(n):      <span class="comment"># 跑 n 次</span></span><br><span class="line">        count += <span class="number">1</span></span><br><span class="line">    <span class="keyword">return</span> count</span><br></pre></td></tr></table></figure>
+
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">n=8   → 操作数: 8</span><br><span class="line">n=100 → 操作数: 100</span><br></pre></td></tr></table></figure>
+
+<p><strong>特征:</strong> 一层循环，遍历所有元素。数组遍历、链表查找都是 O(n)。</p>
+<h3 id="2-4-O-n-log-n-线性对数阶——分治的代价"><a href="#2-4-O-n-log-n-线性对数阶——分治的代价" class="headerlink" title="2.4 O(n log n) 线性对数阶——分治的代价"></a>2.4 O(n log n) 线性对数阶——分治的代价</h3><figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">def</span> <span class="title function_">linear_log_recur</span>(<span class="params">n: <span class="built_in">int</span></span>) -&gt; <span class="built_in">int</span>:</span><br><span class="line">    <span class="keyword">if</span> n &lt;= <span class="number">1</span>:</span><br><span class="line">        <span class="keyword">return</span> <span class="number">1</span></span><br><span class="line">    count = linear_log_recur(n // <span class="number">2</span>) + linear_log_recur(n // <span class="number">2</span>)</span><br><span class="line">    <span class="keyword">for</span> _ <span class="keyword">in</span> <span class="built_in">range</span>(n):</span><br><span class="line">        count += <span class="number">1</span></span><br><span class="line">    <span class="keyword">return</span> count</span><br></pre></td></tr></table></figure>
+
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">n=8 → 操作数: 32</span><br></pre></td></tr></table></figure>
+
+<p><strong>特征:</strong> 递归二分(共 log n 层)，每层做 n 次操作。归并排序、快速排序、堆排序都是 O(n log n)——这是<strong>分治思想的典型复杂度</strong>。</p>
+<h3 id="2-5-O-n²-平方阶——两层嵌套"><a href="#2-5-O-n²-平方阶——两层嵌套" class="headerlink" title="2.5 O(n²) 平方阶——两层嵌套"></a>2.5 O(n²) 平方阶——两层嵌套</h3><figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">def</span> <span class="title function_">quadratic</span>(<span class="params">n: <span class="built_in">int</span></span>) -&gt; <span class="built_in">int</span>:</span><br><span class="line">    count = <span class="number">0</span></span><br><span class="line">    <span class="keyword">for</span> i <span class="keyword">in</span> <span class="built_in">range</span>(n):</span><br><span class="line">        <span class="keyword">for</span> j <span class="keyword">in</span> <span class="built_in">range</span>(n):</span><br><span class="line">            count += <span class="number">1</span></span><br><span class="line">    <span class="keyword">return</span> count</span><br></pre></td></tr></table></figure>
+
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">n=8   → 操作数: 64 = 8²</span><br><span class="line">n=100 → 操作数: 10000</span><br></pre></td></tr></table></figure>
+
+<details class="note "><summary><p>note</p>
+</summary>
+<p><strong>特征:</strong> 两层嵌套循环。冒泡排序、选择排序、插入排序都是 O(n²)。当 <code>n &gt; 1000</code> 时，O(n²) 的算法就开始明显变慢。</p>
+
+</details>
+
+<h3 id="2-6-O-2ⁿ-指数阶——增长恐怖"><a href="#2-6-O-2ⁿ-指数阶——增长恐怖" class="headerlink" title="2.6 O(2ⁿ) 指数阶——增长恐怖"></a>2.6 O(2ⁿ) 指数阶——增长恐怖</h3><figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">def</span> <span class="title function_">exponential</span>(<span class="params">n: <span class="built_in">int</span></span>) -&gt; <span class="built_in">int</span>:</span><br><span class="line">    count = <span class="number">0</span></span><br><span class="line">    base = <span class="number">1</span></span><br><span class="line">    <span class="keyword">for</span> _ <span class="keyword">in</span> <span class="built_in">range</span>(n):</span><br><span class="line">        <span class="keyword">for</span> _ <span class="keyword">in</span> <span class="built_in">range</span>(base):</span><br><span class="line">            count += <span class="number">1</span></span><br><span class="line">        base *= <span class="number">2</span></span><br><span class="line">    <span class="keyword">return</span> count</span><br></pre></td></tr></table></figure>
+
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">n=5  → 操作数: 31  (2⁵-1)</span><br><span class="line">n=10 → 操作数: 1023 (2¹⁰-1)</span><br><span class="line">n=20 → 操作数: 1048575 (约 100 万)</span><br></pre></td></tr></table></figure>
+
+<p><strong>递归版本(斐波那契):</strong></p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">def</span> <span class="title function_">exp_recur</span>(<span class="params">n: <span class="built_in">int</span></span>) -&gt; <span class="built_in">int</span>:</span><br><span class="line">    <span class="keyword">if</span> n == <span class="number">1</span>:</span><br><span class="line">        <span class="keyword">return</span> <span class="number">1</span></span><br><span class="line">    <span class="keyword">return</span> exp_recur(n - <span class="number">1</span>) + exp_recur(n - <span class="number">1</span>) + <span class="number">1</span></span><br></pre></td></tr></table></figure>
+
+<div class="note danger"><p><strong>指数增长有多可怕?</strong><br><code>n=1</code> 时操作数 <code>1</code>，<code>n=10</code> 时操作数 <code>1023</code>，<code>n=20</code> 时操作数约 <code>100万</code>，<code>n=30</code> 时约 <code>10亿</code>。<br><strong>n 每增加 1，操作数翻倍。</strong> 这就是为什么指数级算法只能处理很小的 n。</p>
+</div>
+
+<h3 id="2-7-O-n-阶乘阶——最慢的常见复杂度"><a href="#2-7-O-n-阶乘阶——最慢的常见复杂度" class="headerlink" title="2.7 O(n!) 阶乘阶——最慢的常见复杂度"></a>2.7 O(n!) 阶乘阶——最慢的常见复杂度</h3><figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">def</span> <span class="title function_">factorial_recur</span>(<span class="params">n: <span class="built_in">int</span></span>) -&gt; <span class="built_in">int</span>:</span><br><span class="line">    <span class="keyword">if</span> n == <span class="number">0</span>:</span><br><span class="line">        <span class="keyword">return</span> <span class="number">1</span></span><br><span class="line">    count = <span class="number">0</span></span><br><span class="line">    <span class="keyword">for</span> _ <span class="keyword">in</span> <span class="built_in">range</span>(n):</span><br><span class="line">        count += factorial_recur(n - <span class="number">1</span>)</span><br><span class="line">    <span class="keyword">return</span> count</span><br></pre></td></tr></table></figure>
+
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">n=5 → 操作数: 120 (5!)</span><br><span class="line">n=8 → 操作数: 40320 (8!)</span><br><span class="line">n=10 → 操作数: 3628800 (约 362 万)</span><br></pre></td></tr></table></figure>
+
+<p><strong>特征:</strong> n 个分支，每个分支又产生 n-1 个子分支。旅行商问题的暴力解法就是 O(n!)。</p>
+<h3 id="2-8-复杂度对比表-n-8"><a href="#2-8-复杂度对比表-n-8" class="headerlink" title="2.8 复杂度对比表(n&#x3D;8)"></a>2.8 复杂度对比表(n&#x3D;8)</h3><table>
+<thead>
+<tr>
+<th>复杂度</th>
+<th>n&#x3D;8 操作数</th>
+<th>n 翻倍后</th>
+<th>一句话</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>O(1)</td>
+<td>固定值</td>
+<td>不变</td>
+<td>和 n 无关</td>
+</tr>
+<tr>
+<td>O(log n)</td>
+<td>3</td>
+<td>4 (加 1)</td>
+<td>砍半法</td>
+</tr>
+<tr>
+<td>O(n)</td>
+<td>8</td>
+<td>16 (翻倍)</td>
+<td>一层循环</td>
+</tr>
+<tr>
+<td>O(n log n)</td>
+<td>32</td>
+<td>约 38</td>
+<td>分治合并</td>
+</tr>
+<tr>
+<td>O(n²)</td>
+<td>64</td>
+<td>256 (翻 4 倍)</td>
+<td>两层嵌套</td>
+</tr>
+<tr>
+<td>O(2ⁿ)</td>
+<td>255</td>
+<td>约 5万 (爆炸)</td>
+<td>每加 1 翻倍</td>
+</tr>
+<tr>
+<td>O(n!)</td>
+<td>40320</td>
+<td>约 362万 (3.6M)</td>
+<td>暴力排列</td>
+</tr>
+</tbody></table>
+<h3 id="2-9-增长速度可视化"><a href="#2-9-增长速度可视化" class="headerlink" title="2.9 增长速度可视化"></a>2.9 增长速度可视化</h3><figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br></pre></td><td class="code"><pre><span class="line">操作数(log scale)</span><br><span class="line">    │</span><br><span class="line">    │  ── O(n!)         —— 垂直上升</span><br><span class="line">    │  ── O(2ⁿ)</span><br><span class="line">    │  ── O(n²)</span><br><span class="line">    │  ── O(n log n)</span><br><span class="line">    │  ── O(n)</span><br><span class="line">    │  ── O(log n)      —— 几乎平缓</span><br><span class="line">    │  ── O(1)          —— 水平线</span><br><span class="line">    └──────────────────</span><br><span class="line">              n</span><br></pre></td></tr></table></figure>
+
+<hr>
+<h2 id="三、空间复杂度"><a href="#三、空间复杂度" class="headerlink" title="三、空间复杂度"></a>三、空间复杂度</h2><p>时间复杂度和空间复杂度是<strong>对偶的</strong>：时间看操作次数，空间看内存占用。</p>
+<h3 id="3-1-空间复杂度的七大阶"><a href="#3-1-空间复杂度的七大阶" class="headerlink" title="3.1 空间复杂度的七大阶"></a>3.1 空间复杂度的七大阶</h3><p><strong>O(1) 常数阶</strong></p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">nums = [<span class="number">0</span>] * <span class="number">10000</span>   <span class="comment"># 固定大小，和 n 无关</span></span><br></pre></td></tr></table></figure>
+
+<p><strong>O(n) 线性阶</strong></p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">nums = [<span class="number">0</span>] * n       <span class="comment"># n 越大，数组越长</span></span><br></pre></td></tr></table></figure>
+<p>递归版本: 递归 n 层，调用栈占 O(n) 空间。</p>
+<p><strong>O(n²) 平方阶</strong></p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">num_matrix = [[<span class="number">0</span>] * n <span class="keyword">for</span> _ <span class="keyword">in</span> <span class="built_in">range</span>(n)]  <span class="comment"># n×n 矩阵</span></span><br></pre></td></tr></table></figure>
+
+<p><strong>O(2ⁿ) 指数阶——满二叉树</strong></p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">def</span> <span class="title function_">build_tree</span>(<span class="params">n: <span class="built_in">int</span></span>) -&gt; TreeNode | <span class="literal">None</span>:</span><br><span class="line">    <span class="keyword">if</span> n == <span class="number">0</span>:</span><br><span class="line">        <span class="keyword">return</span> <span class="literal">None</span></span><br><span class="line">    root = TreeNode(<span class="number">0</span>)</span><br><span class="line">    root.left = build_tree(n - <span class="number">1</span>)</span><br><span class="line">    root.right = build_tree(n - <span class="number">1</span>)</span><br><span class="line">    <span class="keyword">return</span> root</span><br></pre></td></tr></table></figure>
+
+<div class="note danger"><p><strong>重点拆解: 满二叉树为什么是 O(2ⁿ)?</strong></p>
+<p>核心原因: <strong>每个节点分裂出两个子节点</strong>，每层节点数翻倍。</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br></pre></td><td class="code"><pre><span class="line">build_tree(3)</span><br><span class="line">                  层 0    1 个节点(根)</span><br><span class="line">           ┌───────┴───────┐</span><br><span class="line">       build_tree(2)    build_tree(2)</span><br><span class="line">                  层 1    2 个节点</span><br><span class="line">       ┌────┴────┐     ┌────┴────┐</span><br><span class="line">   build_tree(1) b(1) build_tree(1) b(1)</span><br><span class="line">                  层 2    4 个节点</span><br><span class="line">   ┌──┴──┐    ┌──┴──┐  ┌──┴──┐  ┌──┴──┐</span><br><span class="line">  b(0) b(0) b(0) b(0) b(0) b(0) b(0) b(0)</span><br><span class="line">                  层 3    8 个节点(终止)</span><br></pre></td></tr></table></figure>
+
+<ul>
+<li>层 0: 2⁰ &#x3D; 1</li>
+<li>层 1: 2¹ &#x3D; 2</li>
+<li>层 2: 2² &#x3D; 4</li>
+<li>层 k: 2ᵏ</li>
+</ul>
+<p><strong>总节点数 &#x3D; 2ⁿ - 1</strong></p>
+<ul>
+<li>n&#x3D;5: 2⁵-1 &#x3D; 31 个节点</li>
+<li>n&#x3D;10: 2¹⁰-1 &#x3D; 1023 个节点</li>
+<li>n&#x3D;20: 2²⁰-1 ≈ 100 万个节点</li>
+</ul>
+<p>这就是 <strong>O(2ⁿ)</strong> 的由来——每深入一层，节点数翻倍。</p>
+</div>
+
+<hr>
+<h2 id="四、时空权衡"><a href="#四、时空权衡" class="headerlink" title="四、时空权衡"></a>四、时空权衡</h2><p>很多时候，<strong>时间和空间不可兼得</strong>:</p>
+<table>
+<thead>
+<tr>
+<th>场景</th>
+<th>做法</th>
+<th>时间复杂度</th>
+<th>空间复杂度</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>斐波那契(纯递归)</td>
+<td>直接递归</td>
+<td>O(2ⁿ)</td>
+<td>O(n)</td>
+</tr>
+<tr>
+<td>斐波那契(记忆化)</td>
+<td>加缓存</td>
+<td>O(n)</td>
+<td>O(n)</td>
+</tr>
+<tr>
+<td>斐波那契(迭代)</td>
+<td>滚动变量</td>
+<td>O(n)</td>
+<td>O(1)</td>
+</tr>
+</tbody></table>
+<div class="note warning"><p><strong><code>用空间换时间</code></strong> 是最常见的优化策略:</p>
+<ul>
+<li>缓存&#x2F;记忆化: 用 O(n) 空间把 O(2ⁿ) 降到 O(n)</li>
+<li>哈希表: 用 O(n) 空间把 O(n) 查找降到 O(1)</li>
+<li>预计算: 在数据量大、查询频繁的场景，提前算好存起来</li>
+</ul>
+<p><strong>但也要注意反过来的情形:</strong> 某些嵌入式系统内存极小，可能需要”用时间换空间”——比如解压算法，用 CPU 时间去换存储空间。</p>
+</div>
+
+<hr>
+<h2 id="五、总结"><a href="#五、总结" class="headerlink" title="五、总结"></a>五、总结</h2><h3 id="5-1-快速判断复杂度的口诀"><a href="#5-1-快速判断复杂度的口诀" class="headerlink" title="5.1 快速判断复杂度的口诀"></a>5.1 快速判断复杂度的口诀</h3><figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">一层循环 O(n)，两层嵌套 O(n²)，</span><br><span class="line">每轮砍半 O(log n)，分治合并 O(n log n)，</span><br><span class="line">递归分支 O(2ⁿ)，全排列 O(n!)。</span><br></pre></td></tr></table></figure>
+
+<h3 id="5-2-算法设计的目标"><a href="#5-2-算法设计的目标" class="headerlink" title="5.2 算法设计的目标"></a>5.2 算法设计的目标</h3><figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line">O(1)  ← 理想(不可能所有操作都这样)</span><br><span class="line">O(log n) ← 优秀(二分查找)</span><br><span class="line">O(n)  ← 良好(遍历一次)</span><br><span class="line">O(n log n) ← 可接受(排序算法的上限)</span><br><span class="line">O(n²) ← 通常只在 n 小时使用</span><br><span class="line">O(2ⁿ)/O(n!) ← 尽量避免，或改用近似算法</span><br></pre></td></tr></table></figure>
+
+<h3 id="5-3-学习路线"><a href="#5-3-学习路线" class="headerlink" title="5.3 学习路线"></a>5.3 学习路线</h3><p>时间复杂度是数据结构与算法的”通用语言”。掌握它之后，你就可以:</p>
+<ol>
+<li><strong>分析任何算法的效率</strong>: 排序、搜索、图算法……</li>
+<li><strong>在不同方案间做选择</strong>: 用 O(n log n) 的排序还是 O(n²) 的？</li>
+<li><strong>理解后续章节</strong>: 树的高度是 O(log n)、哈希表的查找是 O(1)、动态规划的本质是避免指数爆炸</li>
+</ol>
+<hr>
+<h2 id="六、面试高频题"><a href="#六、面试高频题" class="headerlink" title="六、面试高频题"></a>六、面试高频题</h2><h3 id="Q1-大O、大Θ、大Ω-的区别？"><a href="#Q1-大O、大Θ、大Ω-的区别？" class="headerlink" title="Q1: 大O、大Θ、大Ω 的区别？"></a>Q1: 大O、大Θ、大Ω 的区别？</h3><ul>
+<li><strong>大O (O)</strong>: 上界——最坏情况，算法不会比这个更慢</li>
+<li><strong>大Ω (Ω)</strong>: 下界——最好情况，算法至少这么快</li>
+<li><strong>大Θ (Θ)</strong>: 紧界——既是上界也是下界</li>
+</ul>
+<p>日常使用中”大O”常被用来表示最坏情况，但严格来说大O只是上界。面试中一般问”时间复杂度”默认指最坏情况的大O。</p>
+<h3 id="Q2-O-2ⁿ-和-O-n²-哪个增长更快？直观感受是什么？"><a href="#Q2-O-2ⁿ-和-O-n²-哪个增长更快？直观感受是什么？" class="headerlink" title="Q2: O(2ⁿ) 和 O(n²) 哪个增长更快？直观感受是什么？"></a>Q2: <code>O(2ⁿ)</code> 和 <code>O(n²)</code> 哪个增长更快？直观感受是什么？</h3><p><strong>O(2ⁿ) 快得多。</strong> 当 n&#x3D;10 时，n²&#x3D;100，2ⁿ&#x3D;1024；n&#x3D;20 时，n²&#x3D;400，2ⁿ&#x3D;大约 100 万。指数增长的本质是<strong>每加 1 就翻倍</strong>，而平方增长只是乘一个固定的 n。</p>
+<h3 id="Q3-什么是”用空间换时间”？举一个例子。"><a href="#Q3-什么是”用空间换时间”？举一个例子。" class="headerlink" title="Q3: 什么是”用空间换时间”？举一个例子。"></a>Q3: 什么是”用空间换时间”？举一个例子。</h3><p>“用空间换时间”是指用<strong>额外的内存</strong>来<strong>减少计算时间</strong>。经典例子：斐波那契数列的记忆化递归——用一个字典存已经算过的结果，避免重复计算。纯递归 O(2ⁿ) → 记忆化后 O(n)，代价是用了 O(n) 的额外空间。</p>
+<hr>
+<blockquote>
+<p><strong>下一节预告:</strong> 掌握了计算复杂度的”通用语言”后，我们终于可以进入真正的数据结构了——<strong>第 3 章: 数据结构</strong>。从基本数据类型开始，然后是<strong>数组与链表</strong>——所有数据结构的基石。</p>
+</blockquote>
+
+    </div>
+
+    
+    
+    
+
+    <footer class="post-footer">
+          
+
+<div class="post-copyright">
+<ul>
+  <li class="post-copyright-author">
+      <strong>本文作者： </strong>陌忆
+  </li>
+  <li class="post-copyright-link">
+      <strong>本文链接：</strong>
+      <a href="https://moyi-math.github.io/2026/07/25/Hello%E7%AE%97%E6%B3%95-2.2-%E6%97%B6%E9%97%B4%E5%A4%8D%E6%9D%82%E5%BA%A6%E4%B8%8E%E7%A9%BA%E9%97%B4%E5%A4%8D%E6%9D%82%E5%BA%A6/" title="Hello算法 学习笔记 · 2.2 时间复杂度与空间复杂度">https://moyi-math.github.io/2026/07/25/Hello算法-2.2-时间复杂度与空间复杂度/</a>
+  </li>
+  <li class="post-copyright-license">
+      <strong>版权声明： </strong>本博客所有文章除特别声明外，均采用 <a href="https://creativecommons.org/licenses/by-nc-sa/4.0/" rel="noopener" target="_blank"><i class="fab fa-fw fa-creative-commons"></i>BY-NC-SA</a> 许可协议。转载请注明出处！
+  </li>
+</ul>
+</div>
+
+          <div class="post-tags">
+              <a href="/tags/%E7%AE%97%E6%B3%95/" rel="tag"># 算法</a>
+              <a href="/tags/%E6%95%B0%E6%8D%AE%E7%BB%93%E6%9E%84/" rel="tag"># 数据结构</a>
+              <a href="/tags/Python/" rel="tag"># Python</a>
+              <a href="/tags/%E6%97%B6%E9%97%B4%E5%A4%8D%E6%9D%82%E5%BA%A6/" rel="tag"># 时间复杂度</a>
+              <a href="/tags/%E7%A9%BA%E9%97%B4%E5%A4%8D%E6%9D%82%E5%BA%A6/" rel="tag"># 空间复杂度</a>
+              <a href="/tags/%E5%A4%A7O%E8%A1%A8%E7%A4%BA%E6%B3%95/" rel="tag"># 大O表示法</a>
+              <a href="/tags/O-1/" rel="tag"># O(1)</a>
+              <a href="/tags/O-n/" rel="tag"># O(n)</a>
+              <a href="/tags/O-n%C2%B2/" rel="tag"># O(n²)</a>
+              <a href="/tags/O-2%E2%81%BF/" rel="tag"># O(2ⁿ)</a>
+              <a href="/tags/O-log-n/" rel="tag"># O(log n)</a>
+              <a href="/tags/O-nlog-n/" rel="tag"># O(nlog n)</a>
+              <a href="/tags/O-n/" rel="tag"># O(n!)</a>
+          </div>
+
+        
+
+          <div class="post-nav">
+            <div class="post-nav-item">
+                <a href="/2026/07/25/Coding-Agent-3-%E4%BF%9D%E9%99%A9%E4%B8%9D%E8%AE%BE%E8%AE%A1/" rel="prev" title="入门 Coding Agent（三）：当 LLM 不可靠时——Agent 的保险丝设计">
+                  <i class="fa fa-angle-left"></i> 入门 Coding Agent（三）：当 LLM 不可靠时——Agent 的保险丝设计
+                </a>
+            </div>
+            <div class="post-nav-item">
+                <a href="/2026/07/25/Hello%E7%AE%97%E6%B3%95-2.1-%E8%BF%AD%E4%BB%A3%E4%B8%8E%E9%80%92%E5%BD%92/" rel="next" title="Hello算法 学习笔记 · 2.1 迭代与递归">
+                  Hello算法 学习笔记 · 2.1 迭代与递归 <i class="fa fa-angle-right"></i>
+                </a>
+            </div>
+          </div>
+    </footer>
+  </article>
+</div>
+
+
+
+
+
+
+</div>
+  </main>
+
+  <footer class="footer">
+    <div class="footer-inner">
+
+  <div class="copyright">
+    &copy; 
+    <span itemprop="copyrightYear">2026</span>
+    <span class="with-love">
+      <i class="fab fa-osi"></i>
+    </span>
+    <span class="author" itemprop="copyrightHolder">陌忆</span>
+  </div>
+<div class="wordcount">
+  <span class="post-meta-item">
+    <span class="post-meta-item-icon">
+      <i class="fa fa-chart-line"></i>
+    </span>
+    <span title="站点总字数">106k</span>
+  </span>
+  <span class="post-meta-item">
+    <span class="post-meta-item-icon">
+      <i class="fa fa-coffee"></i>
+    </span>
+    <span title="站点阅读时长">6:24</span>
+  </span>
+</div>
+  <div class="powered-by">由 <a href="https://hexo.io/" rel="noopener" target="_blank">Hexo</a> & <a href="https://theme-next.js.org/" rel="noopener" target="_blank">NexT.Gemini</a> 强力驱动
+  </div>
+
+    </div>
+  </footer>
+
+  
+  <div class="toggle sidebar-toggle" role="button">
+    <span class="toggle-line"></span>
+    <span class="toggle-line"></span>
+    <span class="toggle-line"></span>
+  </div>
+  <div class="sidebar-dimmer"></div>
+  <div class="back-to-top" role="button" aria-label="返回顶部">
+    <i class="fa fa-arrow-up fa-lg"></i>
+    <span>0%</span>
+  </div>
+
+<noscript>
+  <div class="noscript-warning">Theme NexT works best with JavaScript enabled</div>
+</noscript>
+<!-- Site running time -->
+<span id="timeDate" aria-live="off"></span>
+<script>
+(function() {
+  var start = new Date("2022-11-17T08:00:00+08:00");
+  function pad(n) { return n < 10 ? "0" + n : "" + n; }
+  function tick() {
+    var diff = Date.now() - start.getTime();
+    if (diff < 0) return;
+    var d = Math.floor(diff / 86400000);
+    var h = Math.floor((diff % 86400000) / 3600000);
+    var m = Math.floor((diff % 3600000) / 60000);
+    var timeDate = document.getElementById("timeDate");
+    if (!timeDate) return;
+    timeDate.textContent =
+      "\u672C\u7AD9\u5DF2\u5B89\u5168\u8FD0\u884C " + d + " \u5929 " + pad(h) + " \u5C0F\u65F6 " + pad(m) + " \u5206";
+  }
+  tick();
+  setInterval(tick, 60000);
+})();
+</script>
+
+</body>
+</html>
